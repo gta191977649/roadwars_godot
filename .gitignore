@@ -1,0 +1,14 @@
+/build/
+/config.local.json
+/platform/godot/third_party/godot-cpp/
+/platform/godot/project/.godot/
+/platform/godot/project/bin/*
+!/platform/godot/project/bin/.gitkeep
+__pycache__/
+*.pyc
+/extracted/
+/original/
+*.exe
+*.dll
+*.pak
+*.pkh

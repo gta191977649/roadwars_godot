@@ -1,0 +1,9 @@
+[configuration]
+entry_symbol = "roadwars_library_init"
+compatibility_minimum = "4.7.2"
+reloadable = false
+
+[libraries]
+windows.x86_64 = "res://bin/roadwars_godot.dll"
+linux.x86_64 = "res://bin/roadwars_godot.so"
+macos = "res://bin/roadwars_godot.dylib"

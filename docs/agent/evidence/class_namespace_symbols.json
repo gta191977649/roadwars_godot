@@ -1,0 +1,116 @@
+{
+  "program": "RoadWars",
+  "source": "Ghidra MCP symbols.get; actual Class symbol type, not inferred from namespace spelling",
+  "classes": [
+    {
+      "address": "NO ADDRESS",
+      "external": false,
+      "global": true,
+      "name": "AFX_COM",
+      "namespace": "Global",
+      "primary": true,
+      "source": "ANALYSIS",
+      "type": "Class"
+    },
+    {
+      "address": "NO ADDRESS",
+      "external": false,
+      "global": true,
+      "name": "AUX_DATA",
+      "namespace": "Global",
+      "primary": true,
+      "source": "ANALYSIS",
+      "type": "Class"
+    },
+    {
+      "address": "NO ADDRESS",
+      "external": false,
+      "global": true,
+      "name": "CArchive",
+      "namespace": "Global",
+      "primary": true,
+      "source": "ANALYSIS",
+      "type": "Class"
+    },
+    {
+      "address": "NO ADDRESS",
+      "external": false,
+      "global": true,
+      "name": "CAsyncSocket",
+      "namespace": "Global",
+      "primary": true,
+      "source": "ANALYSIS",
+      "type": "Class"
+    },
+    {
+      "address": "NO ADDRESS",
+      "external": false,
+      "global": true,
+      "name": "COleResizeBar",
+      "namespace": "Global",
+      "primary": true,
+      "source": "ANALYSIS",
+      "type": "Class"
+    },
+    {
+      "address": "NO ADDRESS",
+      "external": false,
+      "global": true,
+      "name": "CPlex",
+      "namespace": "Global",
+      "primary": true,
+      "source": "ANALYSIS",
+      "type": "Class"
+    },
+    {
+      "address": "NO ADDRESS",
+      "external": false,
+      "global": true,
+      "name": "CPrintDialog",
+      "namespace": "Global",
+      "primary": true,
+      "source": "ANALYSIS",
+      "type": "Class"
+    },
+    {
+      "address": "NO ADDRESS",
+      "external": false,
+      "global": true,
+      "name": "CPrintDialogEx",
+      "namespace": "Global",
+      "primary": true,
+      "source": "ANALYSIS",
+      "type": "Class"
+    },
+    {
+      "address": "NO ADDRESS",
+      "external": false,
+      "global": true,
+      "name": "CPropertySet",
+      "namespace": "Global",
+      "primary": true,
+      "source": "ANALYSIS",
+      "type": "Class"
+    },
+    {
+      "address": "NO ADDRESS",
+      "external": false,
+      "global": true,
+      "name": "CThreadLocalObject",
+      "namespace": "Global",
+      "primary": true,
+      "source": "ANALYSIS",
+      "type": "Class"
+    },
+    {
+      "address": "NO ADDRESS",
+      "external": false,
+      "global": true,
+      "name": "CTypeLibCacheMap",
+      "namespace": "Global",
+      "primary": true,
+      "source": "ANALYSIS",
+      "type": "Class"
+    }
+  ]
+}
