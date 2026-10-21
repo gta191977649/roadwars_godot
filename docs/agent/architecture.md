@@ -10,15 +10,29 @@ Godot bootstrap Node -> portable Runtime -> portable Renderer contract
                                             Godot RenderingServer
 ```
 
-`roadwars_core` is a C++20 static library with no OS or Godot dependencies. It exposes project-owned vectors, transforms, opaque resource handles, input and result types. `ResourceReader` and `Logger` are host contracts. Runtime updates accept elapsed seconds and input; the skeleton only submits a static diagnostic triangle. The original simulation timestep and coordinate convention remain unresolved. GameEntry now applies the observed outer-loop float delta clamp and mode dispatch through address-labeled hooks.
+`roadwars_core` is a C++20 static library with no OS or Godot dependencies. It exposes project-owned vectors, transforms, opaque resource handles, input and result types. ResourceReader and Logger are host contracts. GameEntry retains observed scheduling in an explicit legacy-reference policy and supplies a separate user-authorized fixed-simulation policy for live gameplay. The portable SimulationClock advances at60Hz independently of rendering. The Godot adapter supplies monotonic elapsed time, honors pause/time scale and renders interpolated snapshots without feeding them back into physics. Runtime remains a diagnostic triangle fixture. The explicit free-driving profile owns ResourceStore, portable initialization, TrackCollision, VehicleDynamics and RacePresentation. Read frame_independence.md before changing scheduling;60Hz is a modern policy, not a recovered original frequency.
 
-`roadwars_godot` owns the host lifecycle and adapts contracts. All Godot types, input calls, filesystem access, future audio adapters and RID management stay below `platform/godot`. No renderer-owned RID crosses into the core. The extension is built for the 4.7 API and loaded by Godot 4.7.2.
+`roadwars_godot` owns the host lifecycle and adapts contracts. All Godot types, input calls, filesystem access, native audio playback and RID management stay below `platform/godot`. Original audio commands/PCM decoding, camera, skid sampling and physics remain portable. No renderer-owned RID crosses into the core. The extension is built for the 4.7 API and loaded by Godot 4.7.2.
 
 ## Rendering and lifetime
 
 A single GameHost Node owns ServerRenderer followed by Runtime. Runtime is destroyed first, releasing instances before meshes. The renderer releases remaining instances/meshes, detaches its viewport camera/scenario, then frees material, shader, camera and scenario. It borrows the bootstrap viewport; it does not free the viewport itself. The host must be the sole game-world renderer for that viewport.
 
 World geometry uses RenderingServer mesh and instance RIDs, not per-object MeshInstance3D nodes. Mesh uploads are cached under monotonically allocated opaque handles. Updates submit transforms. All current calls occur on the Godot main thread. Do not access RenderingDevice internals or introduce worker-thread submission without a separate design and synchronization policy.
+
+The simulation retains original left-handed +Z-forward coordinates. The Godot adapter
+reflects Z for vertices/normals and conjugates object transforms. The portable chase
+camera currently supplies a right-handed look basis; its adapter also reverses the
+right column to preserve the original screen-right convention. Never negate original
+LEFT/RIGHT input to compensate for a rendering reflection. Read rendering_corrections.md.
+
+Original-asset mode uses native Godot custom vertex-linear fog, a directional light,
+vertex/prelit materials and a native Sky resource. The Sky shader evaluates the
+original dome triangles and UVs rather than inventing a cubemap or atmosphere.
+Original particle pools retain their trigger/lifetime/motion in portable C++.
+Native RenderingServer particle resources display those slots using a particles
+shader, native transparency and view-depth sorting. Godot does not advance their
+original motion a second time. Spark and tire pools release before their materials.
 
 The diagnostic material is unshaded and double-sided solely to make a dependency-free smoke triangle visible. It does not establish original lighting, winding or material behavior. Original asset and coordinate conversion requires independent evidence.
 
@@ -30,4 +44,13 @@ Follow original C++ directory/module/class structure when actually recovered fro
 
 ## Build and platform limits
 
-Windows x64 is the initial validated host. The core builds without fetching Godot; the extension needs the pinned dependency. Linux/macOS manifest entries are provided, but those platforms require their own build and runtime validation. Godot owns input and window processing; recovered simulation must not depend on its physics engine. Host resource and audio services will be wired as recovered logic first requires them; no original-game loading is currently implemented.
+Windows x64 is the initial validated host. The core builds without fetching Godot; the extension needs the pinned dependency. Linux/macOS manifest entries require their own runtime validation. Godot owns input/window processing and implements ResourceReader through FileAccess using the single configured game root. Recovered simulation does not depend on Godot physics. RacePresentation releases instances before meshes, then materials and textures; GameHost destroys vehicle/presentation before resources and renderer. Native Godot audio plays portable original-sample commands; QMDX spatial behavior has separate coverage limits. Read test_driving.md for profile boundaries and validation.
+
+## New diagnostic extensions
+
+`game_src/extensions/` contains the optional portable Dear ImGui/imgui-console UI
+and C++ stream logging. It is new infrastructure, has no RE mappings and is built
+separately from `roadwars_core`. Godot Logger callbacks, input, monitor DPI and
+RenderingServer canvas/texture ownership remain in `platform/godot/extension`.
+The overlay outlives scene restarts and releases its RIDs and logger at host exit.
+See game_src/extensions/README.md for controls, metrics and validation.

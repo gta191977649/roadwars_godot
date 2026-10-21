@@ -1,0 +1,57 @@
+{
+  "date": "2026-10-22",
+  "reference_sha256": "93b4e4c301a5694b55e16977c2e52f4971bd9089659e3d58617c8af2368436c8",
+  "core_ctest": {
+    "passed": 26,
+    "total": 26
+  },
+  "original_runtime_executed": false,
+  "records": [
+    {
+      "log": "sfx_smoke_test.gd.log",
+      "output": "Godot Engine v4.7.2.stable.official.ed1daf0bf - https://godotengine.org\nOpenGL API 3.3.0 - Build 32.0.101.9150 - Compatibility - Using Device: Intel - Intel(R) Arc(TM) B390 GPU\n\nROADWARS_RACE_LOADED: Dark Forest / Animal (original logic trace)\nROADWARS_SFX_SMOKE_OK: actual_tire_starts=1; actual_crashes=3; tire_peak=0.08878500014544; collision_peak=8.99614429473877; loop stop; overlapping one-shots; completion; reset; teardown\n"
+    },
+    {
+      "log": "camera_smoke_test.gd.log",
+      "output": "Godot Engine v4.7.2.stable.official.ed1daf0bf - https://godotengine.org\nOpenGL API 3.3.0 - Build 32.0.101.9150 - Compatibility - Using Device: Intel - Intel(R) Arc(TM) B390 GPU\n\nROADWARS_RACE_LOADED: Dark Forest / Animal (original logic trace)\nROADWARS_CAMERA_SMOKE_OK: recovered chase; mouse orbit; three-second idle; gradual return; actual-eye view distance\n"
+    },
+    {
+      "log": "drive_smoke_test.gd.log",
+      "output": "Godot Engine v4.7.2.stable.official.ed1daf0bf - https://godotengine.org\nOpenGL API 3.3.0 - Build 32.0.101.9150 - Compatibility - Using Device: Intel - Intel(R) Arc(TM) B390 GPU\n\nROADWARS_RACE_LOADED: Dark Forest / Animal (original logic trace)\nNative skid pixels: 1510\nROADWARS_DRIVE_SMOKE_OK: displacement=41.2960510253906; speed=24.6275310516357; throttle/steer/brake/reset\n"
+    },
+    {
+      "log": "particle_smoke_test.gd.log",
+      "output": "Godot Engine v4.7.2.stable.official.ed1daf0bf - https://godotengine.org\nOpenGL API 3.3.0 - Build 32.0.101.9150 - Compatibility - Using Device: Intel - Intel(R) Arc(TM) B390 GPU\n\nROADWARS_RACE_LOADED: Dark Forest / Animal (original logic trace)\nNative particle pixels: 34086\nROADWARS_PARTICLE_SMOKE_OK: sparks=2; tire smoke=32; native particle RIDs released on exit\nROADWARS_RACE_LOADED: Dark Forest / Animal (original logic trace)\nROADWARS_RACE_LOADED: Dark Forest / Animal (original logic trace)\nROADWARS_RACE_LOADED: Dark Forest / Animal (original logic trace)\n"
+    },
+    {
+      "log": "race_smoke_test.gd.log",
+      "output": "Godot Engine v4.7.2.stable.official.ed1daf0bf - https://godotengine.org\nOpenGL API 3.3.0 - Build 32.0.101.9150 - Compatibility - Using Device: Intel - Intel(R) Arc(TM) B390 GPU\n\nROADWARS_RACE_LOADED: Dark Forest / Animal (static resource preview)\nROADWARS_RACE_LOADED: Dark Forest / Animal (static resource preview)\nROADWARS_RACE_LOADED: Dark Forest / Animal (static resource preview)\nROADWARS_RACE_LOADED: Dark Forest / Animal (static resource preview)\nOriginal sky pixels: 118558\nROADWARS_RACE_SMOKE_OK: 1577 RIDs; 3 restarts; all released\n"
+    },
+    {
+      "log": "audio_smoke_test.gd.log",
+      "output": "Godot Engine v4.7.2.stable.official.ed1daf0bf - https://godotengine.org\nOpenGL API 3.3.0 - Build 32.0.101.9150 - Compatibility - Using Device: Intel - Intel(R) Arc(TM) B390 GPU\n\nROADWARS_RACE_LOADED: Dark Forest / Animal (original logic trace)\nROADWARS_AUDIO_SMOKE_OK: idle_hz=1033.0; maximum_hz=31512.0; peak_db=-4.66153287887573; native original PCM; voice released\n"
+    },
+    {
+      "log": "fog_smoke.log",
+      "output": "Godot Engine v4.7.2.stable.official.ed1daf0bf - https://godotengine.org\nOpenGL API 3.3.0 - Build 32.0.101.9150 - Compatibility - Using Device: Intel - Intel(R) Arc(TM) B390 GPU\n\nROADWARS_FOG_SMOKE_OK: linear vertex fog and fog exemption rendered\n"
+    },
+    {
+      "log": "godot_smoke.log",
+      "output": "Godot Engine v4.7.2.stable.official.ed1daf0bf - https://godotengine.org\nOpenGL API 3.3.0 - Build 32.0.101.9150 - Compatibility - Using Device: Intel - Intel(R) Arc(TM) B390 GPU\n\nVisible triangle pixels: 33282\nROADWARS_SMOKE_OK: 10 restarts; all owned RIDs released\n"
+    }
+  ],
+  "sha256": {
+    "game_src/unresolved/original_camera.cpp": "cd07d8e1125afbe6886b5e632f8028017b5d2deb1305b0a88c17bc0fa5915620",
+    "game_src/unresolved/skid_marks.cpp": "d971fb11a4ca1dd88973e96b83703cedd907c9c0eccadd0153747e4075041cd6",
+    "game_src/unresolved/weapon_mounts.cpp": "15273bca436540378a9bb2ac1348d01721e63877c064591f7360821e0791a849",
+    "game_src/unresolved/tire_audio.cpp": "d75473363bfbc5ec1e67e7d524f24a0226536e188658983cbe398498ca3e550f",
+    "game_src/unresolved/collision_audio.cpp": "c3f086567d0bffab59bb5f7930a6ee00d7f05c4e7ca29ba06e088a5a786a3bbc",
+    "game_src/unresolved/vehicle_dynamics.cpp": "36c5240dc0ee9d789018d22376b70d80b887071ddb0d07c8b13a9925d83d214e",
+    "game_src/unresolved/contact_orientation.cpp": "6f334295a033e8412b4dbd796b1f73aeb0fb03350eb62788d76c1792ffe7772d",
+    "platform/godot/extension/game_host.cpp": "3d1f754dd6c60d8c1e85efddd76270431781043b708bdadf4446663fc1c3fe83",
+    "platform/godot/extension/engine_audio_adapter.cpp": "1d2576ff89951d923d88d3edc14d771551f384f821939b085cf3d3d25ef1b3f3",
+    "platform/godot/extension/sfx_audio_adapter.cpp": "ec366e2a8ebeaf6099aa7b88becb4279fc58304ad2a21a2e7cd5b293497a613f",
+    "platform/godot/rendering/server_renderer.cpp": "07d780b4994bd5e9de422d1998f692f13536378a4fa1099a70771fc7d3fdf7ec",
+    "platform/godot/project/bin/roadwars_godot.dll": "ee37e60c9cc021395d4ba8e600dee8743c81398363379d9da279ca78bf602e14"
+  }
+}

@@ -24,6 +24,6 @@ Confidence is independent of status: `unknown`, `hypothesis`, `high`, `confirmed
 
 ## Current limits
 
-The inventory covers currently recognized functions and RTTI types. Unrecognized functions and original source-only classes may remain. Most function ownership is unresolved; library classes are not proof of gameplay classes. The observed outer-loop variable-delta clamp and dispatch are retained in entry_loop_ghidra.json. Internal simulation timestep, vehicle dynamics, collision, AI, rendering state interpretation and source project layout remain unestablished. The triangle is new infrastructure only.
+The inventory covers currently recognized functions and RTTI types. Unrecognized functions and original source-only classes may remain. Most ownership and source paths remain unresolved; library classes are not proof of gameplay classes. Entry-loop evidence is retained in entry_loop_ghidra.json. Shared initialization, vehicle force helpers and track collision now have focused evidence and partial portable implementations; read test_driving.md and each evidence file for exact coverage. Complete initialization, race rules, AI, rendering state and original source layout remain open. Reconstructed execution and synthetic tests do not establish original-executable equivalence.
 
 The project is independent. Do not import code or findings from neighboring roadwars-re or roadwars_tools repositories. Original assets stay outside version control.

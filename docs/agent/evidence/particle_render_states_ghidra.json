@@ -1,0 +1,83 @@
+{
+  "program": "RoadWars",
+  "binary_sha256": "93b4e4c301a5694b55e16977c2e52f4971bd9089659e3d58617c8af2368436c8",
+  "date": "2026-10-22",
+  "functions": [
+    {
+      "body_size": 1155,
+      "decompiled_code": "\r\nvoid FUN_004ffb96(void)\r\n\r\n{\r\n  int iVar1;\r\n  undefined4 *puVar2;\r\n  int extraout_ECX;\r\n  char *pcVar3;\r\n  int local_b048;\r\n  char local_b040 [8];\r\n  undefined1 local_b038 [84];\r\n  int local_afe4;\r\n  uint local_afe0;\r\n  undefined4 *local_afdc;\r\n  undefined2 local_afd8 [1500];\r\n  int local_a420;\r\n  int local_a41c;\r\n  undefined2 local_a418 [20982];\r\n  undefined4 uStack_2c;\r\n  undefined4 uStack_28;\r\n  undefined4 uStack_24;\r\n  undefined2 *puStack_20;\r\n  int iStack_1c;\r\n  undefined2 *puStack_18;\r\n  undefined1 *puStack_14;\r\n  int *piStack_10;\r\n  \r\n  FUN_005170f0();\r\n  piStack_10 = (int *)0x4ffbb6;\r\n  iVar1 = IsEmpty();\r\n  if (iVar1 == 0) {\r\n    piStack_10 = (int *)0x4ffbca;\r\n    local_a420 = FUN_00500c60();\r\n    local_a41c = 0;\r\n    local_b048 = 0;\r\n    piStack_10 = (int *)0x4;\r\n    puStack_14 = (undefined1 *)0x15;\r\n    puStack_18 = (undefined2 *)0x4ffbff;\r\n    FUN_004dd1d0();\r\n    piStack_10 = (int *)0x1;\r\n    puStack_14 = (undefined1 *)0x1b;\r\n    puStack_18 = (undefined2 *)0x4ffc0b;\r\n    FUN_004dd1d0();\r\n    piStack_10 = (int *)0x0;\r\n    puStack_14 = (undefined1 *)0xe;\r\n    puStack_18 = (undefined2 *)0x4ffc17;\r\n    FUN_004dd1d0();\r\n    piStack_10 = (int *)0x5;\r\n    puStack_14 = (undefined1 *)0x13;\r\n    puStack_18 = (undefined2 *)0x4ffc23;\r\n    FUN_004dd1d0();\r\n    piStack_10 = (int *)0x6;\r\n    puStack_14 = (undefined1 *)0x14;\r\n    puStack_18 = (undefined2 *)0x4ffc2f;\r\n    FUN_004dd1d0();\r\n    piStack_10 = (int *)0x4ffc37;\r\n    FUN_004dbe9e();\r\n    *(undefined1 *)(extraout_ECX + 0x20) = 1;\r\n    *(undefined4 *)(extraout_ECX + 0x1c) = 0;\r\n    while (local_a420 != 0) {\r\n      piStack_10 = &local_a420;\r\n      puStack_14 = (undefined1 *)0x4ffc80;\r\n      puVar2 = (undefined4 *)FUN_00500c80();\r\n      pcVar3 = local_b040;\r\n      for (iVar1 = 0x1a; iVar1 != 0; iVar1 = iVar1 + -1) {\r\n        *(undefined4 *)pcVar3 = *puVar2;\r\n        puVar2 = puVar2 + 1;\r\n        pcVar3 = pcVar3 + 4;\r\n      }\r\n      if (local_b040[0] == '\\x01') {\r\n        if ((local_afe4 != *(int *)(extraout_ECX + 0x1c)) ||\r\n           ((local_afe0 & 0xff) != (uint)*(byte *)(extraout_ECX + 0x20))) {\r\n          if ((0 < local_b048) && (*(int *)(extraout_ECX + 0x1c) != 0)) {\r\n            piStack_10 = (int *)0x0;\r\n            puStack_14 = (undefined1 *)(local_b048 * 3);\r\n            puStack_18 = local_afd8;\r\n            iStack_1c = local_a41c;\r\n            puStack_20 = local_a418;\r\n            uStack_24 = 0x144;\r\n            uStack_28 = 4;\r\n            uStack_2c = 0x4ffd13;\r\n            FUN_004dd100();\r\n          }\r\n          if (local_afe4 != *(int *)(extraout_ECX + 0x1c)) {\r\n            *(int *)(extraout_ECX + 0x1c) = local_afe4;\r\n            piStack_10 = *(int **)(extraout_ECX + 0x1c);\r\n            puStack_14 = (undefined1 *)0x0;\r\n            puStack_18 = (undefined2 *)0x4ffd47;\r\n            FUN_004dd270();\r\n          }\r\n          if ((local_afe0 & 0xff) != (uint)*(byte *)(extraout_ECX + 0x20)) {\r\n            *(undefined1 *)(extraout_ECX + 0x20) = (undefined1)local_afe0;\r\n            if (*(char *)(extraout_ECX + 0x20) == '\\0') {\r\n              piStack_10 = (int *)0x5;\r\n              puStack_14 = (undefined1 *)0x13;\r\n              puStack_18 = (undefined2 *)0x4ffd8c;\r\n              FUN_004dd1d0();\r\n              piStack_10 = (int *)0x2;\r\n              puStack_14 = (undefined1 *)0x14;\r\n              puStack_18 = (undefined2 *)0x4ffd98;\r\n              FUN_004dd1d0();\r\n            }\r\n            else {\r\n              piStack_10 = (int *)0x5;\r\n              puStack_14 = (undefined1 *)0x13;\r\n              puStack_18 = (undefined2 *)0x4ffda6;\r\n              FUN_004dd1d0();\r\n              piStack_10 = (int *)0x6;\r\n              puStack_14 = (undefined1 *)0x14;\r\n              puStack_18 = (undefined2 *)0x4ffdb2;\r\n              FUN_004dd1d0();\r\n            }\r\n          }\r\n          local_b048 = 0;\r\n          local_a41c = 0;\r\n        }\r\n        puStack_14 = local_b038;\r\n        puStack_18 = local_a418 + local_a41c * 0xe;\r\n        iStack_1c = 0x4ffde7;\r\n        piStack_10 = (int *)0x54;\r\n        FUN_005179f0();\r\n        local_afd8[local_a41c] = (undefined2)local_a41c;\r\n        local_a41c = local_a41c + 1;\r\n        local_afd8[local_a41c] = (undefined2)local_a41c;\r\n        local_a41c = local_a41c + 1;\r\n        local_afd8[local_a41c] = (undefined2)local_a41c;\r\n        local_a41c = local_a41c + 1;\r\n        local_b048 = local_b048 + 1;\r\n        if (400 < local_b048) {\r\n          piStack_10 = (int *)0x0;\r\n          puStack_14 = (undefined1 *)(local_b048 * 3);\r\n          puStack_18 = local_afd8;\r\n          puStack_20 = local_a418;\r\n          uStack_24 = 0x144;\r\n          uStack_28 = 4;\r\n          uStack_2c = 0x4ffea1;\r\n          iStack_1c = local_a41c;\r\n          FUN_004dd100();\r\n          local_a41c = 0;\r\n          local_b048 = 0;\r\n        }\r\n      }\r\n      else if (local_b040[0] == '\\x02') {\r\n        if (0 < local_b048) {\r\n          piStack_10 = (int *)0x0;\r\n          puStack_14 = (undefined1 *)(local_b048 * 3);\r\n          puStack_18 = local_afd8;\r\n          iStack_1c = local_a41c;\r\n          puStack_20 = local_a418;\r\n          uStack_24 = 0x144;\r\n          uStack_28 = 4;\r\n          uStack_2c = 0x4fff05;\r\n          FUN_004dd100();\r\n          local_a41c = 0;\r\n          local_b048 = 0;\r\n        }\r\n        piStack_10 = (int *)0x0;\r\n        puStack_14 = (undefined1 *)0x4fff2d;\r\n        (**(code **)*local_afdc)();\r\n        *(undefined4 *)(extraout_ECX + 0x1c) = 0;\r\n        if (*(char *)(extraout_ECX + 0x20) == '\\0') {\r\n          piStack_10 = (int *)0x5;\r\n          puStack_14 = (undefined1 *)0x13;\r\n          puStack_18 = (undefined2 *)0x4fff55;\r\n          FUN_004dd1d0();\r\n          piStack_10 = (int *)0x2;\r\n          puStack_14 = (undefined1 *)0x14;\r\n          puStack_18 = (undefined2 *)0x4fff61;\r\n          FUN_004dd1d0();\r\n        }\r\n        else {\r\n          piStack_10 = (int *)0x5;\r\n          puStack_14 = (undefined1 *)0x13;\r\n          puStack_18 = (undefined2 *)0x4fff6f;\r\n          FUN_004dd1d0();\r\n          piStack_10 = (int *)0x6;\r\n          puStack_14 = (undefined1 *)0x14;\r\n          puStack_18 = (undefined2 *)0x4fff7b;\r\n          FUN_004dd1d0();\r\n        }\r\n        piStack_10 = (int *)0x0;\r\n        puStack_14 = (undefined1 *)0xe;\r\n        puStack_18 = (undefined2 *)0x4fff87;\r\n        FUN_004dd1d0();\r\n        piStack_10 = (int *)0x4fff8f;\r\n        FUN_004dbe9e();\r\n        piStack_10 = (int *)0x0;\r\n        puStack_14 = (undefined1 *)0x18;\r\n        puStack_18 = (undefined2 *)0x4fff9b;\r\n        FUN_004dd1d0();\r\n        piStack_10 = (int *)0x5;\r\n        puStack_14 = (undefined1 *)0x19;\r\n        puStack_18 = (undefined2 *)0x4fffa7;\r\n        FUN_004dd1d0();\r\n      }\r\n    }\r\n    if (0 < local_b048) {\r\n      piStack_10 = (int *)0x0;\r\n      puStack_14 = (undefined1 *)(local_b048 * 3);\r\n      puStack_18 = local_afd8;\r\n      iStack_1c = local_a41c;\r\n      puStack_20 = local_a418;\r\n      uStack_24 = 0x144;\r\n      uStack_28 = 4;\r\n      uStack_2c = 0x4fffe5;\r\n      FUN_004dd100();\r\n    }\r\n    piStack_10 = (int *)0x1;\r\n    puStack_14 = (undefined1 *)0xe;\r\n    puStack_18 = (undefined2 *)0x4ffff1;\r\n    FUN_004dd1d0();\r\n    piStack_10 = (int *)0x5;\r\n    puStack_14 = (undefined1 *)0x13;\r\n    puStack_18 = (undefined2 *)0x4ffffd;\r\n    FUN_004dd1d0();\r\n    piStack_10 = (int *)0x6;\r\n    puStack_14 = (undefined1 *)0x14;\r\n    puStack_18 = (undefined2 *)0x500009;\r\n    FUN_004dd1d0();\r\n    piStack_10 = (int *)0x500011;\r\n    FUN_004dbe3c();\r\n  }\r\n  return;\r\n}\r\n\r\n",
+      "entry_address": "004ffb96",
+      "target_name": "FUN_004ffb96"
+    },
+    {
+      "body_size": 23,
+      "decompiled_code": "\r\nvoid FUN_004dbe9e(void)\r\n\r\n{\r\n  FUN_004dd1d0(0x1c,0);\r\n  return;\r\n}\r\n\r\n",
+      "entry_address": "004dbe9e",
+      "target_name": "FUN_004dbe9e"
+    },
+    {
+      "body_size": 98,
+      "decompiled_code": "\r\nvoid __fastcall FUN_004dbe3c(int param_1)\r\n\r\n{\r\n  if ((*(int *)(param_1 + 0xc2ec) == 0x23) && (*(int *)(param_1 + 0xc2dc) != 0)) {\r\n    FUN_004dd1d0(0x1c,1);\r\n  }\r\n  else if ((*(int *)(param_1 + 0xc2ec) == 0x8c) && (*(int *)(param_1 + 0xc2e0) != 0)) {\r\n    FUN_004dd1d0(0x1c,1);\r\n  }\r\n  else {\r\n    FUN_004dbe9e();\r\n  }\r\n  return;\r\n}\r\n\r\n",
+      "entry_address": "004dbe3c",
+      "target_name": "FUN_004dbe3c"
+    },
+    {
+      "body_size": 89,
+      "decompiled_code": "\r\nvoid __thiscall FUN_004dd1d0(int param_1,int param_2,int param_3)\r\n\r\n{\r\n  if (*(int *)(param_1 + 0xbf7c + param_2 * 4) != param_3) {\r\n    *(int *)(param_1 + 0xbf7c + param_2 * 4) = param_3;\r\n    (**(code **)(**(int **)(param_1 + 0x77c) + 0x50))\r\n              (*(undefined4 *)(param_1 + 0x77c),param_2,\r\n               *(undefined4 *)(param_1 + 0xbf7c + param_2 * 4));\r\n  }\r\n  return;\r\n}\r\n\r\n",
+      "entry_address": "004dd1d0",
+      "target_name": "FUN_004dd1d0"
+    }
+  ],
+  "assembly_observations": {
+    "startup_address": "004ffbf3",
+    "state_pairs": [
+      [
+        21,
+        4
+      ],
+      [
+        27,
+        1
+      ],
+      [
+        14,
+        0
+      ],
+      [
+        19,
+        5
+      ],
+      [
+        20,
+        6
+      ]
+    ],
+    "packet_flag_zero": {
+      "address": "004ffd80",
+      "state_pairs": [
+        [
+          19,
+          5
+        ],
+        [
+          20,
+          2
+        ]
+      ]
+    },
+    "packet_flag_nonzero": {
+      "address": "004ffd9a",
+      "state_pairs": [
+        [
+          19,
+          5
+        ],
+        [
+          20,
+          6
+        ]
+      ]
+    },
+    "fog_disable_helper": "004dbe9e calls state28=0"
+  }
+}

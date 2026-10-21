@@ -1,1 +1,23 @@
-{"enabled_classes":["Node","Viewport","SceneTree","RenderingServer","Input","FileAccess","OS"]}
+{
+  "enabled_classes": [
+    "Node",
+    "Viewport",
+    "SceneTree",
+    "RenderingServer",
+    "Input",
+    "FileAccess",
+    "OS",
+    "AudioStreamPlayer",
+    "AudioStreamWAV",
+    "AudioServer",
+    "InputEventMouseMotion",
+    "DisplayServer",
+    "Logger",
+    "ScriptBacktrace",
+    "InputEventKey",
+    "InputEventMouseButton",
+    "ProjectSettings",
+    "Engine",
+    "Time"
+  ]
+}

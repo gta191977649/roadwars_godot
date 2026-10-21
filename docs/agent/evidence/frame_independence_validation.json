@@ -1,0 +1,29 @@
+{
+  "date": "2026-10-22",
+  "modernization": true,
+  "reference_frequency_confirmed": false,
+  "simulation_hz": 60,
+  "core_ctest": {
+    "passed": 28,
+    "total": 28
+  },
+  "portable_trace_comparison": "10 render FPS: 1200 physics ticks, bit-identical complete trace\n15 render FPS: 1200 physics ticks, bit-identical complete trace\n30 render FPS: 1200 physics ticks, bit-identical complete trace\n60 render FPS: 1200 physics ticks, bit-identical complete trace\n75 render FPS: 1200 physics ticks, bit-identical complete trace\n120 render FPS: 1200 physics ticks, bit-identical complete trace\n144 render FPS: 1200 physics ticks, bit-identical complete trace\n240 render FPS: 1200 physics ticks, bit-identical complete trace\nJitter and 350/900ms stalls: bit-identical complete trace; no elapsed time dropped\n \n",
+  "native_records": {
+    "timing_smoke_test.gd.log": "Godot Engine v4.7.2.stable.official.ed1daf0bf - https://godotengine.org\nOpenGL API 3.3.0 - Build 32.0.101.9150 - Compatibility - Using Device: Intel - Intel(R) Arc(TM) B390 GPU\n\nROADWARS_RACE_LOADED: Dark Forest / Animal (original logic trace)\nFixed host at 60 render FPS: identical 300-tick vehicle/effect state\nROADWARS_RACE_LOADED: Dark Forest / Animal (original logic trace)\nFixed host at 10 render FPS: identical 300-tick vehicle/effect state\nROADWARS_RACE_LOADED: Dark Forest / Animal (original logic trace)\nFixed host at 15 render FPS: identical 300-tick vehicle/effect state\nROADWARS_RACE_LOADED: Dark Forest / Animal (original logic trace)\nFixed host at 30 render FPS: identical 300-tick vehicle/effect state\nROADWARS_RACE_LOADED: Dark Forest / Animal (original logic trace)\nFixed host at 75 render FPS: identical 300-tick vehicle/effect state\nROADWARS_RACE_LOADED: Dark Forest / Animal (original logic trace)\nFixed host at 120 render FPS: identical 300-tick vehicle/effect state\nROADWARS_RACE_LOADED: Dark Forest / Animal (original logic trace)\nFixed host at 144 render FPS: identical 300-tick vehicle/effect state\nROADWARS_RACE_LOADED: Dark Forest / Animal (original logic trace)\nFixed host at 240 render FPS: identical 300-tick vehicle/effect state\nROADWARS_RACE_LOADED: Dark Forest / Animal (original logic trace)\nROADWARS_TIMING_SMOKE_OK: independent fixed simulation; interpolated native presentation; recovered stall ticks=23; engine pause; lifecycle\n",
+    "camera_smoke_test.gd.log": "Godot Engine v4.7.2.stable.official.ed1daf0bf - https://godotengine.org\nOpenGL API 3.3.0 - Build 32.0.101.9150 - Compatibility - Using Device: Intel - Intel(R) Arc(TM) B390 GPU\n\nROADWARS_RACE_LOADED: Dark Forest / Animal (original logic trace)\nROADWARS_CAMERA_SMOKE_OK: recovered chase; mouse orbit; three-second idle; gradual return; actual-eye view distance\n",
+    "drive_smoke_test.gd.log": "Godot Engine v4.7.2.stable.official.ed1daf0bf - https://godotengine.org\nOpenGL API 3.3.0 - Build 32.0.101.9150 - Compatibility - Using Device: Intel - Intel(R) Arc(TM) B390 GPU\n\nROADWARS_RACE_LOADED: Dark Forest / Animal (original logic trace)\nNative skid pixels: 1510\nROADWARS_DRIVE_SMOKE_OK: displacement=41.2960510253906; speed=24.6275310516357; throttle/steer/brake/reset\n",
+    "sfx_smoke_test.gd.log": "Godot Engine v4.7.2.stable.official.ed1daf0bf - https://godotengine.org\nOpenGL API 3.3.0 - Build 32.0.101.9150 - Compatibility - Using Device: Intel - Intel(R) Arc(TM) B390 GPU\n\nROADWARS_RACE_LOADED: Dark Forest / Animal (original logic trace)\nROADWARS_SFX_SMOKE_OK: actual_tire_starts=1; actual_crashes=3; tire_peak=6.74631547927856; collision_peak=8.99614429473877; loop stop; overlapping one-shots; completion; reset; teardown\n",
+    "particle_smoke_test.gd.log": "Godot Engine v4.7.2.stable.official.ed1daf0bf - https://godotengine.org\nOpenGL API 3.3.0 - Build 32.0.101.9150 - Compatibility - Using Device: Intel - Intel(R) Arc(TM) B390 GPU\n\nROADWARS_RACE_LOADED: Dark Forest / Animal (original logic trace)\nNative particle pixels: 34084\nROADWARS_PARTICLE_SMOKE_OK: sparks=2; tire smoke=32; native particle RIDs released on exit\nROADWARS_RACE_LOADED: Dark Forest / Animal (original logic trace)\nROADWARS_RACE_LOADED: Dark Forest / Animal (original logic trace)\nROADWARS_RACE_LOADED: Dark Forest / Animal (original logic trace)\n",
+    "godot_smoke.log": "Godot Engine v4.7.2.stable.official.ed1daf0bf - https://godotengine.org\nOpenGL API 3.3.0 - Build 32.0.101.9150 - Compatibility - Using Device: Intel - Intel(R) Arc(TM) B390 GPU\n\nVisible triangle pixels: 33282\nROADWARS_SMOKE_OK: 10 restarts; all owned RIDs released\n"
+  },
+  "sha256": {
+    "game_src/core/simulation_clock.hpp": "0cc35f0e217c7aa57a33b98f30cbe36a17d8e4853d87bda3d9510d9b0529be82",
+    "game_src/unresolved/game_entry.cpp": "b4ac67e375db8bbb6a7bdb31d7ebdebcda1723c2e14d201f9330ad6adc4874ee",
+    "game_src/unresolved/game_entry.hpp": "24f727a85b13eed9ee86d768525f84e2b175eefb094b255ee3fbec19e85aa297",
+    "platform/godot/extension/game_host.cpp": "35446c5ed8346cd8ade2e404508531a2e1db237ad32c22cb35fb72bf7d39574c",
+    "platform/godot/rendering/server_renderer.cpp": "5b583426f006576d0e186cda9f3fe60985472bc019b0dba5c041aef0de90e137",
+    "tests/core/simulation_clock_test.cpp": "2485ace3d7817bbf7e13480d0c6cfa254841cedd3197e4fc66e38fca7fa0153a",
+    "tests/core/frame_independence_probe.cpp": "ebec22c111205e8d541f2c9219acb3fbc42e8e93622c991e981f184c8899c69b",
+    "platform/godot/project/bin/roadwars_godot.dll": "e824b64ba3f9baf75c407e8d1fa57103aa16ae31770526c493fe19037696b4df"
+  }
+}

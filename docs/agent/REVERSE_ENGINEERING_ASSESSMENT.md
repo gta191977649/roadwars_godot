@@ -2,6 +2,8 @@
 
 Date: 2026-10-22. This report records the initial static investigation. Later bootstrap validation is documented separately; it does not validate original gameplay.
 
+Current follow-up: [test_driving.md](test_driving.md) and the subsystem evidence now document original-asset loading, shared initialization and a limited portable driving/collision profile. The initial unknowns below are historical search boundaries; consult those newer records before repeating analysis. No original-executable runtime equivalence has been established.
+
 ## Identity and boundaries
 
 - Ghidra project: hp2_ps2; selected program: RoadWars; original input: the Kopio executable.

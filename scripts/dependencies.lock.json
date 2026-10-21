@@ -2,5 +2,15 @@
   "godot_version": "4.7.2",
   "godot_cpp_commit": "cedbd9e71b24eb2898b28867c5faf6114da9e5e2",
   "godot_cpp_api_version": "4.7",
-  "godot_cpp_archive_sha256": "84f19255b8f65764d0d6de6e0b8109ddbc446cbc117d5d75e16c73dabed2250e"
+  "godot_cpp_archive_sha256": "84f19255b8f65764d0d6de6e0b8109ddbc446cbc117d5d75e16c73dabed2250e",
+  "imgui-console": {
+    "repository": "rmxbalanque/imgui-console",
+    "commit": "7840945b5a20ea9f4e83f98d1ad3d9379aede3ed",
+    "sha256": "f2bd3a6740bdded728e72afecb06ae5fe502f38880c10e685ea4ace4d826f8a5"
+  },
+  "imgui": {
+    "repository": "ocornut/imgui",
+    "commit": "c6e0284ac58b3f205c95365478888f7b53b077e2",
+    "sha256": "5e3e36621f18a5aa8831dedf7ff57d0817e9468d60460bf5e1693da605be5f7b"
+  }
 }

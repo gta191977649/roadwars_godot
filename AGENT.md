@@ -9,6 +9,8 @@ Read in order:
 
 ## Non-negotiable boundaries
 
+- The user explicitly authorizes fixing original frame-rate dependence. Live gameplay must use the portable `SimulationClock` fixed-step policy; rendering cadence must never determine physics callback count. Keep the legacy variable-step policy only for reference analysis/tests. Preserve accumulated elapsed time, keep interpolation visual-only, and run the cross-frame-rate regression when changing simulation scheduling or physics. Read `docs/agent/frame_independence.md`.
+
 - Recover original behavior in portable C++; all Godot integration belongs in `platform/godot/` and uses RenderingServer for the game world.
 - Organize recovered `game_src` files using original source paths, namespaces and module/class ownership **when supported by evidence**. Record that evidence before moving files. Do not copy installation asset paths as if they were original C++ paths. Keep unresolved ownership in `game_src/unresolved/`; do not invent a subsystem layout.
 - `game_src/core` and `game_src/interfaces` are new infrastructure, not claims about the original source project. Never add RE markers to unrelated infrastructure to inflate progress.
@@ -24,4 +26,4 @@ Read in order:
 
 Update evidence, CSV source mappings and generated progress for relevant changes. Run `python scripts/progress.py update`, `python scripts/progress.py check`, and `python scripts/check_boundaries.py`. Build the portable core and run its tests. If touching integration, build the Godot extension and run lifecycle/render smoke tests as applicable. Report precisely which checks ran and any missing prerequisites; never describe unexecuted checks as passing.
 
-No original gameplay has been reconstructed. The top-level variable-delta clamp and dispatch structure are now evidenced, but subsystem timing, coordinates and most business class ownership remain open questions. The default Godot launch is diagnostic; strict original-loop mode fails at the first missing implementation.
+Read `docs/agent/test_driving.md` before extending the original-asset test profile. Shared initialization, vehicle force helpers and ground/wall collision now have partial portable reconstructions. Full initialization, race dispatch, missing-ground recovery and most class ownership remain incomplete. The default Godot launch is diagnostic; trace mode explicitly selects a limited free-driving profile. Keep the single installation root in ignored `config.local.json`; never add source-level machine-path fallbacks.

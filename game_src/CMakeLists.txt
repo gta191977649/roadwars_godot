@@ -1,5 +1,14 @@
-add_library(roadwars_core STATIC core/runtime.cpp unresolved/game_entry.cpp)
+add_library(roadwars_core STATIC core/runtime.cpp unresolved/game_entry.cpp
+  unresolved/race_frontend.cpp
+  unresolved/race_music.cpp
+  unresolved/resource_store.cpp unresolved/mesh_scene.cpp unresolved/bitmap.cpp
+  unresolved/track_collision.cpp unresolved/game_initialization.cpp
+  unresolved/race_presentation.cpp unresolved/vehicle_dynamics.cpp unresolved/vehicle_input.cpp
+  unresolved/contact_orientation.cpp unresolved/wall_response.cpp
+  unresolved/track_render_settings.cpp unresolved/particle_effects.cpp unresolved/wheel_pose.cpp
+  unresolved/engine_audio.cpp unresolved/track_animation.cpp)
 include(${CMAKE_CURRENT_SOURCE_DIR}/generated_classes.cmake OPTIONAL)
+target_sources(roadwars_core PRIVATE unresolved/skid_marks.cpp unresolved/original_camera.cpp unresolved/weapon_mounts.cpp)
 if(ROADWARS_CLASS_SOURCES)
   target_sources(roadwars_core PRIVATE ${ROADWARS_CLASS_SOURCES})
 endif()
@@ -10,3 +19,5 @@ if(MSVC)
 else()
   target_compile_options(roadwars_core PRIVATE -Wall -Wextra -Wpedantic -fno-fast-math -ffp-contract=off)
 endif()
+
+target_sources(roadwars_core PRIVATE unresolved/collision_audio.cpp unresolved/tire_audio.cpp)

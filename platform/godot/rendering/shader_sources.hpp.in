@@ -1,0 +1,6 @@
+#pragma once
+#include <string_view>
+namespace roadwars::shaders {
+inline constexpr std::string_view original_surface = R"RWSHADER(@RW_SURFACE_SHADER@)RWSHADER";
+inline constexpr std::string_view original_particle = R"RWSHADER(@RW_PARTICLE_SHADER@)RWSHADER";
+} // namespace roadwars::shaders

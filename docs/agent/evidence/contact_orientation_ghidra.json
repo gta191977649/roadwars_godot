@@ -1,0 +1,132 @@
+{
+  "binary_sha256": "93b4e4c301a5694b55e16977c2e52f4971bd9089659e3d58617c8af2368436c8",
+  "program": "RoadWars",
+  "functions": [
+    {
+      "address": "004286e0",
+      "body_size": 444,
+      "decompiled_code": "\r\n/* WARNING: Globals starting with '_' overlap smaller symbols at the same address */\r\n\r\nvoid FUN_004286e0(float *param_1,float *param_2,float *param_3,float param_4)\r\n\r\n{\r\n  float10 fVar1;\r\n  \r\n  if (*param_2 == _DAT_005f50a8) {\r\n    if (*param_3 != _DAT_005f50a8) {\r\n      if (_DAT_005f50a8 <= *param_1) {\r\n        if ((_DAT_005f50a8 < *param_1) &&\r\n           (*param_1 = *param_1 - _DAT_005f533c * param_4, *param_1 < _DAT_005f50a8)) {\r\n          fVar1 = (float10)FUN_005173f0((double)*param_3);\r\n          if (fVar1 < (float10)_DAT_005f5330) {\r\n            *param_1 = 0.0;\r\n            *param_3 = 0.0;\r\n          }\r\n          *param_2 = *param_3 * _DAT_005f501c;\r\n        }\r\n      }\r\n      else {\r\n        *param_1 = _DAT_005f533c * param_4 + *param_1;\r\n        if (_DAT_005f50a8 < *param_1) {\r\n          fVar1 = (float10)FUN_005173f0((double)*param_3);\r\n          if (fVar1 < (float10)_DAT_005f5330) {\r\n            *param_1 = 0.0;\r\n            *param_3 = 0.0;\r\n          }\r\n          *param_2 = *param_3 * _DAT_005f501c;\r\n        }\r\n      }\r\n    }\r\n  }\r\n  else if (*param_2 <= *param_1) {\r\n    if ((*param_2 < *param_1) &&\r\n       (*param_1 = *param_1 - _DAT_005f533c * param_4, *param_1 < *param_2)) {\r\n      *param_3 = *param_2;\r\n      *param_2 = 0.0;\r\n    }\r\n  }\r\n  else {\r\n    *param_1 = _DAT_005f533c * param_4 + *param_1;\r\n    if (*param_2 < *param_1) {\r\n      *param_3 = *param_2;\r\n      *param_2 = 0.0;\r\n    }\r\n  }\r\n  return;\r\n}\r\n\r\n",
+      "entry_address": "004286e0",
+      "target_name": "FUN_004286e0"
+    },
+    {
+      "address": "004292fe",
+      "body_size": 521,
+      "decompiled_code": "\r\n/* WARNING: Globals starting with '_' overlap smaller symbols at the same address */\r\n\r\nvoid __fastcall FUN_004292fe(int param_1)\r\n\r\n{\r\n  float10 fVar1;\r\n  float local_2c;\r\n  float local_28;\r\n  undefined4 local_14;\r\n  undefined4 local_10;\r\n  undefined4 local_c;\r\n  float local_8;\r\n  \r\n  fVar1 = (float10)thunk_FUN_00428b3b(0,1);\r\n  local_28 = (float)fVar1;\r\n  local_8 = local_28;\r\n  if ((*(float *)(param_1 + 0x4714) == _DAT_005f50a8) &&\r\n     (*(float *)(param_1 + 0x471c) == _DAT_005f50a8)) {\r\n    D3DRMVectorSubtract(&local_14,param_1 + 0x4754,param_1 + 0x476c);\r\n    fVar1 = (float10)thunk_FUN_0047c1b4(local_14,local_10,local_c,local_14,0,local_c);\r\n    fVar1 = (float10)FUN_00517334((double)fVar1);\r\n    local_28 = (float)(fVar1 * (float10)_DAT_005f5324);\r\n    if (*(float *)(param_1 + 0x4758) < *(float *)(param_1 + 0x4770)) {\r\n      local_28 = -local_28;\r\n    }\r\n  }\r\n  if ((*(float *)(param_1 + 0x4718) == _DAT_005f50a8) &&\r\n     (*(float *)(param_1 + 0x4720) == _DAT_005f50a8)) {\r\n    D3DRMVectorSubtract(&local_14,param_1 + 0x4760,param_1 + 0x4778);\r\n    fVar1 = (float10)thunk_FUN_0047c1b4(local_14,local_10,local_c,local_14,0,local_c);\r\n    fVar1 = (float10)FUN_00517334((double)fVar1);\r\n    local_2c = (float)(fVar1 * (float10)_DAT_005f5324);\r\n    if (*(float *)(param_1 + 0x4764) < *(float *)(param_1 + 0x477c)) {\r\n      local_2c = -local_2c;\r\n    }\r\n  }\r\n  else {\r\n    local_2c = local_8;\r\n  }\r\n  local_8 = (local_28 + local_2c) * _DAT_005f501c;\r\n  fVar1 = (float10)thunk_FUN_00428b3b(0,1);\r\n  if ((float)((float10)local_8 - fVar1) != _DAT_005f50a8) {\r\n    thunk_FUN_00428c62();\r\n  }\r\n  return;\r\n}\r\n\r\n",
+      "entry_address": "004292fe",
+      "target_name": "FUN_004292fe"
+    },
+    {
+      "address": "00429507",
+      "body_size": 525,
+      "decompiled_code": "\r\n/* WARNING: Globals starting with '_' overlap smaller symbols at the same address */\r\n\r\nvoid __fastcall FUN_00429507(int param_1)\r\n\r\n{\r\n  float fVar1;\r\n  float10 fVar2;\r\n  float local_18;\r\n  undefined4 local_14;\r\n  undefined4 local_10;\r\n  undefined4 local_c;\r\n  float local_8;\r\n  \r\n  fVar2 = (float10)thunk_FUN_00428b6f(0,1);\r\n  local_18 = (float)fVar2;\r\n  local_8 = local_18;\r\n  if ((*(float *)(param_1 + 0x471c) == _DAT_005f50a8) &&\r\n     (*(float *)(param_1 + 0x4720) == _DAT_005f50a8)) {\r\n    D3DRMVectorSubtract(&local_14,param_1 + 0x476c,param_1 + 0x4778);\r\n    fVar2 = (float10)thunk_FUN_0047c1b4(local_14,local_10,local_c,local_14,0,local_c);\r\n    fVar2 = (float10)FUN_00517334((double)fVar2);\r\n    local_8 = (float)(-fVar2 * (float10)_DAT_005f5324);\r\n    if (*(float *)(param_1 + 0x4770) < *(float *)(param_1 + 0x477c)) {\r\n      local_8 = -local_8;\r\n    }\r\n  }\r\n  if ((*(float *)(param_1 + 0x4714) == _DAT_005f50a8) &&\r\n     (*(float *)(param_1 + 0x4718) == _DAT_005f50a8)) {\r\n    D3DRMVectorSubtract(&local_14,param_1 + 0x4754,param_1 + 0x4760);\r\n    fVar2 = (float10)thunk_FUN_0047c1b4(local_14,local_10,local_c,local_14,0,local_c);\r\n    fVar2 = (float10)FUN_00517334((double)fVar2);\r\n    local_18 = (float)(-fVar2 * (float10)_DAT_005f5324);\r\n    if (*(float *)(param_1 + 0x4758) < *(float *)(param_1 + 0x4764)) {\r\n      local_18 = -local_18;\r\n    }\r\n  }\r\n  fVar1 = (local_8 + local_18) * _DAT_005f501c;\r\n  fVar2 = (float10)thunk_FUN_00428b6f(0,1);\r\n  if ((float)((float10)fVar1 - fVar2) != _DAT_005f50a8) {\r\n    thunk_FUN_00428c8c();\r\n  }\r\n  return;\r\n}\r\n\r\n",
+      "entry_address": "00429507",
+      "target_name": "FUN_00429507"
+    },
+    {
+      "address": "00429714",
+      "body_size": 201,
+      "decompiled_code": "\r\n/* WARNING: Globals starting with '_' overlap smaller symbols at the same address */\r\n\r\nvoid __fastcall FUN_00429714(int param_1)\r\n\r\n{\r\n  float fVar1;\r\n  int iVar2;\r\n  undefined1 local_1c [12];\r\n  float local_10;\r\n  int local_c;\r\n  float local_8;\r\n  \r\n  local_8 = 0.0;\r\n  for (local_c = 0; local_c < 4; local_c = local_c + 1) {\r\n    iVar2 = thunk_FUN_00428a8f(local_1c,*(undefined4 *)(param_1 + 0x44b0 + local_c * 4),0,1);\r\n    local_10 = *(float *)(param_1 + 0x4724 + local_c * 4) - *(float *)(iVar2 + 4);\r\n    if (*(float *)(param_1 + 0x5b74 + local_c * 0xc) <= *(float *)(param_1 + 0x4758 + local_c * 0xc)\r\n       ) {\r\n      fVar1 = *(float *)(param_1 + 0x4758 + local_c * 0xc);\r\n    }\r\n    else {\r\n      fVar1 = *(float *)(param_1 + 0x5b74 + local_c * 0xc);\r\n    }\r\n    local_8 = local_8 + fVar1;\r\n  }\r\n  return;\r\n}\r\n\r\n",
+      "entry_address": "00429714",
+      "target_name": "FUN_00429714"
+    },
+    {
+      "address": "0042988c",
+      "body_size": 498,
+      "decompiled_code": "\r\n/* WARNING: Globals starting with '_' overlap smaller symbols at the same address */\r\n\r\nvoid __thiscall FUN_0042988c(int param_1,float param_2)\r\n\r\n{\r\n  undefined4 *puVar1;\r\n  undefined4 *puVar2;\r\n  float10 fVar3;\r\n  undefined1 local_38 [12];\r\n  undefined4 local_2c;\r\n  undefined4 local_28;\r\n  undefined4 local_24;\r\n  undefined1 local_20 [12];\r\n  undefined1 local_14 [4];\r\n  undefined4 local_10;\r\n  float local_c;\r\n  int local_8;\r\n  \r\n  for (local_8 = 0; local_8 < 4; local_8 = local_8 + 1) {\r\n    if (*(float *)(param_1 + 0x4758 + local_8 * 0xc) < *(float *)(param_1 + 0x5b74 + local_8 * 0xc))\r\n    {\r\n      puVar2 = (undefined4 *)(param_1 + 0x4754 + local_8 * 0xc);\r\n      puVar1 = (undefined4 *)(param_1 + 0x5b70 + local_8 * 0xc);\r\n      fVar3 = (float10)thunk_FUN_0047c742(*puVar1,puVar1[1],puVar1[2],*puVar2,puVar2[1],puVar2[2]);\r\n      local_c = (float)fVar3;\r\n      if (_DAT_005f50b0 < local_c) {\r\n        *(float *)(param_1 + 0x4714 + local_8 * 4) =\r\n             param_2 + *(float *)(param_1 + 0x4714 + local_8 * 4);\r\n      }\r\n    }\r\n  }\r\n  if (*(float *)(param_1 + 0x4758) == _DAT_005f5344) {\r\n    *(float *)(param_1 + 0x5bac) = param_2 + *(float *)(param_1 + 0x5bac);\r\n  }\r\n  if (_DAT_005f5118 <= *(float *)(param_1 + 0x5bac)) {\r\n    puVar2 = (undefined4 *)\r\n             thunk_FUN_004185fe(local_38,*(undefined4 *)(param_1 + 0x4418),\r\n                                *(undefined4 *)(param_1 + 0x4420),0,0);\r\n    local_2c = *puVar2;\r\n    local_28 = puVar2[1];\r\n    local_24 = puVar2[2];\r\n    thunk_FUN_0042889c(local_2c,local_28,local_24,0);\r\n    local_10 = thunk_FUN_00428a64(0,1);\r\n    thunk_FUN_004bb23c(1,local_10,local_10,local_14,local_20);\r\n    *(undefined4 *)(param_1 + 0x5bac) = 0;\r\n    *(undefined4 *)(param_1 + 0x4fe4) = 0;\r\n    *(undefined4 *)(param_1 + 0x4fe0) = 0;\r\n    *(undefined4 *)(param_1 + 0x4fdc) = 0;\r\n    _memset((void *)(param_1 + 0x4fc4),0,0xc);\r\n  }\r\n  return;\r\n}\r\n\r\n",
+      "entry_address": "0042988c",
+      "target_name": "FUN_0042988c"
+    },
+    {
+      "address": "00429a7e",
+      "body_size": 353,
+      "decompiled_code": "\r\nvoid __thiscall FUN_00429a7e(int param_1,undefined4 param_2)\r\n\r\n{\r\n  undefined4 *puVar1;\r\n  int iVar2;\r\n  float10 fVar3;\r\n  undefined1 local_24 [12];\r\n  undefined4 local_18;\r\n  float local_14;\r\n  undefined4 local_10;\r\n  float local_c;\r\n  float local_8;\r\n  \r\n  thunk_FUN_0042c670(1);\r\n  thunk_FUN_004297dd();\r\n  thunk_FUN_0042988c(param_2);\r\n  puVar1 = (undefined4 *)thunk_FUN_00428a8f(local_24,0,1,1);\r\n  local_18 = *puVar1;\r\n  local_14 = (float)puVar1[1];\r\n  local_10 = puVar1[2];\r\n  fVar3 = (float10)thunk_FUN_00429714();\r\n  local_14 = (float)fVar3;\r\n  thunk_FUN_0042889c(local_18,local_14,local_10,0);\r\n  thunk_FUN_004292fe();\r\n  thunk_FUN_00429507();\r\n  iVar2 = thunk_FUN_00428e7e();\r\n  if ((iVar2 == 0) && (iVar2 = thunk_FUN_00428eea(), iVar2 != 0)) {\r\n    *(undefined4 *)(param_1 + 0x4fe4) = 0;\r\n    *(undefined4 *)(param_1 + 0x4fe0) = 0;\r\n  }\r\n  fVar3 = (float10)thunk_FUN_00428b3b(*(undefined4 *)(param_1 + 0x449c),0);\r\n  local_8 = (float)fVar3;\r\n  thunk_FUN_004286e0(&local_8,param_1 + 0x5bc0,param_1 + 0x5bc4,param_2);\r\n  thunk_FUN_00428958(local_8,*(undefined4 *)(param_1 + 0x449c));\r\n  fVar3 = (float10)thunk_FUN_00428b6f(*(undefined4 *)(param_1 + 0x449c),0);\r\n  local_c = (float)fVar3;\r\n  thunk_FUN_004286e0(&local_c,param_1 + 0x5bc8,param_1 + 0x5bcc,param_2);\r\n  thunk_FUN_004289de(local_c,*(undefined4 *)(param_1 + 0x449c));\r\n  return;\r\n}\r\n\r\n",
+      "entry_address": "00429a7e",
+      "target_name": "FUN_00429a7e"
+    },
+    {
+      "address": "0042c670",
+      "body_size": 264,
+      "decompiled_code": "\r\nvoid __thiscall FUN_0042c670(int param_1,int param_2)\r\n\r\n{\r\n  undefined4 *puVar1;\r\n  undefined4 *puVar2;\r\n  undefined1 local_38 [12];\r\n  undefined1 local_2c [12];\r\n  undefined1 local_20 [12];\r\n  undefined1 local_14 [12];\r\n  int local_8;\r\n  \r\n  if (param_2 == 0) {\r\n    puVar1 = (undefined4 *)thunk_FUN_00428a8f(local_14,*(undefined4 *)(param_1 + 0x44a4),1,1);\r\n    *(undefined4 *)(param_1 + 0x5b58) = *puVar1;\r\n    *(undefined4 *)(param_1 + 0x5b5c) = puVar1[1];\r\n    *(undefined4 *)(param_1 + 0x5b60) = puVar1[2];\r\n    puVar1 = (undefined4 *)thunk_FUN_00428a8f(local_20,*(undefined4 *)(param_1 + 0x44ac),1,0);\r\n    *(undefined4 *)(param_1 + 0x5b64) = *puVar1;\r\n    *(undefined4 *)(param_1 + 0x5b68) = puVar1[1];\r\n    *(undefined4 *)(param_1 + 0x5b6c) = puVar1[2];\r\n  }\r\n  puVar1 = (undefined4 *)thunk_FUN_00428a8f(local_2c,*(undefined4 *)(param_1 + 0x44b0),1,param_2);\r\n  *(undefined4 *)(param_1 + 0x5b70) = *puVar1;\r\n  *(undefined4 *)(param_1 + 0x5b74) = puVar1[1];\r\n  *(undefined4 *)(param_1 + 0x5b78) = puVar1[2];\r\n  for (local_8 = 1; local_8 < 4; local_8 = local_8 + 1) {\r\n    puVar2 = (undefined4 *)\r\n             thunk_FUN_00428a8f(local_38,*(undefined4 *)(param_1 + 0x44b0 + local_8 * 4),1,0);\r\n    puVar1 = (undefined4 *)(param_1 + 0x5b70 + local_8 * 0xc);\r\n    *puVar1 = *puVar2;\r\n    puVar1[1] = puVar2[1];\r\n    puVar1[2] = puVar2[2];\r\n  }\r\n  return;\r\n}\r\n\r\n",
+      "entry_address": "0042c670",
+      "target_name": "FUN_0042c670"
+    },
+    {
+      "address": "004d3dbd",
+      "body_size": 294,
+      "decompiled_code": "\r\n/* WARNING: Globals starting with '_' overlap smaller symbols at the same address */\r\n\r\nundefined4 * __thiscall FUN_004d3dbd(int param_1,undefined4 *param_2)\r\n\r\n{\r\n  int iVar1;\r\n  undefined4 *puVar2;\r\n  undefined4 *puVar3;\r\n  float10 fVar4;\r\n  \r\n  if ((((*(uint *)(param_1 + 0x50) & 0x200) == 0) || (*(int *)(param_1 + 0x1a4) == 0)) ||\r\n     ((*(uint *)(param_1 + 0x50) & 0x40) != 0)) {\r\n    fVar4 = (float10)FUN_004d5790(1);\r\n    FUN_004fdde7(param_1 + 0xe4,(float)(fVar4 * (float10)_DAT_005f5a9c));\r\n    fVar4 = (float10)FUN_004d5830(1);\r\n    FUN_004fdea1(param_1 + 0x164,(float)(fVar4 * (float10)_DAT_005f5a9c));\r\n    fVar4 = (float10)FUN_004d57e0(1);\r\n    FUN_004fdd6d(param_1 + 0x124,(float)(-fVar4 * (float10)_DAT_005f5a9c));\r\n    FUN_004fd7d2(param_1 + 0x1a8,param_1 + 0x124,param_1 + 0x164);\r\n    FUN_004fd7d2(param_1 + 0x1a8,param_1 + 0x1a8,param_1 + 0xe4);\r\n    *(undefined4 *)(param_1 + 0x1a4) = 1;\r\n    puVar2 = (undefined4 *)(param_1 + 0x1a8);\r\n    puVar3 = param_2;\r\n    for (iVar1 = 0x10; iVar1 != 0; iVar1 = iVar1 + -1) {\r\n      *puVar3 = *puVar2;\r\n      puVar2 = puVar2 + 1;\r\n      puVar3 = puVar3 + 1;\r\n    }\r\n  }\r\n  else {\r\n    puVar2 = (undefined4 *)(param_1 + 0x1a8);\r\n    puVar3 = param_2;\r\n    for (iVar1 = 0x10; iVar1 != 0; iVar1 = iVar1 + -1) {\r\n      *puVar3 = *puVar2;\r\n      puVar2 = puVar2 + 1;\r\n      puVar3 = puVar3 + 1;\r\n    }\r\n  }\r\n  return param_2;\r\n}\r\n\r\n",
+      "entry_address": "004d3dbd",
+      "target_name": "FUN_004d3dbd"
+    },
+    {
+      "address": "004fdde7",
+      "body_size": 123,
+      "decompiled_code": "\r\nvoid FUN_004fdde7(float *param_1,float param_2)\r\n\r\n{\r\n  float10 fVar1;\r\n  float10 fVar2;\r\n  \r\n  fVar1 = (float10)fcos((float10)param_2);\r\n  fVar2 = (float10)fsin((float10)param_2);\r\n  *param_1 = (float)fVar1;\r\n  param_1[1] = 0.0;\r\n  param_1[2] = -(float)fVar2;\r\n  param_1[3] = 0.0;\r\n  param_1[4] = 0.0;\r\n  param_1[5] = 1.0;\r\n  param_1[6] = 0.0;\r\n  param_1[7] = 0.0;\r\n  param_1[8] = (float)fVar2;\r\n  param_1[9] = 0.0;\r\n  param_1[10] = (float)fVar1;\r\n  param_1[0xb] = 0.0;\r\n  param_1[0xc] = 0.0;\r\n  param_1[0xd] = 0.0;\r\n  param_1[0xe] = 0.0;\r\n  param_1[0xf] = 1.0;\r\n  return;\r\n}\r\n\r\n",
+      "entry_address": "004fdde7",
+      "target_name": "FUN_004fdde7"
+    },
+    {
+      "address": "004fdea1",
+      "body_size": 124,
+      "decompiled_code": "\r\nvoid FUN_004fdea1(float *param_1,float param_2)\r\n\r\n{\r\n  float10 fVar1;\r\n  float10 fVar2;\r\n  \r\n  fVar1 = (float10)fcos((float10)param_2);\r\n  fVar2 = (float10)fsin((float10)param_2);\r\n  param_1[1] = (float)fVar2;\r\n  *param_1 = (float)fVar1;\r\n  param_1[2] = 0.0;\r\n  param_1[3] = 0.0;\r\n  param_1[4] = -(float)fVar2;\r\n  param_1[5] = (float)fVar1;\r\n  param_1[6] = 0.0;\r\n  param_1[7] = 0.0;\r\n  param_1[8] = 0.0;\r\n  param_1[9] = 0.0;\r\n  param_1[10] = 1.0;\r\n  param_1[0xb] = 0.0;\r\n  param_1[0xc] = 0.0;\r\n  param_1[0xd] = 0.0;\r\n  param_1[0xe] = 0.0;\r\n  param_1[0xf] = 1.0;\r\n  return;\r\n}\r\n\r\n",
+      "entry_address": "004fdea1",
+      "target_name": "FUN_004fdea1"
+    },
+    {
+      "address": "004fdd6d",
+      "body_size": 122,
+      "decompiled_code": "\r\nvoid FUN_004fdd6d(undefined4 *param_1,float param_2)\r\n\r\n{\r\n  float10 fVar1;\r\n  float10 fVar2;\r\n  \r\n  fVar1 = (float10)fcos((float10)param_2);\r\n  fVar2 = (float10)fsin((float10)param_2);\r\n  param_1[6] = (float)fVar2;\r\n  *param_1 = 0x3f800000;\r\n  param_1[1] = 0;\r\n  param_1[2] = 0;\r\n  param_1[3] = 0;\r\n  param_1[4] = 0;\r\n  param_1[5] = (float)fVar1;\r\n  param_1[7] = 0;\r\n  param_1[8] = 0;\r\n  param_1[9] = -(float)fVar2;\r\n  param_1[10] = (float)fVar1;\r\n  param_1[0xb] = 0;\r\n  param_1[0xc] = 0;\r\n  param_1[0xd] = 0;\r\n  param_1[0xe] = 0;\r\n  param_1[0xf] = 0x3f800000;\r\n  return;\r\n}\r\n\r\n",
+      "entry_address": "004fdd6d",
+      "target_name": "FUN_004fdd6d"
+    },
+    {
+      "address": "004fd7d2",
+      "body_size": 227,
+      "decompiled_code": "\r\nvoid FUN_004fd7d2(float *param_1,float *param_2,float *param_3)\r\n\r\n{\r\n  float fVar1;\r\n  float fVar2;\r\n  float fVar3;\r\n  float fVar4;\r\n  int iVar5;\r\n  int iVar6;\r\n  float *pfVar7;\r\n  float local_44 [16];\r\n  \r\n  if (param_3 == param_1) {\r\n    if (param_2 != param_1) {\r\n      iVar6 = -4;\r\n      do {\r\n        iVar5 = -0x10;\r\n        fVar1 = param_3[iVar6 + 4];\r\n        fVar2 = param_3[iVar6 + 8];\r\n        fVar3 = param_3[iVar6 + 0xc];\r\n        fVar4 = param_3[iVar6 + 0x10];\r\n        do {\r\n          param_1[iVar5 + 0x10] =\r\n               (float)((float10)fVar4 * (float10)param_2[iVar5 + 0x13] +\r\n                       (float10)fVar2 * (float10)param_2[iVar5 + 0x11] +\r\n                      (float10)fVar1 * (float10)param_2[iVar5 + 0x10] +\r\n                      (float10)fVar3 * (float10)param_2[iVar5 + 0x12]);\r\n          iVar5 = iVar5 + 4;\r\n        } while (iVar5 != 0);\r\n        ffree((float10)fVar1);\r\n        ffree((float10)fVar2);\r\n        ffree((float10)fVar3);\r\n        ffree((float10)fVar4);\r\n        param_1 = param_1 + 1;\r\n        iVar6 = iVar6 + 1;\r\n      } while (iVar6 != 0);\r\n      return;\r\n    }\r\n    pfVar7 = local_44;\r\n    for (iVar6 = 0x10; iVar6 != 0; iVar6 = iVar6 + -1) {\r\n      *pfVar7 = *param_3;\r\n      param_3 = param_3 + 1;\r\n      pfVar7 = pfVar7 + 1;\r\n    }\r\n    param_3 = local_44;\r\n  }\r\n  iVar6 = -4;\r\n  do {\r\n    iVar5 = -4;\r\n    fVar1 = *param_2;\r\n    fVar2 = param_2[1];\r\n    fVar3 = param_2[2];\r\n    fVar4 = param_2[3];\r\n    do {\r\n      param_1[iVar5 + 4] =\r\n           (float)((float10)fVar4 * (float10)param_3[iVar5 + 0x10] +\r\n                   (float10)fVar2 * (float10)param_3[iVar5 + 8] +\r\n                  (float10)fVar1 * (float10)param_3[iVar5 + 4] +\r\n                  (float10)fVar3 * (float10)param_3[iVar5 + 0xc]);\r\n      iVar5 = iVar5 + 1;\r\n    } while (iVar5 != 0);\r\n    ffree((float10)fVar1);\r\n    ffree((float10)fVar2);\r\n    ffree((float10)fVar3);\r\n    ffree((float10)fVar4);\r\n    param_2 = param_2 + 4;\r\n    param_1 = param_1 + 4;\r\n    iVar6 = iVar6 + 1;\r\n  } while (iVar6 != 0);\r\n  return;\r\n}\r\n\r\n",
+      "entry_address": "004fd7d2",
+      "target_name": "FUN_004fd7d2"
+    },
+    {
+      "address": "004d5790",
+      "body_size": 77,
+      "decompiled_code": "\r\nfloat10 __thiscall FUN_004d5790(int param_1,int param_2)\r\n\r\n{\r\n  undefined4 local_c;\r\n  undefined4 local_8;\r\n  \r\n  local_8 = *(float *)(param_1 + 0xb4);\r\n  if (param_2 != 0) {\r\n    for (local_c = *(int *)(param_1 + 8); local_c != 0; local_c = *(int *)(local_c + 8)) {\r\n      local_8 = local_8 + *(float *)(local_c + 0xb4);\r\n    }\r\n  }\r\n  return (float10)local_8;\r\n}\r\n\r\n",
+      "entry_address": "004d5790",
+      "target_name": "FUN_004d5790"
+    },
+    {
+      "address": "004d5830",
+      "body_size": 77,
+      "decompiled_code": "\r\nfloat10 __thiscall FUN_004d5830(int param_1,int param_2)\r\n\r\n{\r\n  undefined4 local_c;\r\n  undefined4 local_8;\r\n  \r\n  local_8 = *(float *)(param_1 + 0xbc);\r\n  if (param_2 != 0) {\r\n    for (local_c = *(int *)(param_1 + 8); local_c != 0; local_c = *(int *)(local_c + 8)) {\r\n      local_8 = local_8 + *(float *)(local_c + 0xbc);\r\n    }\r\n  }\r\n  return (float10)local_8;\r\n}\r\n\r\n",
+      "entry_address": "004d5830",
+      "target_name": "FUN_004d5830"
+    },
+    {
+      "address": "004d57e0",
+      "body_size": 77,
+      "decompiled_code": "\r\nfloat10 __thiscall FUN_004d57e0(int param_1,int param_2)\r\n\r\n{\r\n  undefined4 local_c;\r\n  undefined4 local_8;\r\n  \r\n  local_8 = *(float *)(param_1 + 0xb8);\r\n  if (param_2 != 0) {\r\n    for (local_c = *(int *)(param_1 + 8); local_c != 0; local_c = *(int *)(local_c + 8)) {\r\n      local_8 = local_8 + *(float *)(local_c + 0xb8);\r\n    }\r\n  }\r\n  return (float10)local_8;\r\n}\r\n\r\n",
+      "entry_address": "004d57e0",
+      "target_name": "FUN_004d57e0"
+    },
+    {
+      "address": "00428e7e",
+      "body_size": 108,
+      "decompiled_code": "\r\n/* WARNING: Globals starting with '_' overlap smaller symbols at the same address */\r\n\r\nundefined4 __fastcall FUN_00428e7e(int param_1)\r\n\r\n{\r\n  undefined4 uVar1;\r\n  \r\n  if ((((*(float *)(param_1 + 0x4714) == _DAT_005f50a8) ||\r\n       (*(float *)(param_1 + 0x4718) == _DAT_005f50a8)) ||\r\n      (*(float *)(param_1 + 0x471c) == _DAT_005f50a8)) ||\r\n     (*(float *)(param_1 + 0x4720) == _DAT_005f50a8)) {\r\n    uVar1 = 0;\r\n  }\r\n  else {\r\n    uVar1 = 1;\r\n  }\r\n  return uVar1;\r\n}\r\n\r\n",
+      "entry_address": "00428e7e",
+      "target_name": "FUN_00428e7e"
+    },
+    {
+      "address": "00428eea",
+      "body_size": 108,
+      "decompiled_code": "\r\n/* WARNING: Globals starting with '_' overlap smaller symbols at the same address */\r\n\r\nundefined4 __fastcall FUN_00428eea(int param_1)\r\n\r\n{\r\n  undefined4 uVar1;\r\n  \r\n  if ((((*(float *)(param_1 + 0x4714) == _DAT_005f50a8) &&\r\n       (*(float *)(param_1 + 0x4718) == _DAT_005f50a8)) &&\r\n      (*(float *)(param_1 + 0x471c) == _DAT_005f50a8)) &&\r\n     (*(float *)(param_1 + 0x4720) == _DAT_005f50a8)) {\r\n    uVar1 = 1;\r\n  }\r\n  else {\r\n    uVar1 = 0;\r\n  }\r\n  return uVar1;\r\n}\r\n\r\n",
+      "entry_address": "00428eea",
+      "target_name": "FUN_00428eea"
+    },
+    {
+      "address": "0047c1b4",
+      "body_size": 107,
+      "decompiled_code": "\r\n/* WARNING: Globals starting with '_' overlap smaller symbols at the same address */\r\n\r\nfloat10 FUN_0047c1b4(void)\r\n\r\n{\r\n  float10 fVar1;\r\n  float10 fVar2;\r\n  float10 fVar3;\r\n  float local_8;\r\n  \r\n  fVar1 = (float10)D3DRMVectorDotProduct(&stack0x00000004,&stack0x00000010);\r\n  fVar2 = (float10)D3DRMVectorModulus(&stack0x00000004);\r\n  fVar3 = (float10)D3DRMVectorModulus(&stack0x00000010);\r\n  local_8 = (float)((float10)(float)fVar1 / (fVar3 * (float10)(float)fVar2));\r\n  if (local_8 <= _DAT_005f5118) {\r\n    if (local_8 < _DAT_005f5120) {\r\n      local_8 = -1.0;\r\n    }\r\n  }\r\n  else {\r\n    local_8 = 1.0;\r\n  }\r\n  return (float10)local_8;\r\n}\r\n\r\n",
+      "entry_address": "0047c1b4",
+      "target_name": "FUN_0047c1b4"
+    }
+  ]
+}

@@ -1,0 +1,22 @@
+#pragma once
+#include "game_src/unresolved/engine_audio.hpp"
+
+namespace roadwars {
+// Portable host codec replacement for the original QMDX Microsoft ADPCM path.
+Result decode_ms_adpcm_wave(std::span<const std::byte>, WavePcm&);
+
+// New portable owner for the evidenced no-CD race music path; original class unknown.
+class RaceMusic {
+  public:
+    Result load(ResourceStore&, std::string& error);
+    Result start(EngineAudioCommand&);
+    EngineAudioCommand stop();
+    const WavePcm& sample() const { return sample_; }
+    bool playing() const { return playing_; }
+
+  private:
+    WavePcm sample_;
+    float volume_{};
+    bool playing_{};
+};
+} // namespace roadwars

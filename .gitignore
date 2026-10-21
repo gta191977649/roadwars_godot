@@ -12,3 +12,6 @@ __pycache__/
 *.dll
 *.pak
 *.pkh
+
+/platform/godot/third_party/imgui/
+/platform/godot/third_party/imgui-console/

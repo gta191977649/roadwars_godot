@@ -1,13 +1,20 @@
 #pragma once
+#include "game_src/core/simulation_clock.hpp"
 #include "game_src/interfaces/host.hpp"
 
 namespace roadwars {
 // New host adaptation of the observed global loop, not an original class name.
 enum class GameMode { single_race = 0, multiplayer = 1, season = 2 };
 enum class LoopStage {
-    initialize_0045c8ab, keyboard_004dffdf, joystick_004e005a,
-    common_00408663, inactivity_block_0045c29c, shortcuts_0045d8ed,
-    single_race_004a4f57, multiplayer_0046d7a0, season_004a16b0,
+    initialize_0045c8ab,
+    keyboard_004dffdf,
+    joystick_004e005a,
+    common_00408663,
+    inactivity_block_0045c29c,
+    shortcuts_0045d8ed,
+    single_race_004a4f57,
+    multiplayer_0046d7a0,
+    season_004a16b0,
     transition_004ab60d
 };
 struct LoopState {
@@ -25,16 +32,24 @@ class LoopHooks {
 };
 class GameEntry {
   public:
-    explicit GameEntry(LoopHooks& hooks) : hooks_(hooks) {}
+    enum class Timing { legacy_reference, fixed_simulation };
+    explicit GameEntry(LoopHooks& hooks, Timing timing = Timing::legacy_reference)
+        : hooks_(hooks), timing_(timing) {}
     Result start();
     Result advance(double delta_seconds, const InputState& input);
     void stop();
     LoopState& state() { return state_; }
     bool running() const { return running_; }
+    double interpolation_alpha() const { return clock_.interpolation_alpha(); }
+    std::uint64_t simulation_ticks() const { return clock_.ticks(); }
     static const char* original_address(LoopStage stage);
+
   private:
     LoopHooks& hooks_;
     LoopState state_{};
     bool running_{};
+    Timing timing_;
+    SimulationClock clock_;
+    Result advance_step(double delta_seconds, const InputState& input);
 };
 } // namespace roadwars

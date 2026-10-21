@@ -11,7 +11,10 @@ ROOT = Path(__file__).resolve().parents[1]
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--headless', action='store_true', help='Only test extension and lifecycle, not pixels')
+    parser.add_argument('--fog', action='store_true', help='Render original linear fog and exempt-material fixtures')
     args = parser.parse_args()
+    if args.fog and args.headless:
+        parser.error('--fog requires a real rendering surface')
     executable = json.loads((ROOT / 'config.local.json').read_text())['godot_executable']
     project = ROOT / 'platform/godot/project'
     options = {'cwd': ROOT, 'capture_output': True, 'text': True, 'timeout': 60}
@@ -27,14 +30,20 @@ def main():
     print(imported.stdout, imported.stderr)
     if imported.returncode or 'ERROR:' in imported.stderr:
         return 1
-    capture = ROOT / 'build/godot_smoke.png'
-    command = [executable, '--path', str(project), '--script', 'res://smoke_test.gd']
+    capture = ROOT / ('build/fog_smoke.png' if args.fog else 'build/godot_smoke.png')
+    command = [executable, '--path', str(project), '--script', 'res://' + ('fog_smoke_test.gd' if args.fog else 'smoke_test.gd')]
     if args.headless:
         command.append('--headless')
-    command += ['--', '--capture=' + str(capture)]
+    command += ['--', '--no-debug-overlay', '--capture=' + str(capture)]
+    log_path = ROOT / 'build' / ('fog_smoke.log' if args.fog else 'godot_smoke.log')
+    log_path.unlink(missing_ok=True)
+    command[1:1] = ['--log-file', str(log_path)]
     result = subprocess.run(command, **options)
-    print(result.stdout, result.stderr)
-    if result.returncode or 'ERROR:' in result.stderr or 'leaked' in result.stderr.lower() or 'ROADWARS_SMOKE_OK' not in result.stdout:
+    log = log_path.read_text(encoding='utf-8', errors='replace') if log_path.is_file() else ''
+    output = result.stdout + '\n' + result.stderr + '\n' + log
+    print(output)
+    marker = 'ROADWARS_FOG_SMOKE_OK' if args.fog else 'ROADWARS_SMOKE_OK'
+    if result.returncode or 'ERROR:' in output or 'leaked' in output.lower() or marker not in output:
         return 1
     if not args.headless:
         print('Verified render capture:', capture)

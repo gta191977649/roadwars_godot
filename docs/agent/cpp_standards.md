@@ -16,6 +16,8 @@
 
 ## Binary and behavioral fidelity
 
+- Authorized modernization: live gameplay uses a fixed simulation clock and interpolated presentation. Original frame-rate dependence must not be reproduced. Keep recovered per-step formulas separate from the modern scheduling policy; never feed render-interpolated positions back into physics. Preserve a legacy reference mode for analysis, clearly labeled. Input-edge commands must survive frames without physics ticks and execute once during catch-up.
+
 - Separate serialized structures from runtime objects. Decode little-endian fields explicitly; do not read raw bytes directly into C++ structs or depend on native padding, alignment or pointer width.
 - Preserve evidenced original units, numerical widths, floating-point order and update order. No fast-math, implicit timing model changes, speculative parameter tuning or silent bug fixes.
 - Do not translate decompiled pseudocode mechanically: repair calling conventions, object layouts, signedness and ownership using disassembly and corroborating evidence.

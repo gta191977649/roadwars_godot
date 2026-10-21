@@ -1,0 +1,16 @@
+{
+  "binary_sha256": "93b4e4c301a5694b55e16977c2e52f4971bd9089659e3d58617c8af2368436c8",
+  "address": "004ddb75",
+  "result": {
+    "content": [
+      {
+        "type": "text",
+        "text": "004ddb75 55                PUSH EBP\n004ddb76 8b ec             MOV EBP,ESP\n004ddb78 83 ec 08          SUB ESP,0x8\n004ddb7b 89 4d f8          MOV dword ptr [EBP + -0x8],ECX\n004ddb7e 83 7d 08 ff       CMP dword ptr [EBP + 0x8],-0x1\n004ddb82 74 27             JZ 0x004ddbab\n004ddb84 d9 05 bc 5a 5f 00 FLD float ptr [0x005f5abc]\n004ddb8a d8 4d 0c          FMUL float ptr [EBP + 0xc]\n004ddb8d e8 2a 8c 03 00    CALL 0x005167bc\n004ddb92 89 45 fc          MOV dword ptr [EBP + -0x4],EAX\n004ddb95 8b 45 fc          MOV EAX,dword ptr [EBP + -0x4]\n004ddb98 50                PUSH EAX\n004ddb99 6a 00             PUSH 0x0\n004ddb9b 8b 4d 08          MOV ECX,dword ptr [EBP + 0x8]\n004ddb9e 51                PUSH ECX\n004ddb9f 8b 55 f8          MOV EDX,dword ptr [EBP + -0x8]\n004ddba2 8b 02             MOV EAX,dword ptr [EDX]\n004ddba4 50                PUSH EAX\n004ddba5 ff 15 c4 09 65 00 CALL dword ptr [0x006509c4]\n004ddbab 8b e5             MOV ESP,EBP"
+      }
+    ],
+    "structuredContent": {
+      "data": "004ddb75 55                PUSH EBP\n004ddb76 8b ec             MOV EBP,ESP\n004ddb78 83 ec 08          SUB ESP,0x8\n004ddb7b 89 4d f8          MOV dword ptr [EBP + -0x8],ECX\n004ddb7e 83 7d 08 ff       CMP dword ptr [EBP + 0x8],-0x1\n004ddb82 74 27             JZ 0x004ddbab\n004ddb84 d9 05 bc 5a 5f 00 FLD float ptr [0x005f5abc]\n004ddb8a d8 4d 0c          FMUL float ptr [EBP + 0xc]\n004ddb8d e8 2a 8c 03 00    CALL 0x005167bc\n004ddb92 89 45 fc          MOV dword ptr [EBP + -0x4],EAX\n004ddb95 8b 45 fc          MOV EAX,dword ptr [EBP + -0x4]\n004ddb98 50                PUSH EAX\n004ddb99 6a 00             PUSH 0x0\n004ddb9b 8b 4d 08          MOV ECX,dword ptr [EBP + 0x8]\n004ddb9e 51                PUSH ECX\n004ddb9f 8b 55 f8          MOV EDX,dword ptr [EBP + -0x8]\n004ddba2 8b 02             MOV EAX,dword ptr [EDX]\n004ddba4 50                PUSH EAX\n004ddba5 ff 15 c4 09 65 00 CALL dword ptr [0x006509c4]\n004ddbab 8b e5             MOV ESP,EBP"
+    },
+    "isError": false
+  }
+}
