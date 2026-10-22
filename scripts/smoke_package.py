@@ -3,6 +3,7 @@ import argparse
 from pathlib import Path
 import os
 import json
+import tempfile
 import shutil
 import subprocess
 import sys
@@ -16,7 +17,7 @@ def main():
     package = args.package.resolve()
     if sorted(p.name for p in package.iterdir()) != ['RoadWars-RE.exe', 'roadwars_godot.dll']:
         raise ValueError('Expected exactly the embedded-pack EXE and extension DLL')
-    base = ROOT / 'build/package-smoke'
+    base = Path(tempfile.mkdtemp(prefix='package-smoke-', dir=ROOT / 'build'))
     assets = base / 'assets'
     assets.mkdir(parents=True, exist_ok=True)
     # Private read-only test copies: hard links avoid copying the original archives.
@@ -25,7 +26,8 @@ def main():
         try: os.link(source, destination)
         except OSError: shutil.copy2(source, destination)
         return destination
-    shutil.copytree(game_directory(), assets, copy_function=copy_asset, dirs_exist_ok=True)
+    shutil.copytree(game_directory(), assets, copy_function=copy_asset, dirs_exist_ok=True,
+                    ignore=shutil.ignore_patterns('*.exe', '*.dll', 'config.local.json'))
     def run(name, binary, cwd, arguments, expected=None):
         log = base / (name + '.log')
         command = [str(binary), '--headless', '--quit-after', '12', '--log-file', str(log)] + arguments

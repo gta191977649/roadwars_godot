@@ -36,8 +36,8 @@ bool GameHost::resolve_startup_directory() {
     }
     if (developer_build_) {
         const godot::String configs[] = {
-            "res://../../../config.local.json",
-            godot::OS::get_singleton()->get_executable_path().get_base_dir().path_join("config.local.json")};
+            godot::OS::get_singleton()->get_executable_path().get_base_dir().path_join("config.local.json"),
+            "res://../../../config.local.json"};
         for (const auto& path : configs) {
             if (!godot::FileAccess::file_exists(path))
                 continue;

@@ -2,6 +2,7 @@
 import argparse
 import json
 import os
+import platform
 from pathlib import Path
 import shutil
 import subprocess
@@ -35,6 +36,8 @@ def main():
         raise ValueError('--jobs must be positive')
     if sys.platform not in TARGETS:
         raise ValueError('Supported native packaging hosts: Windows, Linux, macOS')
+    if sys.platform != 'darwin' and platform.machine().lower() not in {'amd64', 'x86_64'}:
+        raise ValueError('Windows/Linux package presets currently require an x86_64 native host')
     preset, target, library, executable, template = TARGETS[sys.platform]
     template_path = args.templates_dir.resolve() / template
     version_file = template_path.parent / 'version.txt'
@@ -42,6 +45,8 @@ def main():
         raise ValueError(f'Missing matching Godot {VERSION} export templates: {template_path}. Install templates or pass --templates-dir.')
     config = load_config() if (ROOT / 'config.local.json').is_file() else {}
     godot = str(args.godot or config.get('godot_executable') or shutil.which('godot') or shutil.which('godot4') or '')
+    if not godot:
+        raise ValueError('Pass --godot or put the matching Godot editor on PATH')
     if sys.platform == 'win32':
         console = Path(godot).with_name(Path(godot).stem + '_console.exe')
         if console.is_file(): godot = str(console)
@@ -61,6 +66,12 @@ def main():
         if not extension.is_file():
             raise ValueError('Native Release library was not produced: ' + str(extension))
         stage = ROOT / 'build/package-project' / target
+        # Rebuild the staging allowlist, so stale tests/assets cannot enter a pack.
+        if stage.exists():
+            resolved = stage.resolve()
+            if not resolved.is_relative_to(ROOT.resolve()) or not resolved.is_relative_to((ROOT / 'build/package-project').resolve()):
+                raise ValueError('Unsafe package staging directory: ' + str(resolved))
+            shutil.rmtree(resolved)
         stage.mkdir(parents=True, exist_ok=True)
         # Allowlist rather than excluding an evolving collection of smoke scenes.
         source = ROOT / 'platform/godot/project'

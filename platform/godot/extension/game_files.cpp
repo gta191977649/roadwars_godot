@@ -1,11 +1,12 @@
-#include "platform/godot/extension/frame_trace.hpp"
 #include "platform/godot/extension/game_files.hpp"
+#include "game_src/unresolved/resource_store.hpp"
+#include "platform/godot/extension/frame_trace.hpp"
 #include <cstring>
 #include <filesystem>
-#include "game_src/unresolved/resource_store.hpp"
 #include <godot_cpp/classes/dir_access.hpp>
-#include <godot_cpp/classes/os.hpp>
 #include <godot_cpp/classes/file_access.hpp>
+#include <godot_cpp/classes/os.hpp>
+#include <godot_cpp/variant/utility_functions.hpp>
 
 namespace roadwars {
 godot::String resolve_game_path(const godot::String& root, const godot::String& relative,
@@ -124,8 +125,13 @@ Result GameFiles::read(std::string_view path, std::vector<std::byte>& output) {
     if (found == resolved_.end()) {
         godot::String error;
         auto resolved = resolve_game_path(root_, relative, false, error);
-        if (resolved.is_empty())
+        if (resolved.is_empty()) {
+            if (error.begins_with("Ambiguous case variants:")) {
+                godot::UtilityFunctions::push_error(error);
+                return Result::invalid_argument;
+            }
             return Result::not_found;
+        }
         found = resolved_.emplace(std::string(path), std::move(resolved)).first;
     }
     const auto file = godot::FileAccess::open(found->second, godot::FileAccess::READ);

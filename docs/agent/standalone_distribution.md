@@ -79,7 +79,10 @@ The exported EXE smoke runs independently from the repository with only EXE+DLL:
 root/bin/deep-ancestor installation placement, isolated missing-assets failure,
 explicit remote root, and a real Single Race load. Frontend race/return/BGM smoke,
 developer-config menu smoke, competition lifecycle smoke and diagnostic renderer
-lifecycle smoke passed. Final direct-debug acceptance is recorded after execution.
+lifecycle smoke passed. Both direct `RoadWars-RE.exe --debug` and separated `RoadWars-RE.exe -- --debug`
+are supported. Godot consumes the direct flag; its active engine debugger also
+enables the host diagnostics. An executable-adjacent developer config takes
+precedence over the repository config when debug mode is explicitly enabled.
 
 Linux/macOS runtime and dialog behavior have not been tested on this Windows host.
 The existing frontend GSM 6.10 audio adapter remains Windows-specific; this work
