@@ -56,3 +56,28 @@ Godot submits the selected snapshot; a selection change clears orbit and visual
 interpolation once, including while paused. No control ownership, AI RNG or physics
 state changes. Player Auto Drive remains an independent checkbox. Route filtering
 still uses the selected AI, with the player entry showing the overall route graph.
+
+## Executed acceptance (2026-10-22)
+
+Core and Godot builds passed. Core38/38 and Godot40/40 CTest passed. Original-asset
+MenuFrontend acceptance exercised live Continue, Restart Race and explicit Replay
+unavailability, plus existing startup/generic screen coverage.
+
+Native competition smoke used actual ImGui popup clicks to select AI0 then Player,
+verified eye changes and the default player target. It opened the original pause
+menu, checked SceneTree paused and unchanged scheduler ticks while normal_process
+ran, then operated Restart Race through Down/Enter and verified countdown/time/laps
+reset. A second pause at actual player route node14 and91mph compared a1280x250
+world region byte-for-byte over20 presented frames; pixels and scheduler ticks
+were unchanged. Native captures route_nodes_14_21.png and pause_moving.png show
+node16/21 labels at the road instead of the former underground fold. Complete
+race/results/navigation and three host restarts released resources cleanly.
+
+Headless competition smoke passed the same state/navigation/restart path, with no
+pixel claim. Native timing smoke retained matching300-tick driving/effect state
+across10..240FPS, stalls and engine pause. The complete portable race frame matrix
+also includes every racer's chase eye/basis, and passed10/15/30/60/75/120/144/240FPS
+plus350/900ms stalls and debug-read purity. No simulation result changed. Progress,
+architecture boundaries and diff whitespace checks passed. The initial native
+menu-restart test exposed capture-release pointer warping changing the hovered
+row; ignoring that first warp event fixed the issue and native rerun passed.

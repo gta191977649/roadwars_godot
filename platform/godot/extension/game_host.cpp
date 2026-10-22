@@ -1333,6 +1333,9 @@ void GameHost::set_competition_paused(bool paused) {
         if (menu->show_pause(race_->frontend().commands(), error) != Result::ok)
             throw std::runtime_error(error);
         pause_menu_ = std::move(menu);
+        ui_mouse_visible_ = false; // Pause menu takes focus; F8 can refocus debug UI.
+        if (debug_overlay_)
+            debug_overlay_->focus(false);
         previous_tree_paused_ = get_tree()->is_paused();
         get_tree()->set_pause(true);
     } else {

@@ -129,3 +129,16 @@ Fonts/16321go.bmp with alphabet321G replaces the initial ordinary HUD font mista
 G is the full GO! graphic. Native clean captures start_clean_20/24/28/32.png were
 visually inspected. Core38 and Godot40 checks passed, full fixed-tick camera/cue
 frame matrix passed, native competition and no-debug intro lifecycle passed.
+
+## Godot pause/menu, route heights and Inspect (2026-10-22)
+
+See race_pause.md and race_pause_ghidra.json. Corrected the missing-surface fallback
+for Dark Forest nodes16/21, which previously reused invalid serialized Y near-244.
+Native route capture now shows those labels along the road. Esc uses SceneTree
+pause, preserves interpolation alpha/time debt, freezes server particles/native
+audio and opens the original Single Race menu; Restart Race is live. Inspect now
+follows an AI or the default Player through independent portable chase snapshots.
+Native actual popup/keyboard tests, moving91mph pause pixel equality, full race and
+restart/cleanup passed. Core38 and Godot40 CTest, native timing and the full portable
+frame matrix passed. Replay remains explicitly unavailable. No original-runtime
+comparison is claimed and partial original functions remain analyzing.

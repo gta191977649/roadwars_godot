@@ -148,6 +148,22 @@ func run_test() -> void:
                        host.get_camera_position().distance_to(before_eye) > 1,
                        "Inspect did not switch the camera target"):
             return
+    # Escape transfers focus from debug UI to the original pause menu.
+    key_event(KEY_ESCAPE, true)
+    key_event(KEY_ESCAPE, false)
+    if not await pump():
+        return
+    if not require(host.get_competition_state().get("paused", false) and
+                   not host.get_ui_mouse_visible(), "Pause menu did not take keyboard focus"):
+        return
+    key_event(KEY_ESCAPE, true)
+    key_event(KEY_ESCAPE, false)
+    if not await pump():
+        return
+    key_event(KEY_F8, true)
+    key_event(KEY_F8, false)
+    if not await pump():
+        return
     if not require(host.get_race_debug_line_count() > 0, "Route debug produced no visible primitives"):
         return
     if not await capture("race_debug"):
