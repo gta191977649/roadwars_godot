@@ -61,6 +61,8 @@ Result RaceStart::load(ResourceStore& resources, const MeshObject& world, std::s
             return Result::unavailable;
         }
     }
+    if (track_camera_.load(world, error) != Result::ok)
+        return Result::unavailable;
     reset();
     return Result::ok;
 }
@@ -82,7 +84,7 @@ int RaceStart::digit(float remaining) {
 // RE-STUB: 93b4e4c301a5694b55e16977c2e52f4971bd9089659e3d58617c8af2368436c8:function:004094fb
 // RE-STUB: 93b4e4c301a5694b55e16977c2e52f4971bd9089659e3d58617c8af2368436c8:function:004e553d
 Result RaceStart::update(float remaining, float dt, const VehicleDynamics& vehicle,
-                         const TrackCollision& track) {
+                         const TrackCollision& track, bool finished) {
     if (!std::isfinite(remaining) || !std::isfinite(dt) || dt < 0)
         return Result::invalid_argument;
     remaining_ = remaining;
@@ -91,6 +93,8 @@ Result RaceStart::update(float remaining, float dt, const VehicleDynamics& vehic
         sounded_[3 - number] = true;
         pending_sounds_.push_back(3 - number);
     }
+    if (finished)
+        return track_camera_.update(vehicle.state().position, camera_);
     if (remaining >= 3) {
         const auto ground = track.sample(eye_);
         if (ground.hit)

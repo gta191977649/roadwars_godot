@@ -1,6 +1,7 @@
 #pragma once
 #include "game_src/interfaces/host.hpp"
 #include <array>
+#include <functional>
 #include <span>
 
 namespace roadwars {
@@ -28,15 +29,19 @@ struct ParticleRenderState {
     std::uint32_t color_argb{}, atlas_frame{};
     bool active{};
 };
-// Same numerical CRT generator as 005170b0. The test profile chooses its seed;
-// it does not claim the original game's globally shared random-call sequence.
+// Same numerical CRT generator as 005170b0. Seeded profiles choose a diagnostic
+// stream; live callers can borrow the race-owned shared draw callback.
 class ParticleRandom {
   public:
     explicit ParticleRandom(std::uint32_t seed = 1) : state_(seed) {}
+    // New adapter: borrow the race-owned CRT stream without reseeding it.
+    explicit ParticleRandom(std::function<std::uint32_t()> draw)
+        : state_(0), draw_(std::move(draw)) {}
     std::uint32_t next();
 
   private:
     std::uint32_t state_;
+    std::function<std::uint32_t()> draw_;
 };
 ParticleSettings vehicle_spark_settings(float special_effects_scalar);
 std::array<Vec3, 3> particle_triangle(float size);

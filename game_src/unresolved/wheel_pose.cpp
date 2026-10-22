@@ -1,5 +1,6 @@
 #include "game_src/unresolved/wheel_pose.hpp"
 #include "game_src/unresolved/contact_orientation.hpp"
+#include "game_src/unresolved/race_loadout.hpp"
 #include <cmath>
 
 namespace roadwars {
@@ -7,21 +8,7 @@ namespace roadwars {
 // Stock Street/Poor rendering subset; purchase, LOD and upgrade transitions remain outside it.
 Result load_stock_wheel_scale(ResourceStore& resources, std::string_view vehicle, float& scale_x,
                               std::string& error) {
-    Configuration config;
-    const auto result =
-        config.load(resources, "Cars/" + std::string(vehicle) + "/Tires/Street/Poor/Data.ini");
-    if (result != Result::ok) {
-        error = "Stock tire scale configuration unavailable";
-        return result;
-    }
-    float scale{};
-    if (config.number("SCALE", "SCALEX", scale) != Result::ok || scale <= 0) {
-        error = "Invalid original tire X scale";
-        return Result::invalid_argument;
-    }
-    scale_x = scale;
-    error.clear();
-    return Result::ok;
+    return load_wheel_scale(resources, vehicle, {}, scale_x, error);
 }
 
 // RE-STUB: 93b4e4c301a5694b55e16977c2e52f4971bd9089659e3d58617c8af2368436c8:function:00428cb6

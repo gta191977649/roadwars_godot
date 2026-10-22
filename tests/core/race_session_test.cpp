@@ -55,7 +55,11 @@ Words state_words(const RaceSession& session) {
         number(value.z);
     };
     integer(session.phase());
+    integer(session.ending());
+    integer(session.idle_return_requested());
+    number(session.idle_return_remaining());
     integer(session.ticks());
+    integer(session.random_state());
     wide(session.time());
     number(session.countdown());
     const auto& start = session.start_sequence();
@@ -69,6 +73,65 @@ Words state_words(const RaceSession& session) {
         integer(index);
     for (const auto& racer : session.racers()) {
         const auto& vehicle = *racer.vehicle;
+        const auto& equipment = vehicle.equipment();
+        number(equipment.internal_hp);
+        number(equipment.maximum_internal_hp);
+        for (const auto hp : equipment.armor_hp)
+            number(hp);
+        for (const auto hp : equipment.maximum_armor_hp)
+            number(hp);
+        for (const auto upgrade : equipment.engine_upgrades)
+            integer(upgrade);
+        integer(equipment.nitrous_ammo);
+        number(equipment.nitrous_timer);
+        number(equipment.nitrous_duration_scalar);
+        number(equipment.internal_repair_per_second);
+        number(equipment.dying_timer);
+        number(equipment.traction_multiplier);
+        number(vehicle.disabled_contact_1c());
+        require(vehicle.damage_visuals() != nullptr, "Participant lacks actual body damage owner");
+        const auto& damage = *vehicle.damage_visuals();
+        integer(damage.revision());
+        integer(damage.marks().size());
+        integer(damage.deformations().size());
+        for (const auto& deformation : damage.deformations()) {
+            vector(deformation.local_point);
+            vector(deformation.displacement);
+        }
+        for (const auto& mark : damage.marks()) {
+            integer(mark.side.value_or(0xffffffffu));
+            for (const auto& rectangle : mark.rectangles) {
+                integer(rectangle.left);
+                integer(rectangle.top);
+                integer(rectangle.right);
+                integer(rectangle.bottom);
+            }
+        }
+        number(racer.combat_ai.side_delay_4ad4);
+        number(racer.combat_ai.rear_timer_0c);
+        integer(racer.side_target);
+        integer(racer.active_side_target);
+        require(vehicle.combat() != nullptr, "Participant has no vehicle-owned combat");
+        for (auto slot : {WeaponSlot::front, WeaponSlot::side, WeaponSlot::rear}) {
+            const auto weapon = vehicle.combat()->slot(slot);
+            integer(weapon.ammunition);
+            integer(weapon.active);
+            integer(weapon.ready);
+            integer(weapon.pending);
+            number(weapon.deployment_roll);
+            integer(weapon.elapsed.has_value());
+            if (weapon.elapsed)
+                number(*weapon.elapsed);
+        }
+        for (const auto& visual : vehicle.combat()->visuals()) {
+            integer(visual.slot);
+            integer(visual.kind);
+            integer(visual.index);
+            integer(visual.visible);
+            vector(visual.pose.origin);
+            for (const auto axis : visual.pose.basis)
+                vector(axis);
+        }
         vector(racer.camera.transform.origin);
         for (const auto axis : racer.camera.transform.basis)
             vector(axis);
@@ -141,6 +204,84 @@ Words state_words(const RaceSession& session) {
             vector(event.position);
         }
     }
+    integer(session.selected_hud_item());
+    integer(session.scene_combat().launched_projectiles());
+    integer(session.scene_combat().vehicle_impacts());
+    const auto particle_pool = [&](const auto& pool) {
+        integer(pool.draw_order().size());
+        for (const auto slot : pool.draw_order()) {
+            integer(slot);
+            const auto& particle = pool.particles()[slot];
+            vector(particle.position);
+            vector(particle.velocity);
+            number(particle.remaining_life);
+            number(particle.size);
+            integer(particle.color_argb);
+            integer(particle.atlas_frame);
+            integer(particle.active);
+        }
+    };
+    for (const auto& trail : session.scene_trails())
+        particle_pool(trail.pool);
+    for (const auto& trail : session.vehicle_trails())
+        particle_pool(trail.pool);
+    for (const auto& trail : session.nitrous_trails())
+        particle_pool(trail);
+    for (const auto& effects : session.vehicle_particles()) {
+        particle_pool(effects.sparks);
+        particle_pool(effects.damage);
+        for (const auto& tire : effects.tires)
+            particle_pool(tire);
+    }
+    for (const auto& chimney : session.chimneys())
+        particle_pool(chimney.pool);
+    for (const auto& trail : session.scene_electron_trails())
+        particle_pool(trail);
+    for (const auto& trap : session.scene_electron_traps().poses()) {
+        number(trap.timer);
+        integer(trap.active);
+        integer(trap.beam_visible);
+        vector(trap.beam_pose.origin);
+    }
+    for (const auto& particle : session.weather().particles()) {
+        integer(particle.visible);
+        vector(particle.position);
+        number(particle.age);
+        number(particle.heading);
+    }
+    for (const auto& impact : session.impact_pools()) {
+        particle_pool(impact.pool);
+        const auto& sprite = impact.sprite.particle();
+        integer(sprite.active);
+        vector(sprite.position);
+        number(sprite.remaining_life);
+        number(sprite.size);
+    }
+    for (const auto& owner : session.rear_blast_pools())
+        for (const auto& blast : owner) {
+            integer(blast.primary_active());
+            integer(blast.secondary_active());
+            for (const auto slot : blast.primary_order()) {
+                integer(slot);
+                const auto& particle = blast.primary_particles()[slot];
+                vector(particle.position);
+                vector(particle.velocity);
+                number(particle.remaining_life);
+                integer(particle.color_argb);
+                integer(particle.atlas_frame);
+            }
+            integer(0xffffffffu);
+            for (const auto slot : blast.secondary_order()) {
+                integer(slot);
+                const auto& particle = blast.secondary_particles()[slot];
+                vector(particle.position);
+                vector(particle.velocity);
+                number(particle.remaining_life);
+                integer(particle.color_argb);
+                integer(particle.atlas_frame);
+            }
+            integer(0xffffffffu);
+        }
     return result;
 }
 void validate_result(const RaceSession& session) {
@@ -148,10 +289,16 @@ void validate_result(const RaceSession& session) {
             "Race did not finish within 900 simulated seconds");
     const auto racers = session.racers();
     const auto& player = racers[session.player_index()];
-    require(player.progress.finished && player.progress.completed_laps == session.options().laps,
-            "Player finish did not follow real lap progression");
-    require(player.finish_time > 0 && player.finish_time == session.time(),
-            "Invalid player finish time");
+    require(session.ending() != RaceEndReason::none, "Terminal menu lacks a finish/death reason");
+    if (session.ending() == RaceEndReason::completed) {
+        require(player.progress.finished &&
+                    player.progress.completed_laps == session.options().laps,
+                "Player finish did not follow real lap progression");
+        require(player.finish_time > 0 && player.finish_time < session.time(),
+                "Idle return did not continue after finish");
+    } else
+        require(player.vehicle->equipment().dying_timer > 0,
+                "Elimination lacks actual death state");
     auto ranks = session.ranking();
     for (std::size_t place = 0; place < ranks.size(); ++place)
         require(racers[ranks[place]].rank == static_cast<int>(place + 1),
@@ -162,15 +309,20 @@ void validate_result(const RaceSession& session) {
         require(racers[index].rank >= 1 && racers[index].rank <= static_cast<int>(racers.size()),
                 "Participant rank is outside the race");
     }
-    for (int index = 0; index < session.options().laps; ++index)
+    for (int index = 0; index < player.progress.completed_laps; ++index)
         require(player.lap_times[index] > 0, "Finished lap has no measured time");
     std::vector<FrontendRacer> hud_racers;
     const auto hud = session.frontend_frame(hud_racers);
-    require(hud.race_info && hud.race_info->completed_laps == session.options().laps &&
+    for (std::size_t i = 0; i < racers.size(); ++i)
+        require(hud.racers[i].hidden_on_map == racers[i].passive_jammer &&
+                    hud.racers[i].eliminated == (racers[i].vehicle->equipment().dying_timer != 0),
+                "HUD map status differs from actual original character/death fields");
+    require(hud.race_info && hud.race_info->completed_laps == player.progress.completed_laps &&
                 hud.race_info->total_laps == session.options().laps &&
                 hud.race_info->rank == player.rank &&
                 hud.race_info->racer_count == static_cast<int>(racers.size()) &&
-                hud.racers.size() == racers.size() && hud.racers[hud.player_index].finished,
+                hud.racers.size() == racers.size() &&
+                hud.racers[hud.player_index].finished == player.progress.finished,
             "HUD did not receive the actual race result");
 }
 struct Scenario {
@@ -218,18 +370,45 @@ Trace run(ResourceStore& resources, const Scenario& scenario, const RaceOptions&
     require(session.advance(std::numeric_limits<float>::quiet_NaN(), {}, error) ==
                 Result::invalid_argument,
             "Nonfinite delta accepted");
+    require(session.selected_hud_item() == 0, "Fresh native4ab0=1 did not select HUD map0");
     const auto initial = state_words(session);
+    InputState short_press;
+    short_press.weapon_requested[0] = true;
+    short_press.nitrous_requested = true;
+    require(session.advance(0, short_press, error) == Result::ok && state_words(session) == initial,
+            "Zero-tick combat input mutated simulation");
     for (int cycle = 0; cycle < 3; ++cycle) {
         session.set_paused(true);
         require(session.advance(1, {}, error) == Result::ok && state_words(session) == initial,
                 "Paused race advanced state");
         session.set_paused(false);
-        require(session.restart(error) == Result::ok && state_words(session) == initial,
-                "Restart did not restore the initial race");
+        auto expected_random = session.random_state();
+        for (std::size_t draw = 0; draw < 4 * session.racers().size(); ++draw)
+            original_random(expected_random);
+        require(session.restart(error) == Result::ok && session.random_state() == expected_random &&
+                    session.ticks() == 0,
+                "Restart did not restore participants and consume original reset draws");
+        require(session.load(resources, scenario.collision, options, player, error) == Result::ok &&
+                    state_words(session) == initial,
+                "Seeded initialization changed after restart");
     }
     // Verify route topology against decoded resource order, including the wrap
     // and the first segment entering each optional branch.
     const auto snapshot = session.debug_snapshot();
+    require(snapshot.equipment.size() == session.racers().size(),
+            "Missing actual loadout diagnostics");
+    for (std::size_t i = 0; i < session.racers().size(); ++i) {
+        const auto& racer = session.racers()[i];
+        const auto& diagnostic = snapshot.equipment[i];
+        const auto& parameters = racer.vehicle->parameters();
+        require(ResourceStore::canonical(parameters.tires.type) ==
+                        ResourceStore::canonical(racer.loadout.tires.type) &&
+                    ResourceStore::canonical(parameters.tires.quality) == "BEST" &&
+                    parameters.engine_upgrades == racer.vehicle->equipment().engine_upgrades &&
+                    diagnostic.selected_weapons == racer.loadout.weapons &&
+                    diagnostic.armor_hp == racer.vehicle->equipment().armor_hp,
+                "Race loadout/physics/debug state disagree");
+    }
     const auto nodes = session.route().nodes();
     std::size_t route_edge = 0;
     std::vector<const RaceDebugLine*> route_lines;
@@ -262,17 +441,63 @@ Trace run(ResourceStore& resources, const Scenario& scenario, const RaceOptions&
     SimulationClock clock;
     Trace trace;
     std::size_t compared{};
+    bool terminal_key_checked{};
+    constexpr std::uint64_t maximum_ticks = 60 * 900;
     auto tick = [&](float dt, const InputState& input) {
-        if (session.phase() == RacePhase::finished)
+        if (session.idle_return_requested() || session.ticks() >= maximum_ticks)
             return Result::ok;
-        const auto result = session.advance(dt, input, error);
+        struct PriorTarget {
+            bool active;
+            int ammunition, target;
+        };
+        std::vector<PriorTarget> prior_targets;
+        for (const auto& racer : session.racers()) {
+            const auto slot = racer.vehicle->combat()->slot(WeaponSlot::side);
+            prior_targets.push_back({slot.active, slot.ammunition, racer.active_side_target});
+        }
+        auto actual_input = input;
+        const bool check_terminal =
+            session.ending() != RaceEndReason::none && !terminal_key_checked;
+        if (check_terminal)
+            actual_input.any_key_down = true;
+        const auto result = session.advance(dt, actual_input, error);
+        if (check_terminal) {
+            require(std::abs(session.idle_return_remaining() - (10 - dt)) < .0001f,
+                    "Terminal physical key did not reset original10-second idle timer");
+            terminal_key_checked = true;
+        }
         require(result == Result::ok, error);
+        for (std::size_t owner = 0; owner < session.racers().size(); ++owner) {
+            const auto& racer = session.racers()[owner];
+            const auto slot = racer.vehicle->combat()->slot(WeaponSlot::side);
+            if (slot.active && prior_targets[owner].active &&
+                slot.ammunition == prior_targets[owner].ammunition)
+                require(racer.active_side_target == prior_targets[owner].target,
+                        "AI query target retargeted an already-active guided weapon");
+        }
         const auto state = state_words(session);
         if (session.phase() == RacePhase::countdown)
             for (const auto& racer : session.racers())
                 require(racer.vehicle->state().engine_throttle == 0,
                         "A participant accelerated during the countdown");
         if (session.ticks() == 600) {
+            const auto events = session.dispatch_trace();
+            require(events.size() == session.racers().size() * 2,
+                    "Native controller/force dispatch omitted a live participant");
+            require(events.front().stage == RaceSession::DispatchEvent::Stage::controller &&
+                        events.front().participant == session.player_index(),
+                    "Selected controller was not dispatched before all participant forces");
+            std::size_t event = 1;
+            for (std::size_t owner = 0; owner < session.racers().size(); ++owner) {
+                if (owner != session.player_index()) {
+                    require(events[event].stage == RaceSession::DispatchEvent::Stage::controller &&
+                                events[event++].participant == owner,
+                            "AI combat controller did not precede its own force phase");
+                }
+                require(events[event].stage == RaceSession::DispatchEvent::Stage::force &&
+                            events[event++].participant == owner,
+                        "Participant force phase violated native interleaving");
+            }
             session.set_paused(true);
             require(session.advance(5, {}, error) == Result::ok && state_words(session) == state,
                     "Mid-race pause advanced physics or race timers");
@@ -324,7 +549,7 @@ Trace run(ResourceStore& resources, const Scenario& scenario, const RaceOptions&
         return Result::ok;
     };
     std::size_t frame{};
-    while (session.phase() != RacePhase::finished && session.ticks() < 60 * 900) {
+    while (!session.idle_return_requested() && session.ticks() < maximum_ticks) {
         require(clock.advance(cadence[frame++ % cadence.size()], {}, tick) == Result::ok, error);
         if (!reference && session.ticks() % 3600 == 0) {
             const auto& racer = session.racers()[session.player_index()];
@@ -347,26 +572,65 @@ Trace run(ResourceStore& resources, const Scenario& scenario, const RaceOptions&
     require(session.start_sequence().sounds().size() == 4, "Countdown missed or repeated a sound");
     for (int i = 0; i < 4; ++i)
         require(session.start_sequence().sounds()[i] == i, "Countdown sound order is incorrect");
+    require(session.idle_return_requested(),
+            "Original finish/death idle menu was not requested within 900 seconds");
     validate_result(session);
     if (reference)
         require(compared == reference->size(), "Race finished with a different tick count");
-    const auto finished = state_words(session);
-    require(session.advance(1, {}, error) == Result::ok && state_words(session) == finished,
-            "Finished result changed after additional updates");
+    const auto final_tick = session.ticks();
+    require(session.advance(1.f / 60.f, {}, error) == Result::ok &&
+                session.ticks() == final_tick + 1,
+            "Original terminal race stopped world simulation before returning to menu");
     std::cout << "ROADWARS_RACE_SESSION_OK track=" << options.track << " car=" << options.car
               << " ai=" << options.ai_count << " time=" << session.time()
               << " ticks=" << session.ticks() << " debug_reads=" << read_debug << '\n';
     for (const auto& racer : session.racers())
         std::cout << "RACE_RESULT " << racer.character << " laps=" << racer.progress.completed_laps
                   << " rank=" << racer.rank << " node=" << racer.progress.current_node << '\n';
-    require(session.restart(error) == Result::ok, error);
-    const auto restarted = state_words(session);
-    if (restarted != initial) {
-        const auto mismatch =
-            std::mismatch(restarted.begin(), restarted.end(), initial.begin(), initial.end());
-        throw std::runtime_error("Post-finish restart divergence at state word " +
-                                 std::to_string(mismatch.first - restarted.begin()));
+    if (!reference) {
+        VehicleDynamics eliminated_player;
+        require(eliminated_player.initialize(scenario.parameters, scenario.collision, error) ==
+                    Result::ok,
+                error);
+        RaceSession eliminated;
+        require(eliminated.load(resources, scenario.collision, options, eliminated_player, error) ==
+                    Result::ok,
+                error);
+        eliminated_player.equipment().armor_hp[2] = 0;
+        const auto origin = eliminated_player.state().position;
+        const auto rear = eliminated_player.transform().basis[2];
+        const auto half = eliminated_player.parameters().length * .5f;
+        const Vec3 point{origin.x - rear.x * half, origin.y, origin.z - rear.z * half};
+        require(apply_vehicle_collision_damage(eliminated_player, {1.e8f, 0, 0}, point, false, true,
+                                               3) == Result::ok,
+                "Recovered collision damage failed");
+        require(eliminated_player.equipment().internal_hp == 0 &&
+                    std::count_if(eliminated.audio_events().begin(),
+                                  eliminated.audio_events().end(),
+                                  [](const CombatAudioEvent& event) {
+                                      return event.sample == CombatSample::eliminated;
+                                  }) == 1,
+                "Accepted selected lethal damage missed native elimination cue");
+        require(eliminated.advance(1.f / 60.f, {}, error) == Result::ok, error);
+        require(eliminated.ending() == RaceEndReason::eliminated &&
+                    !eliminated.idle_return_requested(),
+                "Actual selected death did not enter original idle-menu ending");
+        require(!eliminated.racers()[eliminated.player_index()].progress.finished,
+                "Death invented lap completion");
+        const auto death_tick = eliminated.ticks();
+        for (unsigned i = 0; i < 601 && !eliminated.idle_return_requested(); ++i)
+            require(eliminated.advance(1.f / 60.f, {}, error) == Result::ok, error);
+        require(eliminated.idle_return_requested() && eliminated.ticks() > death_tick,
+                "Eliminated race froze or missed strict idle timeout");
+        validate_result(eliminated);
+        require(eliminated.restart(error) == Result::ok &&
+                    eliminated.ending() == RaceEndReason::none &&
+                    !eliminated.idle_return_requested() &&
+                    eliminated_player.equipment().internal_hp > 0,
+                "Restart retained selected death/ending state");
     }
+    require(session.restart(error) == Result::ok, error);
+    require(session.ticks() == 0 && session.time() == 0, "Restart retained combat simulation time");
     require(session.load(resources, scenario.collision, options, player, error) == Result::ok &&
                 state_words(session) == initial,
             "Repeated initialization did not restore the seeded initial race");

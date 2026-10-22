@@ -15,7 +15,9 @@ Vec3 scale(Vec3 value, float scalar) {
 // RE-STUB: 93b4e4c301a5694b55e16977c2e52f4971bd9089659e3d58617c8af2368436c8:function:0042e8f0
 // Physics response subset only; full original dispatch and side effects remain unresolved.
 void apply_wall_response(const VehicleParameters& p, VehicleState& state,
-                         const WallContact& contact, float delta_seconds) {
+                         const WallContact& contact, float delta_seconds, Vec3* response_force) {
+    if (response_force)
+        *response_force = {};
     if (contact.restore_previous) {
         state.position = contact.position;
         state.heading_degrees = contact.heading_degrees;
@@ -60,6 +62,8 @@ void apply_wall_response(const VehicleParameters& p, VehicleState& state,
         state.velocity = scale(state.velocity, (1.0f - incidence) * 1.0f);
         state.yaw_rate *= 0.30000001192092896f;
     }
+    if (response_force)
+        *response_force = force;
     const float remaining_seconds = contact.removed_fraction * delta_seconds;
     const Vec3 displacement = scale(state.velocity, remaining_seconds);
     state.position.x += displacement.x;

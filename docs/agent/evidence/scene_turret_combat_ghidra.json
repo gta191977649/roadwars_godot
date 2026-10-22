@@ -1,0 +1,329 @@
+{
+  "binary_sha256": "93b4e4c301a5694b55e16977c2e52f4971bd9089659e3d58617c8af2368436c8",
+  "source": "Static Ghidra decompilation; original executable not run.",
+  "functions": [
+    {
+      "address": "004c8729",
+      "metadata": {
+        "isThunk": false,
+        "isExternal": false,
+        "hasVarArgs": false,
+        "stackFrameSize": 172,
+        "callingConvention": "unknown",
+        "parameterCount": 0
+      },
+      "functionName": "FUN_004c8729",
+      "signature": "undefined FUN_004c8729()",
+      "programName": "RoadWars",
+      "success": true,
+      "decompilation": "\r\n/* WARNING: Globals starting with '_' overlap smaller symbols at the same address */\r\n\r\nvoid __thiscall\r\nFUN_004c8729(int param_1,float param_2,undefined4 param_3,undefined4 param_4,int param_5)\r\n\r\n{\r\n  undefined4 *puVar1;\r\n  int iVar2;\r\n  float10 fVar3;\r\n  undefined4 uVar4;\r\n  undefined4 uVar5;\r\n  undefined4 uVar6;\r\n  undefined4 uVar7;\r\n  undefined4 uVar8;\r\n  undefined4 uVar9;\r\n  undefined4 uVar10;\r\n  undefined8 uVar11;\r\n  undefined1 local_70 [12];\r\n  float local_64;\r\n  float local_60;\r\n  float local_5c;\r\n  undefined4 local_58;\r\n  undefined4 local_54;\r\n  undefined4 local_50;\r\n  float local_4c;\r\n  undefined4 local_48;\r\n  undefined4 local_44;\r\n  undefined4 local_40;\r\n  undefined4 local_3c;\r\n  undefined4 local_38;\r\n  undefined4 local_34;\r\n  undefined4 local_30;\r\n  float local_2c;\r\n  undefined4 local_28;\r\n  float local_24;\r\n  undefined4 local_20;\r\n  float local_1c;\r\n  undefined4 local_18;\r\n  undefined4 local_14;\r\n  float local_10;\r\n  float local_c;\r\n  float local_8;\r\n  \r\n  *(float *)(param_1 + 0x10) = param_2 + *(float *)(param_1 + 0x10);\r\n  if (param_5 == 0) {\r\n    *(undefined4 *)(param_1 + 8) = 0;\r\n  }\r\n  else if (_DAT_005f51d0 < *(float *)(param_1 + 0x10)) {\r\n    *(undefined4 *)(param_1 + 0x10) = 0;\r\n    thunk_FUN_004c8fde(param_3,param_4);\r\n  }\r\n  local_10 = _DAT_005f50a0 * param_2;\r\n  local_c = _DAT_005f50a0 * param_2;\r\n  puVar1 = (undefined4 *)thunk_FUN_004c914e(local_70,param_2);\r\n  *(undefined4 *)(param_1 + 0x6c) = *puVar1;\r\n  *(undefined4 *)(param_1 + 0x70) = puVar1[1];\r\n  *(undefined4 *)(param_1 + 0x74) = puVar1[2];\r\n  iVar2 = thunk_FUN_0047c3e5(*(undefined4 *)(param_1 + 0x6c),*(undefined4 *)(param_1 + 0x70),\r\n                             *(undefined4 *)(param_1 + 0x74),*(undefined4 *)(param_1 + 0x80),\r\n                             *(undefined4 *)(param_1 + 0x84),*(undefined4 *)(param_1 + 0x88),\r\n                             0x3d4ccccd);\r\n  if (iVar2 == 0) {\r\n    uVar4 = *(undefined4 *)(param_1 + 0x80);\r\n    uVar6 = *(undefined4 *)(param_1 + 0x88);\r\n    uVar7 = *(undefined4 *)(param_1 + 0x6c);\r\n    uVar9 = *(undefined4 *)(param_1 + 0x74);\r\n    local_1c = 0.0;\r\n    local_2c = 0.0;\r\n    uVar11 = CONCAT44(DAT_0064a178,DAT_0064a174);\r\n    uVar8 = 0;\r\n    uVar5 = 0;\r\n    uVar10 = DAT_0064a170;\r\n    local_30 = uVar7;\r\n    local_28 = uVar9;\r\n    local_20 = uVar4;\r\n    local_18 = uVar6;\r\n    fVar3 = (float10)FUN_004d5790(1);\r\n    fVar3 = (float10)thunk_FUN_0047c4d5((float)fVar3,uVar4,uVar5,uVar6,uVar7,uVar8,uVar9,uVar10,\r\n                                        uVar11);\r\n    local_24 = (float)fVar3;\r\n    local_20 = *(undefined4 *)(param_1 + 0x80);\r\n    local_1c = *(float *)(param_1 + 0x84);\r\n    local_18 = *(undefined4 *)(param_1 + 0x88);\r\n    local_30 = *(undefined4 *)(param_1 + 0x6c);\r\n    local_2c = *(float *)(param_1 + 0x70);\r\n    local_28 = *(undefined4 *)(param_1 + 0x74);\r\n    D3DRMVectorSubtract(&local_3c,&local_20,&local_30);\r\n    D3DRMVectorSubtract(&local_48,&local_20,&local_30);\r\n    local_44 = 0;\r\n    fVar3 = (float10)thunk_FUN_0047c1b4(local_3c,local_38,local_34,local_48,0,local_40);\r\n    fVar3 = (float10)FUN_00517334((double)fVar3);\r\n    local_8 = (float)(fVar3 * (float10)_DAT_005f59d0);\r\n    if (local_2c < local_1c) {\r\n      local_8 = -local_8;\r\n    }\r\n    if (local_8 < _DAT_005f50a8) {\r\n      local_8 = local_8 + _DAT_005f511c;\r\n    }\r\n  }\r\n  else {\r\n    local_24 = *(float *)(param_1 + 0xa4);\r\n    local_8 = 0.0;\r\n  }\r\n  *(float *)(param_1 + 0x8c) = local_8;\r\n  *(float *)(param_1 + 0x90) = local_24;\r\n  local_14 = 0;\r\n  if (*(int *)(param_1 + 0x9c) == 0) {\r\n    local_4c = *(float *)(param_1 + 0xa4) - local_24;\r\n    D3DRMVectorRotate(&local_58,&DAT_0064a160,&DAT_0064a170,local_24 * _DAT_005f59cc);\r\n    fVar3 = (float10)thunk_FUN_0047c1b4(*(undefined4 *)(param_1 + 0xac),\r\n                                        *(undefined4 *)(param_1 + 0xb0),\r\n                                        *(undefined4 *)(param_1 + 0xb4),local_58,local_54,local_50);\r\n    fVar3 = (float10)FUN_00517334((double)fVar3);\r\n    local_5c = (float)(fVar3 * (float10)_DAT_005f59d0);\r\n    if ((local_4c < _DAT_005f5388) || ((_DAT_005f50a8 < local_4c && (local_4c < _DAT_005f50a0)))) {\r\n      if ((*(float *)(param_1 + 0xa0) < local_5c) &&\r\n         (local_24 = *(float *)(param_1 + 0xa4) - *(float *)(param_1 + 0xa0),\r\n         local_24 < _DAT_005f50a8)) {\r\n        local_24 = local_24 + _DAT_005f511c;\r\n      }\r\n    }\r\n    else if ((*(float *)(param_1 + 0xa8) < local_5c) &&\r\n            (local_24 = *(float *)(param_1 + 0xa4) + *(float *)(param_1 + 0xa8),\r\n            _DAT_005f511c <= local_24)) {\r\n      local_24 = local_24 - _DAT_005f511c;\r\n    }\r\n  }\r\n  if (**(float **)(param_1 + 0x98) != local_24) {\r\n    local_60 = **(float **)(param_1 + 0x98) - local_24;\r\n    if ((local_60 < _DAT_005f5388) || ((_DAT_005f50a8 < local_60 && (local_60 < _DAT_005f50a0)))) {\r\n      fVar3 = (float10)FUN_005173f0((double)local_60);\r\n      local_60 = (float)fVar3;\r\n      if (local_10 <= local_60) {\r\n        **(float **)(param_1 + 0x98) = **(float **)(param_1 + 0x98) - local_10;\r\n      }\r\n      else {\r\n        **(float **)(param_1 + 0x98) = local_24;\r\n      }\r\n      if (**(float **)(param_1 + 0x98) < _DAT_005f50a8) {\r\n        **(float **)(param_1 + 0x98) = **(float **)(param_1 + 0x98) + _DAT_005f511c;\r\n      }\r\n    }\r\n    else {\r\n      fVar3 = (float10)FUN_005173f0((double)local_60);\r\n      local_60 = (float)fVar3;\r\n      if (local_10 <= local_60) {\r\n        **(float **)(param_1 + 0x98) = local_10 + **(float **)(param_1 + 0x98);\r\n      }\r\n      else {\r\n        **(float **)(param_1 + 0x98) = local_24;\r\n      }\r\n      if (_DAT_005f511c <= **(float **)(param_1 + 0x98)) {\r\n        **(float **)(param_1 + 0x98) = **(float **)(param_1 + 0x98) - _DAT_005f511c;\r\n      }\r\n    }\r\n    local_14 = 1;\r\n  }\r\n  if (**(float **)(param_1 + 0x94) != local_8) {\r\n    local_64 = **(float **)(param_1 + 0x94) - local_8;\r\n    if ((local_64 < _DAT_005f5388) || ((_DAT_005f50a8 < local_64 && (local_64 < _DAT_005f50a0)))) {\r\n      fVar3 = (float10)FUN_005173f0((double)local_64);\r\n      local_64 = (float)fVar3;\r\n      if (local_c <= local_64) {\r\n        **(float **)(param_1 + 0x94) = **(float **)(param_1 + 0x94) - local_c;\r\n      }\r\n      else {\r\n        **(float **)(param_1 + 0x94) = local_8;\r\n      }\r\n      if (**(float **)(param_1 + 0x94) < _DAT_005f50a8) {\r\n        **(float **)(param_1 + 0x94) = **(float **)(param_1 + 0x94) + _DAT_005f511c;\r\n      }\r\n    }\r\n    else {\r\n      fVar3 = (float10)FUN_005173f0((double)local_64);\r\n      local_64 = (float)fVar3;\r\n      if (local_c <= local_64) {\r\n        **(float **)(param_1 + 0x94) = local_c + **(float **)(param_1 + 0x94);\r\n      }\r\n      else {\r\n        **(float **)(param_1 + 0x94) = local_8;\r\n      }\r\n      if (_DAT_005f511c <= **(float **)(param_1 + 0x94)) {\r\n        **(float **)(param_1 + 0x94) = **(float **)(param_1 + 0x94) - _DAT_005f511c;\r\n      }\r\n    }\r\n    if ((**(float **)(param_1 + 0x94) <= _DAT_005f5270) ||\r\n       (_DAT_005f50a0 <= **(float **)(param_1 + 0x94))) {\r\n      if ((**(float **)(param_1 + 0x94) < _DAT_005f59d8) &&\r\n         (_DAT_005f50a0 < **(float **)(param_1 + 0x94))) {\r\n        **(undefined4 **)(param_1 + 0x94) = 0x43aa0000;\r\n      }\r\n    }\r\n    else {\r\n      **(undefined4 **)(param_1 + 0x94) = 0x41a00000;\r\n    }\r\n    local_14 = 1;\r\n  }\r\n  if (param_5 != 0) {\r\n    thunk_FUN_004c8e7b();\r\n  }\r\n  return;\r\n}\r\n\r\n",
+      "entryPoint": "004c8729"
+    },
+    {
+      "address": "004c8e7b",
+      "metadata": {
+        "isThunk": false,
+        "isExternal": false,
+        "hasVarArgs": false,
+        "stackFrameSize": 52,
+        "callingConvention": "unknown",
+        "parameterCount": 0
+      },
+      "functionName": "FUN_004c8e7b",
+      "signature": "undefined FUN_004c8e7b()",
+      "programName": "RoadWars",
+      "success": true,
+      "decompilation": "\r\n/* WARNING: Globals starting with '_' overlap smaller symbols at the same address */\r\n\r\nvoid __thiscall FUN_004c8e7b(int param_1,float param_2)\r\n\r\n{\r\n  int iVar1;\r\n  undefined1 local_10 [12];\r\n  \r\n  *(float *)(param_1 + 0xc) = param_2 + *(float *)(param_1 + 0xc);\r\n  if (*(int *)(param_1 + 8) != 0) {\r\n    iVar1 = thunk_FUN_0047c3e5(*(undefined4 *)(param_1 + 0x6c),*(undefined4 *)(param_1 + 0x70),\r\n                               *(undefined4 *)(param_1 + 0x74),*(undefined4 *)(param_1 + 0x80),\r\n                               *(undefined4 *)(param_1 + 0x84),*(undefined4 *)(param_1 + 0x88),\r\n                               0x3d4ccccd);\r\n    if (iVar1 == 0) {\r\n      iVar1 = thunk_FUN_004c959f();\r\n      if ((iVar1 != 0) && (*(float *)(param_1 + 0xc4) <= *(float *)(param_1 + 0xc))) {\r\n        *(undefined4 *)(param_1 + 0xc) = 0;\r\n        D3DRMVectorRotate(local_10,&DAT_0064a160,&DAT_0064a1b0,\r\n                          _DAT_005f59cc * **(float **)(param_1 + 0x94));\r\n        D3DRMVectorRotate(local_10,local_10,&DAT_0064a170,\r\n                          _DAT_005f59cc * **(float **)(param_1 + 0x98));\r\n        D3DRMVectorScale(local_10,local_10,*(undefined4 *)(param_1 + 0x7c));\r\n        D3DRMVectorAdd(local_10,param_1 + 0x80,local_10);\r\n        (**(code **)(**(int **)(param_1 + 0xb8) + 0x14))\r\n                  (**(undefined4 **)(param_1 + 0x98),**(undefined4 **)(param_1 + 0x94),\r\n                   *(undefined4 *)(param_1 + 0xbc),local_10);\r\n      }\r\n    }\r\n  }\r\n  return;\r\n}\r\n\r\n",
+      "entryPoint": "004c8e7b"
+    },
+    {
+      "address": "004c7c80",
+      "metadata": {
+        "isThunk": false,
+        "isExternal": false,
+        "hasVarArgs": false,
+        "stackFrameSize": 748,
+        "callingConvention": "unknown",
+        "parameterCount": 0
+      },
+      "functionName": "FUN_004c7c80",
+      "signature": "undefined FUN_004c7c80()",
+      "programName": "RoadWars",
+      "success": true,
+      "decompilation": "\r\n/* WARNING: Globals starting with '_' overlap smaller symbols at the same address */\r\n\r\nundefined4 * __thiscall\r\nFUN_004c7c80(undefined4 *param_1,undefined4 param_2,int param_3,undefined4 param_4)\r\n\r\n{\r\n  undefined4 *puVar1;\r\n  float *pfVar2;\r\n  int iVar3;\r\n  float *pfVar4;\r\n  int *local_2dc;\r\n  int *local_2d8;\r\n  int *local_2d4;\r\n  int *local_2d0;\r\n  int *local_2cc;\r\n  int *local_2c8;\r\n  undefined1 local_29c [24];\r\n  void *local_284;\r\n  int *local_280;\r\n  void *local_27c;\r\n  int *local_278;\r\n  void *local_274;\r\n  int *local_270;\r\n  void *local_26c;\r\n  int *local_268;\r\n  void *local_264;\r\n  int *local_260;\r\n  void *local_25c;\r\n  int *local_258;\r\n  undefined1 local_254 [12];\r\n  int *local_248;\r\n  int *local_244;\r\n  int *local_240;\r\n  int *local_23c;\r\n  int *local_238;\r\n  int *local_234;\r\n  char local_230;\r\n  undefined4 local_22f;\r\n  float local_12c [5];\r\n  float local_118;\r\n  char local_114;\r\n  undefined4 local_113;\r\n  void *local_10;\r\n  undefined1 *puStack_c;\r\n  undefined4 local_8;\r\n  \r\n  local_8 = 0xffffffff;\r\n  puStack_c = &LAB_005efd44;\r\n  local_10 = ExceptionList;\r\n  ExceptionList = &local_10;\r\n  param_1[0x2e] = 0;\r\n  param_1[4] = 0;\r\n  param_1[2] = 0;\r\n  *param_1 = param_2;\r\n  param_1[1] = param_4;\r\n  param_1[0x1e] = param_3;\r\n  param_1[0x2f] = 0x42700000;\r\n  param_1[0x30] = 0;\r\n  param_1[0x31] = 0;\r\n  puVar1 = (undefined4 *)FUN_004d3ee3(local_254,1,1,0);\r\n  param_1[0x20] = *puVar1;\r\n  param_1[0x21] = puVar1[1];\r\n  param_1[0x22] = puVar1[2];\r\n  param_1[0x25] = param_1[0x1e] + 0xb8;\r\n  param_1[0x26] = param_1[0x1e] + 0xb4;\r\n  local_114 = DAT_0064a14c;\r\n  puVar1 = &local_113;\r\n  for (iVar3 = 0x40; iVar3 != 0; iVar3 = iVar3 + -1) {\r\n    *puVar1 = 0;\r\n    puVar1 = puVar1 + 1;\r\n  }\r\n  *(undefined2 *)puVar1 = 0;\r\n  *(undefined1 *)((int)puVar1 + 2) = 0;\r\n  local_230 = DAT_0064a150;\r\n  puVar1 = &local_22f;\r\n  for (iVar3 = 0x40; iVar3 != 0; iVar3 = iVar3 + -1) {\r\n    *puVar1 = 0;\r\n    puVar1 = puVar1 + 1;\r\n  }\r\n  *(undefined2 *)puVar1 = 0;\r\n  *(undefined1 *)((int)puVar1 + 2) = 0;\r\n  param_1[0x27] = 0;\r\n  _strncpy(&local_114,(char *)(param_3 + 0x13),3);\r\n  local_113._2_1_ = 0;\r\n  iVar3 = FUN_00517e30(&local_114);\r\n  param_1[0x29] = (float)iVar3;\r\n  D3DRMVectorRotate(param_1 + 0x2b,&DAT_0064a160,&DAT_0064a170,_DAT_005f59cc * (float)param_1[0x29])\r\n  ;\r\n  if ((*(char *)(param_3 + 0x17) == 'F') || (*(char *)(param_3 + 0x17) == 'f')) {\r\n    param_1[0x27] = 1;\r\n    _strncpy(&local_230,(char *)(param_3 + 0x1b),2);\r\n  }\r\n  else {\r\n    _strncpy(&local_114,(char *)(param_3 + 0x17),3);\r\n    local_113._2_1_ = 0;\r\n    iVar3 = FUN_00517e30(&local_114);\r\n    param_1[0x28] = (float)iVar3;\r\n    _strncpy(&local_114,(char *)(param_3 + 0x1b),3);\r\n    local_113._2_1_ = 0;\r\n    iVar3 = FUN_00517e30(&local_114);\r\n    param_1[0x2a] = (float)iVar3;\r\n    _strncpy(&local_230,(char *)(param_3 + 0x1e),2);\r\n  }\r\n  local_22f._1_1_ = 0;\r\n  iVar3 = FUN_0052bdc0(&local_230,&DAT_0061e0b0);\r\n  if (iVar3 == 0) {\r\n    local_25c = operator_new(0x13c4);\r\n    local_8 = 0;\r\n    if (local_25c == (void *)0x0) {\r\n      local_2c8 = (int *)0x0;\r\n    }\r\n    else {\r\n      local_2c8 = (int *)thunk_FUN_0040c300();\r\n    }\r\n    local_258 = local_2c8;\r\n    local_8 = 0xffffffff;\r\n    local_234 = local_2c8;\r\n    thunk_FUN_0040c41e(*param_1);\r\n    (**(code **)(*local_234 + 8))(*(undefined4 *)(param_1[1] + 0x798c),param_1[0x1e],0);\r\n    param_1[0x2e] = local_234;\r\n    param_1[0x30] = 0x42b40000;\r\n    param_1[0x31] = 0x3f000000;\r\n  }\r\n  else {\r\n    iVar3 = FUN_0052bdc0(&local_230,&DAT_0061e0b4);\r\n    if (iVar3 == 0) {\r\n      local_264 = operator_new(0x13c4);\r\n      local_8 = 1;\r\n      if (local_264 == (void *)0x0) {\r\n        local_2cc = (int *)0x0;\r\n      }\r\n      else {\r\n        local_2cc = (int *)thunk_FUN_004ce560();\r\n      }\r\n      local_260 = local_2cc;\r\n      local_8 = 0xffffffff;\r\n      local_238 = local_2cc;\r\n      thunk_FUN_004ce67e(*param_1);\r\n      (**(code **)(*local_238 + 8))(*(undefined4 *)(param_1[1] + 0x798c),param_1[0x1e],0);\r\n      param_1[0x2e] = local_238;\r\n      param_1[0x30] = 0x428c0000;\r\n      param_1[0x31] = 0x3f000000;\r\n    }\r\n    else {\r\n      iVar3 = FUN_0052bdc0(&local_230,&DAT_0061e0b8);\r\n      if (iVar3 == 0) {\r\n        local_26c = operator_new(0x5bdc);\r\n        local_8 = 2;\r\n        if (local_26c == (void *)0x0) {\r\n          local_2d0 = (int *)0x0;\r\n        }\r\n        else {\r\n          local_2d0 = (int *)thunk_FUN_0044c720();\r\n        }\r\n        local_268 = local_2d0;\r\n        local_8 = 0xffffffff;\r\n        local_23c = local_2d0;\r\n        thunk_FUN_0044c83e(*param_1);\r\n        (**(code **)(*local_23c + 8))(*(undefined4 *)(param_1[1] + 0x798c),param_1[0x1e],0);\r\n        param_1[0x2e] = local_23c;\r\n        param_1[0x30] = 0x42700000;\r\n        param_1[0x31] = 0x3f800000;\r\n      }\r\n      else {\r\n        iVar3 = FUN_0052bdc0(&local_230,&DAT_0061e0bc);\r\n        if (iVar3 == 0) {\r\n          local_274 = operator_new(0x13c4);\r\n          local_8 = 3;\r\n          if (local_274 == (void *)0x0) {\r\n            local_2d4 = (int *)0x0;\r\n          }\r\n          else {\r\n            local_2d4 = (int *)thunk_FUN_0047d000();\r\n          }\r\n          local_270 = local_2d4;\r\n          local_8 = 0xffffffff;\r\n          local_240 = local_2d4;\r\n          thunk_FUN_0047d11e(*param_1);\r\n          (**(code **)(*local_240 + 8))(*(undefined4 *)(param_1[1] + 0x798c),param_1[0x1e],0);\r\n          param_1[0x2e] = local_240;\r\n          param_1[0x30] = 0x42dc0000;\r\n          param_1[0x31] = 0x3f000000;\r\n        }\r\n        else {\r\n          iVar3 = FUN_0052bdc0(&local_230,&DAT_0061e0c0);\r\n          if (iVar3 == 0) {\r\n            local_27c = operator_new(0x3098);\r\n            local_8 = 4;\r\n            if (local_27c == (void *)0x0) {\r\n              local_2d8 = (int *)0x0;\r\n            }\r\n            else {\r\n              local_2d8 = (int *)thunk_FUN_0045ae10();\r\n            }\r\n            local_278 = local_2d8;\r\n            local_8 = 0xffffffff;\r\n            local_244 = local_2d8;\r\n            thunk_FUN_0045af2e(*param_1);\r\n            (**(code **)(*local_244 + 8))(*(undefined4 *)(param_1[1] + 0x798c),param_1[0x1e],0);\r\n            param_1[0x2e] = local_244;\r\n            param_1[0x30] = 0x42200000;\r\n            param_1[0x31] = 0x3f800000;\r\n          }\r\n          else {\r\n            local_284 = operator_new(0x53a8);\r\n            local_8 = 5;\r\n            if (local_284 == (void *)0x0) {\r\n              local_2dc = (int *)0x0;\r\n            }\r\n            else {\r\n              local_2dc = (int *)thunk_FUN_0049f330();\r\n            }\r\n            local_280 = local_2dc;\r\n            local_8 = 0xffffffff;\r\n            local_248 = local_2dc;\r\n            thunk_FUN_0049f460(*param_1);\r\n            (**(code **)(*local_248 + 8))(*(undefined4 *)(param_1[1] + 0x798c),param_1[0x1e],0);\r\n            param_1[0x2e] = local_248;\r\n            param_1[0x30] = 0;\r\n            param_1[0x31] = 0x40a00000;\r\n          }\r\n        }\r\n      }\r\n    }\r\n  }\r\n  thunk_FUN_004cf564(param_1[1]);\r\n  param_1[0x32] = 0x40000000;\r\n  param_1[0x33] =\r\n       *(float *)(param_1[0x2e] + 0x290) * (float)param_1[0x32] +\r\n       ((float)param_1[0x2f] + (float)param_1[0x30]) * (float)param_1[0x32];\r\n  param_1[0x23] = *(undefined4 *)param_1[0x25];\r\n  *(undefined4 *)param_1[0x26] = param_1[0x29];\r\n  param_1[0x24] = *(undefined4 *)param_1[0x26];\r\n  pfVar2 = (float *)FUN_004d414f(local_29c);\r\n  pfVar4 = local_12c;\r\n  for (iVar3 = 6; iVar3 != 0; iVar3 = iVar3 + -1) {\r\n    *pfVar4 = *pfVar2;\r\n    pfVar2 = pfVar2 + 1;\r\n    pfVar4 = pfVar4 + 1;\r\n  }\r\n  param_1[0x1f] = local_118 - local_12c[2];\r\n  param_1[3] = param_1[0x31];\r\n  ExceptionList = local_10;\r\n  return param_1;\r\n}\r\n\r\n",
+      "entryPoint": "004c7c80"
+    },
+    {
+      "address": "0045b305",
+      "metadata": {
+        "isThunk": false,
+        "isExternal": false,
+        "hasVarArgs": false,
+        "stackFrameSize": 12,
+        "callingConvention": "unknown",
+        "parameterCount": 0
+      },
+      "functionName": "FUN_0045b305",
+      "signature": "undefined FUN_0045b305()",
+      "programName": "RoadWars",
+      "success": true,
+      "decompilation": "\r\nvoid __thiscall FUN_0045b305(int param_1,undefined4 param_2,undefined4 param_3,int param_4)\r\n\r\n{\r\n  thunk_FUN_004cf5b1(param_2,param_3,param_4);\r\n  if (param_4 == 0) {\r\n    FUN_004d2ea1(param_1 + 0x2dc);\r\n  }\r\n  else {\r\n    FUN_004d2ea1(param_1 + 0x2dc);\r\n  }\r\n  return;\r\n}\r\n\r\n",
+      "entryPoint": "0045b305"
+    },
+    {
+      "address": "0040c763",
+      "metadata": {
+        "isThunk": false,
+        "isExternal": false,
+        "hasVarArgs": false,
+        "stackFrameSize": 12,
+        "callingConvention": "unknown",
+        "parameterCount": 0
+      },
+      "functionName": "FUN_0040c763",
+      "signature": "undefined FUN_0040c763()",
+      "programName": "RoadWars",
+      "success": true,
+      "decompilation": "\r\nvoid __thiscall FUN_0040c763(int param_1,undefined4 param_2,undefined4 param_3,int param_4)\r\n\r\n{\r\n  thunk_FUN_004cf5b1(param_2,param_3,param_4);\r\n  if (param_4 == 0) {\r\n    FUN_004d2ea1(param_1 + 0x2dc);\r\n  }\r\n  else {\r\n    FUN_004d2ea1(param_1 + 0x2dc);\r\n  }\r\n  return;\r\n}\r\n\r\n",
+      "entryPoint": "0040c763"
+    },
+    {
+      "address": "0047d456",
+      "metadata": {
+        "isThunk": false,
+        "isExternal": false,
+        "hasVarArgs": false,
+        "stackFrameSize": 12,
+        "callingConvention": "unknown",
+        "parameterCount": 0
+      },
+      "functionName": "FUN_0047d456",
+      "signature": "undefined FUN_0047d456()",
+      "programName": "RoadWars",
+      "success": true,
+      "decompilation": "\r\nvoid __thiscall FUN_0047d456(int param_1,undefined4 param_2,undefined4 param_3,int param_4)\r\n\r\n{\r\n  thunk_FUN_004cf5b1(param_2,param_3,param_4);\r\n  if (param_4 == 0) {\r\n    FUN_004d2ea1(param_1 + 0x2dc);\r\n  }\r\n  else {\r\n    FUN_004d2ea1(param_1 + 0x2dc);\r\n  }\r\n  return;\r\n}\r\n\r\n",
+      "entryPoint": "0047d456"
+    },
+    {
+      "address": "004ce9c3",
+      "metadata": {
+        "isThunk": false,
+        "isExternal": false,
+        "hasVarArgs": false,
+        "stackFrameSize": 12,
+        "callingConvention": "unknown",
+        "parameterCount": 0
+      },
+      "functionName": "FUN_004ce9c3",
+      "signature": "undefined FUN_004ce9c3()",
+      "programName": "RoadWars",
+      "success": true,
+      "decompilation": "\r\nvoid __thiscall FUN_004ce9c3(int param_1,undefined4 param_2,undefined4 param_3,int param_4)\r\n\r\n{\r\n  thunk_FUN_004cf5b1(param_2,param_3,param_4);\r\n  if (param_4 == 0) {\r\n    FUN_004d2ea1(param_1 + 0x2dc);\r\n  }\r\n  else {\r\n    FUN_004d2ea1(param_1 + 0x2dc);\r\n  }\r\n  return;\r\n}\r\n\r\n",
+      "entryPoint": "004ce9c3"
+    },
+    {
+      "address": "0044cc4a",
+      "metadata": {
+        "isThunk": false,
+        "isExternal": false,
+        "hasVarArgs": false,
+        "stackFrameSize": 12,
+        "callingConvention": "unknown",
+        "parameterCount": 0
+      },
+      "functionName": "FUN_0044cc4a",
+      "signature": "undefined FUN_0044cc4a()",
+      "programName": "RoadWars",
+      "success": true,
+      "decompilation": "\r\nvoid __thiscall FUN_0044cc4a(int param_1,undefined4 param_2,undefined4 param_3,int param_4)\r\n\r\n{\r\n  thunk_FUN_004cf5b1(param_2,param_3,param_4);\r\n  if (param_4 == 0) {\r\n    FUN_004d2ea1(param_1 + 0x2dc);\r\n  }\r\n  else {\r\n    FUN_004d2ea1(param_1 + 0x2dc);\r\n  }\r\n  return;\r\n}\r\n\r\n",
+      "entryPoint": "0044cc4a"
+    },
+    {
+      "address": "004cf564",
+      "metadata": {
+        "isThunk": false,
+        "isExternal": false,
+        "hasVarArgs": false,
+        "stackFrameSize": 12,
+        "callingConvention": "unknown",
+        "parameterCount": 0
+      },
+      "functionName": "FUN_004cf564",
+      "signature": "undefined FUN_004cf564()",
+      "programName": "RoadWars",
+      "success": true,
+      "decompilation": "\r\nvoid __thiscall FUN_004cf564(int param_1,undefined4 param_2)\r\n\r\n{\r\n  *(undefined4 *)(param_1 + 700) = param_2;\r\n  return;\r\n}\r\n\r\n",
+      "entryPoint": "004cf564"
+    },
+    {
+      "address": "004cf5b1",
+      "metadata": {
+        "isThunk": false,
+        "isExternal": false,
+        "hasVarArgs": false,
+        "stackFrameSize": 12,
+        "callingConvention": "unknown",
+        "parameterCount": 0
+      },
+      "functionName": "FUN_004cf5b1",
+      "signature": "undefined FUN_004cf5b1()",
+      "programName": "RoadWars",
+      "success": true,
+      "decompilation": "\r\nvoid __thiscall FUN_004cf5b1(int param_1,undefined4 param_2,undefined4 param_3,undefined4 param_4)\r\n\r\n{\r\n  *(undefined4 *)(param_1 + 0x260) = param_4;\r\n  *(undefined4 *)(param_1 + 0x26c) = param_2;\r\n  *(undefined4 *)(param_1 + 0x264) = param_3;\r\n  return;\r\n}\r\n\r\n",
+      "entryPoint": "004cf5b1"
+    },
+    {
+      "address": "004d2ea1",
+      "metadata": {
+        "isThunk": false,
+        "isExternal": false,
+        "hasVarArgs": false,
+        "stackFrameSize": 16,
+        "callingConvention": "unknown",
+        "parameterCount": 0
+      },
+      "functionName": "FUN_004d2ea1",
+      "signature": "undefined FUN_004d2ea1()",
+      "programName": "RoadWars",
+      "success": true,
+      "decompilation": "\r\nvoid __thiscall FUN_004d2ea1(int param_1,int param_2)\r\n\r\n{\r\n  int iVar1;\r\n  undefined4 local_8;\r\n  \r\n  iVar1 = FUN_004ed6c0(param_2);\r\n  if (iVar1 == 0) {\r\n    if (param_2 != 0) {\r\n      FUN_004ed440(param_2);\r\n      *(int *)(param_2 + 8) = param_1;\r\n      *(undefined4 *)(param_2 + 0xbc) = 0;\r\n      *(undefined4 *)(param_2 + 0xb8) = 0;\r\n      *(undefined4 *)(param_2 + 0xb4) = 0;\r\n      *(undefined4 *)(param_2 + 200) = 0;\r\n      *(undefined4 *)(param_2 + 0xc4) = 0;\r\n      *(undefined4 *)(param_2 + 0xc0) = 0;\r\n    }\r\n    FUN_004d4590();\r\n    for (local_8 = param_1; *(int *)(local_8 + 8) != 0; local_8 = *(int *)(local_8 + 8)) {\r\n    }\r\n    FUN_004d437b();\r\n  }\r\n  return;\r\n}\r\n\r\n",
+      "entryPoint": "004d2ea1"
+    },
+    {
+      "address": "004d3ee3",
+      "metadata": {
+        "isThunk": false,
+        "isExternal": false,
+        "hasVarArgs": false,
+        "stackFrameSize": 104,
+        "callingConvention": "unknown",
+        "parameterCount": 0
+      },
+      "functionName": "FUN_004d3ee3",
+      "signature": "undefined FUN_004d3ee3()",
+      "programName": "RoadWars",
+      "success": true,
+      "decompilation": "\r\nfloat * __thiscall FUN_004d3ee3(int param_1,float *param_2,int param_3,int param_4)\r\n\r\n{\r\n  undefined4 *puVar1;\r\n  int iVar2;\r\n  undefined4 *puVar3;\r\n  undefined4 auStack_b8 [14];\r\n  undefined4 uStack_80;\r\n  undefined1 *puStack_7c;\r\n  float *pfStack_78;\r\n  float *pfStack_74;\r\n  float *pfStack_70;\r\n  undefined1 local_60 [64];\r\n  float local_20;\r\n  float local_1c;\r\n  float local_18;\r\n  int local_14;\r\n  float local_10;\r\n  float local_c;\r\n  float local_8;\r\n  \r\n  local_10 = *(float *)(param_1 + 0xc0);\r\n  local_c = *(float *)(param_1 + 0xc4);\r\n  local_8 = *(float *)(param_1 + 200);\r\n  if ((param_3 != 0) && (*(int *)(param_1 + 8) != 0)) {\r\n    if ((*(uint *)(param_1 + 0x50) & 0x200) == 0) {\r\n      local_8 = 0.0;\r\n      local_c = 0.0;\r\n      local_10 = 0.0;\r\n      for (local_14 = param_1; local_14 != 0; local_14 = *(int *)(local_14 + 8)) {\r\n        local_20 = *(float *)(local_14 + 0xc0);\r\n        local_1c = *(float *)(local_14 + 0xc4);\r\n        local_18 = *(float *)(local_14 + 200);\r\n        if (*(int *)(local_14 + 8) != 0) {\r\n          if (param_4 == 0) {\r\n            pfStack_70 = &local_18;\r\n            pfStack_74 = &local_1c;\r\n            pfStack_78 = &local_20;\r\n            puVar1 = (undefined4 *)(*(int *)(local_14 + 8) + 0x1a8);\r\n            puVar3 = auStack_b8;\r\n            for (iVar2 = 0x10; iVar2 != 0; iVar2 = iVar2 + -1) {\r\n              *puVar3 = *puVar1;\r\n              puVar1 = puVar1 + 1;\r\n              puVar3 = puVar3 + 1;\r\n            }\r\n            FUN_004d53a9();\r\n          }\r\n          else {\r\n            pfStack_70 = &local_18;\r\n            pfStack_74 = &local_1c;\r\n            pfStack_78 = &local_20;\r\n            puStack_7c = local_60;\r\n            uStack_80 = 0x4d3fb3;\r\n            puVar1 = (undefined4 *)FUN_004d3dbd();\r\n            puVar3 = auStack_b8;\r\n            for (iVar2 = 0x10; iVar2 != 0; iVar2 = iVar2 + -1) {\r\n              *puVar3 = *puVar1;\r\n              puVar1 = puVar1 + 1;\r\n              puVar3 = puVar3 + 1;\r\n            }\r\n            FUN_004d53a9();\r\n          }\r\n        }\r\n        local_10 = local_10 + local_20;\r\n        local_c = local_c + local_1c;\r\n        local_8 = local_8 + local_18;\r\n      }\r\n      *(float *)(param_1 + 500) = local_10;\r\n      *(float *)(param_1 + 0x1f8) = local_c;\r\n      *(float *)(param_1 + 0x1fc) = local_8;\r\n    }\r\n    else {\r\n      local_10 = *(float *)(param_1 + 500);\r\n      local_c = *(float *)(param_1 + 0x1f8);\r\n      local_8 = *(float *)(param_1 + 0x1fc);\r\n    }\r\n  }\r\n  *param_2 = local_10;\r\n  param_2[1] = local_c;\r\n  param_2[2] = local_8;\r\n  return param_2;\r\n}\r\n\r\n",
+      "entryPoint": "004d3ee3"
+    },
+    {
+      "address": "004d724f",
+      "metadata": {
+        "isThunk": false,
+        "isExternal": false,
+        "hasVarArgs": false,
+        "stackFrameSize": 12,
+        "callingConvention": "unknown",
+        "parameterCount": 0
+      },
+      "functionName": "FUN_004d724f",
+      "signature": "undefined FUN_004d724f()",
+      "programName": "RoadWars",
+      "success": true,
+      "decompilation": "\r\nvoid FUN_004d724f(undefined4 param_1)\r\n\r\n{\r\n  int iVar1;\r\n  \r\n  iVar1 = FUN_004edfc0(param_1);\r\n  if (iVar1 == 0) {\r\n    FUN_004edd40(param_1);\r\n  }\r\n  return;\r\n}\r\n\r\n",
+      "entryPoint": "004d724f"
+    },
+    {
+      "address": "004edd40",
+      "metadata": {
+        "isThunk": false,
+        "isExternal": false,
+        "hasVarArgs": false,
+        "stackFrameSize": 36,
+        "callingConvention": "unknown",
+        "parameterCount": 0
+      },
+      "functionName": "FUN_004edd40",
+      "signature": "undefined FUN_004edd40()",
+      "programName": "RoadWars",
+      "success": true,
+      "decompilation": "\r\nvoid __thiscall FUN_004edd40(int *param_1,undefined4 param_2)\r\n\r\n{\r\n  void *pvVar1;\r\n  undefined4 local_20;\r\n  void *local_10;\r\n  undefined1 *puStack_c;\r\n  undefined4 local_8;\r\n  \r\n  local_8 = 0xffffffff;\r\n  puStack_c = &LAB_005f046b;\r\n  local_10 = ExceptionList;\r\n  if (param_1[2] == 0) {\r\n    ExceptionList = &local_10;\r\n    FUN_004edc20(param_2);\r\n  }\r\n  else {\r\n    ExceptionList = &local_10;\r\n    pvVar1 = operator_new(0xc);\r\n    local_8 = 0;\r\n    if (pvVar1 == (void *)0x0) {\r\n      local_20 = 0;\r\n    }\r\n    else {\r\n      local_20 = FUN_004ee1d0();\r\n    }\r\n    *(undefined4 *)(param_1[2] + 4) = local_20;\r\n    *(int *)(*(int *)(param_1[2] + 4) + 8) = param_1[2];\r\n    param_1[2] = *(int *)(param_1[2] + 4);\r\n    *(undefined4 *)param_1[2] = param_2;\r\n    *param_1 = *param_1 + 1;\r\n  }\r\n  ExceptionList = local_10;\r\n  return;\r\n}\r\n\r\n",
+      "entryPoint": "004edd40"
+    },
+    {
+      "address": "004edfc0",
+      "metadata": {
+        "isThunk": false,
+        "isExternal": false,
+        "hasVarArgs": false,
+        "stackFrameSize": 20,
+        "callingConvention": "unknown",
+        "parameterCount": 0
+      },
+      "functionName": "FUN_004edfc0",
+      "signature": "undefined FUN_004edfc0()",
+      "programName": "RoadWars",
+      "success": true,
+      "decompilation": "\r\nundefined4 __thiscall FUN_004edfc0(int *param_1,int param_2)\r\n\r\n{\r\n  int iVar1;\r\n  int local_8;\r\n  \r\n  FUN_004ede10();\r\n  local_8 = 0;\r\n  while( true ) {\r\n    if (*param_1 <= local_8) {\r\n      return 0;\r\n    }\r\n    iVar1 = FUN_004ede30();\r\n    if (iVar1 == param_2) break;\r\n    FUN_004ede50();\r\n    local_8 = local_8 + 1;\r\n  }\r\n  return 1;\r\n}\r\n\r\n",
+      "entryPoint": "004edfc0"
+    },
+    {
+      "address": "004d727e",
+      "metadata": {
+        "isThunk": false,
+        "isExternal": false,
+        "hasVarArgs": false,
+        "stackFrameSize": 12,
+        "callingConvention": "unknown",
+        "parameterCount": 0
+      },
+      "functionName": "FUN_004d727e",
+      "signature": "undefined FUN_004d727e()",
+      "programName": "RoadWars",
+      "success": true,
+      "decompilation": "\r\nvoid FUN_004d727e(undefined4 param_1)\r\n\r\n{\r\n  int iVar1;\r\n  undefined4 extraout_var;\r\n  \r\n  iVar1 = FUN_004edfc0(param_1);\r\n  if (iVar1 != 0) {\r\n    FUN_004eded0(extraout_var);\r\n  }\r\n  return;\r\n}\r\n\r\n",
+      "entryPoint": "004d727e"
+    },
+    {
+      "address": "004d72a9",
+      "metadata": {
+        "isThunk": false,
+        "isExternal": false,
+        "hasVarArgs": false,
+        "stackFrameSize": 24,
+        "callingConvention": "unknown",
+        "parameterCount": 0
+      },
+      "functionName": "FUN_004d72a9",
+      "signature": "undefined FUN_004d72a9()",
+      "programName": "RoadWars",
+      "success": true,
+      "decompilation": "\r\n/* WARNING: Globals starting with '_' overlap smaller symbols at the same address */\r\n\r\nvoid __thiscall FUN_004d72a9(int param_1,float param_2)\r\n\r\n{\r\n  int iVar1;\r\n  undefined4 *puVar2;\r\n  int local_8;\r\n  \r\n  FUN_004ede10();\r\n  iVar1 = FUN_004edc10();\r\n  for (local_8 = 0; local_8 < iVar1; local_8 = local_8 + 1) {\r\n    puVar2 = (undefined4 *)FUN_004ede30();\r\n    (*(code *)*puVar2)(puVar2[1],param_2);\r\n    FUN_004ede50();\r\n  }\r\n  *(float *)(param_1 + 0x2c) = param_2 * _DAT_005f5aac + *(float *)(param_1 + 0x2c);\r\n  if (_DAT_005f5118 < *(float *)(param_1 + 0x2c)) {\r\n    *(float *)(param_1 + 0x2c) = *(float *)(param_1 + 0x2c) - _DAT_005f5118;\r\n  }\r\n  return;\r\n}\r\n\r\n",
+      "entryPoint": "004d72a9"
+    },
+    {
+      "address": "004d7360",
+      "metadata": {
+        "isThunk": false,
+        "isExternal": false,
+        "hasVarArgs": false,
+        "stackFrameSize": 12,
+        "callingConvention": "unknown",
+        "parameterCount": 0
+      },
+      "functionName": "FUN_004d7360",
+      "signature": "undefined FUN_004d7360()",
+      "programName": "RoadWars",
+      "success": true,
+      "decompilation": "\r\nundefined4 __thiscall FUN_004d7360(undefined4 param_1,uint param_2)\r\n\r\n{\r\n  FUN_004d7068();\r\n  if ((param_2 & 1) != 0) {\r\n    FUN_00575059(param_1);\r\n  }\r\n  return param_1;\r\n}\r\n\r\n",
+      "entryPoint": "004d7360"
+    },
+    {
+      "address": "004ba95f",
+      "metadata": {
+        "isThunk": false,
+        "isExternal": false,
+        "hasVarArgs": false,
+        "stackFrameSize": 132,
+        "callingConvention": "unknown",
+        "parameterCount": 0
+      },
+      "functionName": "FUN_004ba95f",
+      "signature": "undefined FUN_004ba95f()",
+      "programName": "RoadWars",
+      "success": true,
+      "decompilation": "\r\n/* WARNING: Globals starting with '_' overlap smaller symbols at the same address */\r\n\r\nvoid __thiscall FUN_004ba95f(int param_1,undefined4 param_2,float param_3,int param_4)\r\n\r\n{\r\n  int iVar1;\r\n  undefined4 *puVar2;\r\n  undefined4 uVar3;\r\n  undefined4 *puVar4;\r\n  float10 fVar5;\r\n  undefined1 local_58 [12];\r\n  undefined4 local_4c;\r\n  undefined4 local_48;\r\n  undefined4 local_44;\r\n  float local_40;\r\n  float local_3c;\r\n  float local_38;\r\n  int local_34;\r\n  int local_30;\r\n  float local_2c;\r\n  int local_28;\r\n  int local_24;\r\n  int local_20;\r\n  uint local_1c;\r\n  int local_18;\r\n  undefined4 local_14;\r\n  undefined4 local_10;\r\n  float local_c;\r\n  undefined4 local_8;\r\n  \r\n  local_1c = (uint)(*(float *)(param_1 + 0x7bfc) != _DAT_005f50a8);\r\n  local_14 = *(undefined4 *)(param_1 + 0x7bf4);\r\n  local_10 = *(undefined4 *)(param_1 + 0x7bf8);\r\n  local_c = *(float *)(param_1 + 0x7bfc);\r\n  iVar1 = *(int *)(*(int *)(param_1 + 0x7988) + 0x8c8);\r\n  thunk_FUN_004cde15(*(undefined4 *)(iVar1 + 0x28),*(undefined4 *)(iVar1 + 0x2c),\r\n                     *(undefined4 *)(iVar1 + 0x30),param_1 + 0x7bf4,*(undefined4 *)(param_4 + 4),\r\n                     local_1c);\r\n  if (*(float *)(param_1 + 0x7bfc) != local_c) {\r\n    *(float *)(param_1 + 0x7bfc) =\r\n         *(float *)(param_1 + 0x7bfc) * *(float *)(*(int *)(param_1 + 0x7988) + 0x950);\r\n    FUN_004dcdd8(*(undefined4 *)(param_1 + 0x7bfc),\r\n                 *(undefined4 *)(*(int *)(param_1 + 0x7988) + 0x8f4));\r\n  }\r\n  if (*(int *)(param_1 + 0x7990) != 0) {\r\n    FUN_004fcc79(param_3);\r\n  }\r\n  if (*(int *)(param_1 + 0x79e8) != 0) {\r\n    for (local_20 = 0; local_20 < *(int *)(param_1 + 0x79ec); local_20 = local_20 + 1) {\r\n      puVar4 = (undefined4 *)(*(int *)(param_1 + 0x79f0) + local_20 * 0xc);\r\n      FUN_004fbaad(*puVar4,puVar4[1],puVar4[2],param_3);\r\n    }\r\n  }\r\n  local_8 = 1;\r\n  if ((param_4 != 0) && (iVar1 = thunk_FUN_00485372(), *(float *)(param_4 + 0x3b0) < (float)iVar1))\r\n  {\r\n    local_8 = 0;\r\n  }\r\n  if (*(int *)(param_1 + 0x79bc) != 0) {\r\n    for (local_24 = 0; local_24 < *(int *)(param_1 + 0x79c0); local_24 = local_24 + 1) {\r\n      thunk_FUN_004c8729(param_3,*(undefined4 *)(param_1 + 0x79f8),param_1 + 0x79fc,local_8);\r\n    }\r\n  }\r\n  if (*(int *)(param_1 + 0x79dc) != 0) {\r\n    for (local_28 = 0; local_28 < *(int *)(param_1 + 0x79e0); local_28 = local_28 + 1) {\r\n      thunk_FUN_004c7b1b(param_3);\r\n    }\r\n  }\r\n  for (local_18 = 0; local_18 < *(int *)(param_1 + 0x79c8); local_18 = local_18 + 1) {\r\n    if (*(int *)(*(int *)(*(int *)(param_1 + 0x79cc) + local_18 * 4) + 0x270) == 0) {\r\n      *(float *)(*(int *)(param_1 + 0x79d8) + local_18 * 4) =\r\n           *(float *)(*(int *)(param_1 + 0x79d8) + local_18 * 4) - param_3;\r\n    }\r\n    if ((*(float *)(*(int *)(param_1 + 0x79d8) + local_18 * 4) < _DAT_005f50a8) &&\r\n       (*(int *)(*(int *)(*(int *)(param_1 + 0x79cc) + local_18 * 4) + 0x270) == 0)) {\r\n      *(undefined4 *)(*(int *)(param_1 + 0x79d8) + local_18 * 4) = 0x3fc00000;\r\n      (**(code **)(**(int **)(*(int *)(param_1 + 0x79cc) + local_18 * 4) + 0x14))\r\n                (*(undefined4 *)(*(int *)(param_1 + 0x79d0) + local_18 * 4),\r\n                 *(undefined4 *)(*(int *)(param_1 + 0x79d4) + local_18 * 4),0,0);\r\n    }\r\n  }\r\n  for (local_18 = 0; local_18 < *(int *)(param_1 + 0x799c); local_18 = local_18 + 1) {\r\n    *(float *)(*(int *)(param_1 + 0x79a0) + 0x108 + local_18 * 0x114) =\r\n         param_3 + *(float *)(*(int *)(param_1 + 0x79a0) + 0x108 + local_18 * 0x114);\r\n    if (_DAT_005f50b0 < *(float *)(*(int *)(param_1 + 0x79a0) + 0x108 + local_18 * 0x114)) {\r\n      *(undefined4 *)(*(int *)(param_1 + 0x79a0) + 0x108 + local_18 * 0x114) = 0;\r\n      local_30 = -1;\r\n      local_2c = 100000.0;\r\n      for (local_34 = 0; local_34 < *(int *)(*(int *)(param_1 + 0x79a0) + 0x10c + local_18 * 0x114);\r\n          local_34 = local_34 + 1) {\r\n        if (*(int *)(*(int *)(*(int *)(param_1 + 0x79a0) + 0x110 + local_18 * 0x114) + 0x1c +\r\n                    local_34 * 0x20) != 0) {\r\n          puVar2 = (undefined4 *)FUN_004d3ee3(local_58,1,1,0);\r\n          puVar4 = (undefined4 *)\r\n                   (*(int *)(*(int *)(param_1 + 0x79a0) + 0x110 + local_18 * 0x114) + 8 +\r\n                   local_34 * 0x20);\r\n          *puVar4 = *puVar2;\r\n          puVar4[1] = puVar2[1];\r\n          puVar4[2] = puVar2[2];\r\n        }\r\n        puVar4 = (undefined4 *)\r\n                 (*(int *)(*(int *)(param_1 + 0x79a0) + 0x110 + local_18 * 0x114) + 8 +\r\n                 local_34 * 0x20);\r\n        iVar1 = *(int *)(*(int *)(param_1 + 0x7988) + 0x8c8);\r\n        fVar5 = (float10)thunk_FUN_0047c742(*(undefined4 *)(iVar1 + 0x28),\r\n                                            *(undefined4 *)(iVar1 + 0x2c),\r\n                                            *(undefined4 *)(iVar1 + 0x30),*puVar4,puVar4[1],\r\n                                            puVar4[2]);\r\n        local_38 = (float)fVar5;\r\n        if ((local_38 < local_2c) &&\r\n           (local_38 <\r\n            *(float *)(*(int *)(*(int *)(param_1 + 0x79a0) + 0x110 + local_18 * 0x114) + 0x18 +\r\n                      local_34 * 0x20))) {\r\n          local_30 = local_34;\r\n          local_2c = local_38;\r\n        }\r\n      }\r\n      for (local_34 = 0; local_34 < *(int *)(*(int *)(param_1 + 0x79a0) + 0x10c + local_18 * 0x114);\r\n          local_34 = local_34 + 1) {\r\n        if (local_34 == local_30) {\r\n          if (*(float *)(*(int *)(*(int *)(param_1 + 0x79a0) + 0x110 + local_18 * 0x114) + 0x14 +\r\n                        local_34 * 0x20) <= local_2c) {\r\n            local_40 = *(float *)(*(int *)(*(int *)(param_1 + 0x79a0) + 0x110 + local_18 * 0x114) +\r\n                                  0x18 + local_34 * 0x20) -\r\n                       *(float *)(*(int *)(*(int *)(param_1 + 0x79a0) + 0x110 + local_18 * 0x114) +\r\n                                  0x14 + local_34 * 0x20);\r\n            local_3c = ((*(float *)(*(int *)(*(int *)(param_1 + 0x79a0) + 0x110 + local_18 * 0x114)\r\n                                    + 0x18 + local_34 * 0x20) - local_2c) / local_40) *\r\n                       *(float *)(*(int *)(param_1 + 0x7988) + 0x924);\r\n          }\r\n          else {\r\n            local_3c = _DAT_005f5118 * *(float *)(*(int *)(param_1 + 0x7988) + 0x924);\r\n          }\r\n          FUN_004ddb75(*(undefined4 *)\r\n                        (*(int *)(*(int *)(param_1 + 0x79a0) + 0x110 + local_18 * 0x114) + 4 +\r\n                        local_34 * 0x20),local_3c);\r\n          if (*(int *)(*(int *)(*(int *)(param_1 + 0x79a0) + 0x110 + local_18 * 0x114) + 4 +\r\n                      local_34 * 0x20) == -1) {\r\n            uVar3 = FUN_004dd8d4(*(undefined4 *)\r\n                                  (*(int *)(param_1 + 0x79a0) + 0x104 + local_18 * 0x114),0,\r\n                                 0xffffffff,\r\n                                 *(int *)(*(int *)(param_1 + 0x79a0) + 0x110 + local_18 * 0x114) + 4\r\n                                 + local_34 * 0x20,local_3c,0);\r\n            *(undefined4 *)\r\n             (*(int *)(*(int *)(param_1 + 0x79a0) + 0x110 + local_18 * 0x114) + 4 + local_34 * 0x20)\r\n                 = uVar3;\r\n            local_4c = 0;\r\n            local_48 = 0;\r\n            local_44 = 0;\r\n            FUN_004ddbb1(*(undefined4 *)\r\n                          (*(int *)(*(int *)(param_1 + 0x79a0) + 0x110 + local_18 * 0x114) + 4 +\r\n                          local_34 * 0x20),&local_4c);\r\n            FUN_004ddbda(*(undefined4 *)\r\n                          (*(int *)(*(int *)(param_1 + 0x79a0) + 0x110 + local_18 * 0x114) + 4 +\r\n                          local_34 * 0x20),0xffffffff);\r\n          }\r\n        }\r\n        else if (*(int *)(*(int *)(*(int *)(param_1 + 0x79a0) + 0x110 + local_18 * 0x114) + 4 +\r\n                         local_34 * 0x20) != -1) {\r\n          FUN_004ddb50(*(undefined4 *)\r\n                        (*(int *)(*(int *)(param_1 + 0x79a0) + 0x110 + local_18 * 0x114) + 4 +\r\n                        local_34 * 0x20));\r\n          *(undefined4 *)\r\n           (*(int *)(*(int *)(param_1 + 0x79a0) + 0x110 + local_18 * 0x114) + 4 + local_34 * 0x20) =\r\n               0xffffffff;\r\n        }\r\n      }\r\n    }\r\n  }\r\n  if (*(int *)(param_1 + 0x7a5c) != 0) {\r\n    thunk_FUN_0040410b();\r\n  }\r\n  thunk_FUN_004bfe05();\r\n  return;\r\n}\r\n\r\n",
+      "entryPoint": "004ba95f"
+    }
+  ]
+}

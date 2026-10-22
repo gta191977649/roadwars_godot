@@ -74,8 +74,8 @@
     "game_src/unresolved/types/cd3du_alloc_0061f1d0.hpp": "5b7a0984c31fc7e4fb74837a5b21ba152fe3b04aa36b6b2e049f95166dc4ad90",
     "game_src/unresolved/types/cdc_00622cb0.cpp": "fdf8b32caf72d7e5ffc2fa9735eed19128362f849393dd888cfabeb1998fe009",
     "game_src/unresolved/types/cdc_00622cb0.hpp": "c0933550d8ac687d0f6978bac76f05c579ef2d4139b95423b01bc4f34f2c69c2",
-    "game_src/unresolved/types/cdialog_00620670.cpp": "58ba9c12040af09308bda71f47ac3fcae86ac769da0859a5e67a61128cc5c573",
-    "game_src/unresolved/types/cdialog_00620670.hpp": "1324e89ea8c71c0f50dc802681319f9fbcd718dfc26c16c42d0a586db65533cb",
+    "game_src/unresolved/types/cdialog_00620670.cpp": "8eb9c94757ec54791587d5be6f83b9222bb7533090f4de98b6bc6c9ff6482a8a",
+    "game_src/unresolved/types/cdialog_00620670.hpp": "f52356b352bebd89c0d1476967ac82fee9f937a0f626cb50f3cad7693aa91058",
     "game_src/unresolved/types/cdialog_bar_006236f0.cpp": "cd29e25ce4c05270113046a07437e0a983cc9cdb3b61ae035bdbcda9dbc9ec9e",
     "game_src/unresolved/types/cdialog_bar_006236f0.hpp": "77049d7c538b4ef5d3701f876dc383f0003a0c2579d5fbc4c29b4a5bb8931a3c",
     "game_src/unresolved/types/cdoc_manager_006265e0.cpp": "8260ef8ab6b2dd305b056133b4fbad5902546d79d077067f97a15391574fffb7",
@@ -268,5 +268,5 @@
     "game_src/unresolved/types/type_info_006267d8.hpp": "9ebea917835b3256ccec9451b548dad9c74e2a398ae72a82f1d16586492398f7"
   },
   "class_count": 132,
-  "member_count": 262
+  "member_count": 260
 }

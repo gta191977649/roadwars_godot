@@ -1,0 +1,54 @@
+{
+  "binary_sha256": "93b4e4c301a5694b55e16977c2e52f4971bd9089659e3d58617c8af2368436c8",
+  "source": "Read-only Ghidra; library FID name is not authoritative ownership",
+  "functions": {
+    "004081e3": {
+      "metadata": {
+        "isThunk": false,
+        "isExternal": false,
+        "hasVarArgs": false,
+        "stackFrameSize": 24,
+        "callingConvention": "__thiscall",
+        "parameterCount": 4
+      },
+      "functionName": "CreateIndirect",
+      "signature": "int CreateIndirect(CDialog * this, DLGTEMPLATE * param_1, CWnd * param_2, void * param_3)",
+      "programName": "RoadWars",
+      "success": true,
+      "decompilation": "\r\n/* Library Function - Single Match\r\n    public: virtual int __thiscall CDialog::CreateIndirect(struct DLGTEMPLATE const *,class CWnd\r\n   *,void *)\r\n   \r\n   Libraries: Visual Studio 2003 Debug, Visual Studio 2005 Debug, Visual Studio 2008 Debug, Visual\r\n   Studio 2010 Debug */\r\n\r\nint __thiscall\r\nCDialog::CreateIndirect(CDialog *this,DLGTEMPLATE *param_1,CWnd *param_2,void *param_3)\r\n\r\n{\r\n  int iVar1;\r\n  \r\n  iVar1 = thunk_FUN_004cf5ed(param_1,param_2,param_3,0);\r\n  return iVar1;\r\n}\r\n\r\n",
+      "entryPoint": "004081e3"
+    },
+    "004020e0": {
+      "metadata": {
+        "isThunk": true,
+        "isExternal": false,
+        "hasVarArgs": false,
+        "stackFrameSize": 24,
+        "callingConvention": "__thiscall",
+        "parameterCount": 4
+      },
+      "functionName": "CreateIndirect",
+      "signature": "int CreateIndirect(CDialog * this, DLGTEMPLATE * param_1, CWnd * param_2, void * param_3)",
+      "programName": "RoadWars",
+      "success": true,
+      "decompilation": "\r\nint __thiscall\r\nCDialog::CreateIndirect(CDialog *this,DLGTEMPLATE *param_1,CWnd *param_2,void *param_3)\r\n\r\n{\r\n  int iVar1;\r\n  \r\n  iVar1 = thunk_FUN_004cf5ed(param_1,param_2,param_3,0);\r\n  return iVar1;\r\n}\r\n\r\n",
+      "entryPoint": "004020e0"
+    },
+    "004cf5ed": {
+      "metadata": {
+        "isThunk": false,
+        "isExternal": false,
+        "hasVarArgs": false,
+        "stackFrameSize": 28,
+        "callingConvention": "unknown",
+        "parameterCount": 0
+      },
+      "functionName": "FUN_004cf5ed",
+      "signature": "undefined FUN_004cf5ed()",
+      "programName": "RoadWars",
+      "success": true,
+      "decompilation": "\r\n/* WARNING: Globals starting with '_' overlap smaller symbols at the same address */\r\n\r\nvoid __thiscall FUN_004cf5ed(int param_1,undefined4 param_2,float param_3,float param_4)\r\n\r\n{\r\n  undefined1 local_10 [4];\r\n  float local_c;\r\n  \r\n  if (*(int *)(param_1 + 0x270) == 0) {\r\n    FUN_004d724f(param_1 + 0x2c8);\r\n    *(undefined4 *)(param_1 + 0x270) = 1;\r\n    *(undefined4 *)(param_1 + 0x274) = param_2;\r\n    *(float *)(param_1 + 0x278) = param_3;\r\n    D3DRMVectorRotate(local_10,&DAT_0064a160,&DAT_0064a1b0,param_3 * _DAT_005f5a38);\r\n    *(float *)(param_1 + 0x280) = param_4 * local_c;\r\n    *(float *)(param_1 + 0x27c) = param_4 - *(float *)(param_1 + 0x280);\r\n    *(float *)(param_1 + 0x284) = param_4;\r\n  }\r\n  return;\r\n}\r\n\r\n",
+      "entryPoint": "004cf5ed"
+    }
+  }
+}

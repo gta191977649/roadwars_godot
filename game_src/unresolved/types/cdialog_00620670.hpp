@@ -9,10 +9,6 @@ namespace roadwars::recovered {
 class CDialog_00620670 {
   public:
     // Observed signature (not a confirmed portable ABI): int CreateIndirect(DLGTEMPLATE * param_1, CWnd * param_2, void * param_3)
-    void unresolved_create_indirect_004020e0();
-    // Observed signature (not a confirmed portable ABI): int CreateIndirect(DLGTEMPLATE * param_1, CWnd * param_2, void * param_3)
-    void unresolved_create_indirect_004081e3();
-    // Observed signature (not a confirmed portable ABI): int CreateIndirect(DLGTEMPLATE * param_1, CWnd * param_2, void * param_3)
     void unresolved_create_indirect_00577b2c();
     // Observed signature (not a confirmed portable ABI): void PostModal(void)
     void unresolved_post_modal_005783ac();

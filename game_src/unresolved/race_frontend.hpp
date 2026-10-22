@@ -27,6 +27,15 @@ struct FrontendRacer {
 struct FrontendRaceInfo {
     int completed_laps{}, total_laps{}, rank{}, racer_count{};
 };
+struct FrontendEquipmentFrame {
+    int selected_item{};
+    std::array<int, 3> ammunition{};
+    std::array<bool, 3> present{};
+    int nitrous_ammunition{};
+    bool weapons_unlocked{};
+    float internal_hp{}, maximum_internal_hp{};
+    std::array<float, 4> armor_hp{}, maximum_armor_hp{};
+};
 struct FrontendFrame {
     bool developer_build{};
     std::span<const FrontendRacer> racers;
@@ -39,7 +48,10 @@ struct FrontendFrame {
     // No fabricated lap/rank data in the free-driving profile.
     std::optional<FrontendRaceInfo> race_info;
     std::string status_text;
+    // Race-loop overlay at004823af, independent of weapon icon brightness.
+    bool weapon_lock_warning{};
     std::optional<float> start_countdown;
+    std::optional<FrontendEquipmentFrame> equipment;
 };
 struct FrontendMapSettings {
     Vec3 start;
@@ -56,6 +68,8 @@ class RaceFrontend {
     Result load(ResourceStore&, std::string_view track, Vec3 start,
                 std::span<const std::string> characters, std::string& error);
     Result update(const FrontendFrame&);
+    Result configure_equipment(ResourceStore&, std::string_view car,
+                               const std::array<std::string, 3>& weapons, std::string& error);
     void stop();
     const FrontendMapSettings& map_settings() const { return map_; }
     std::span<const HudQuad> commands() const { return commands_; }
@@ -70,6 +84,7 @@ class RaceFrontend {
     void sprite(const Sprite&, HudRect destination, float alpha = 1, float tint = 1,
                 float degrees = 0, std::array<float, 2> pivot = {});
     void text(int x, int y, std::string_view, bool countdown = false);
+    Result draw_equipment(const FrontendEquipmentFrame&);
     Renderer& renderer_;
     bool loaded_{}, visible_{true}, speedometer_{}, track_map_{}, lap_update_{};
     FrontendMapSettings map_;
@@ -79,5 +94,10 @@ class RaceFrontend {
     std::vector<Sprite> dots_, portraits_;
     std::vector<TextureHandle> textures_;
     std::vector<HudQuad> commands_;
+    std::array<Sprite, 3> weapon_icons_;
+    Sprite nitrous_icon_, damage_background_, damage_shell_;
+    std::array<HudRect, 5> damage_regions_;
+    int internal_offset_{}, shell_offset_{};
+    bool equipment_loaded_{};
 };
 } // namespace roadwars

@@ -3,6 +3,7 @@
 #include "game_src/interfaces/race_debug.hpp"
 #include <godot_cpp/classes/rendering_server.hpp>
 #include <godot_cpp/variant/rid.hpp>
+#include <godot_cpp/variant/dictionary.hpp>
 #include <godot_cpp/variant/transform3d.hpp>
 #include <unordered_map>
 #include <unordered_set>
@@ -20,6 +21,10 @@ class ServerRenderer final : public Renderer {
     void destroy_instance(InstanceHandle) override;
     void set_instance_visible(InstanceHandle, bool) override;
     void set_instance_static(InstanceHandle, bool) override;
+    void reset_instance_interpolation(InstanceHandle) override;
+    Result set_instance_mesh(InstanceHandle, MeshHandle) override;
+    Result update_texture(TextureHandle, std::uint32_t, std::uint32_t,
+                          std::span<const std::byte>) override;
     void destroy_mesh(MeshHandle) override;
     void update_camera(const Transform&, float vertical_fov_degrees) override;
     std::size_t live_rids() const;
@@ -45,13 +50,19 @@ class ServerRenderer final : public Renderer {
                               std::span<const std::array<float, 4>>) override;
     void destroy_material(MaterialHandle material) override;
     void destroy_texture(TextureHandle texture) override;
-    ParticleSystemHandle create_particles(std::uint32_t, MaterialHandle, bool = false) override;
+    ParticleSystemHandle create_particles(std::uint32_t, MaterialHandle, bool = false,
+                                          bool = false) override;
+    Result set_instance_vertex_color(InstanceHandle, std::uint32_t) override;
     void set_particles_visible(bool visible);
     Result update_particles(ParticleSystemHandle, std::span<const ParticleDrawState>) override;
     void destroy_particles(ParticleSystemHandle) override;
 
+    godot::Dictionary presentation_snapshot() const;
+    static bool test_interpolation_history();
     void begin_simulation_tick();
     void reset_interpolation();
+    void reset_camera_interpolation();
+    void set_interpolation_enabled(bool enabled);
     void set_paused(bool paused);
     void present_interpolated(double alpha);
     Vec3 interpolated_camera_position(double alpha) const;
@@ -59,11 +70,12 @@ class ServerRenderer final : public Renderer {
 
   private:
     struct PoseHistory {
-        godot::Transform3D previous, current;
+        godot::Transform3D previous, current, presented;
     };
     std::unordered_map<std::uint64_t, PoseHistory> instance_poses_;
     PoseHistory camera_pose_;
-    float camera_fov_{50};
+    float camera_fov_{50}, previous_camera_fov_{50}, presented_camera_fov_{50};
+    bool interpolation_enabled_{};
     godot::RenderingServer* server_{};
     godot::RID viewport_, scenario_, camera_, shader_, material_;
     godot::RID environment_, light_, light_instance_;

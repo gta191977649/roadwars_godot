@@ -5,19 +5,23 @@
 #include "game_src/unresolved/game_entry.hpp"
 #include "game_src/unresolved/game_initialization.hpp"
 #include "game_src/unresolved/menu_frontend.hpp"
+#include "game_src/unresolved/race_ai_combat.hpp"
 #include "game_src/unresolved/race_music.hpp"
 #include "game_src/unresolved/race_presentation.hpp"
 #include "game_src/unresolved/race_session.hpp"
 #include "game_src/unresolved/tire_audio.hpp"
 #include "game_src/unresolved/vehicle_dynamics.hpp"
+#include "platform/godot/extension/combat_audio_adapter.hpp"
 #include "platform/godot/extension/debug_overlay.hpp"
 #include "platform/godot/extension/engine_audio_adapter.hpp"
 #include "platform/godot/extension/game_files.hpp"
+#include "platform/godot/extension/original_weapon_input.hpp"
 #include "platform/godot/extension/sfx_audio_adapter.hpp"
 #include "platform/godot/rendering/server_renderer.hpp"
 #include <godot_cpp/classes/input_event.hpp>
 #include <godot_cpp/classes/node.hpp>
 #include <memory>
+#include <set>
 
 namespace roadwars {
 class GameHost : public godot::Node, public LoopHooks {
@@ -25,6 +29,9 @@ class GameHost : public godot::Node, public LoopHooks {
   protected:
     static void _bind_methods();
     void _notification(int what);
+
+  private:
+    OriginalWeaponKeys weapon_keys_;
 
   public:
     void _ready() override;
@@ -84,6 +91,8 @@ class GameHost : public godot::Node, public LoopHooks {
     int64_t get_simulation_ticks() const;
     double get_simulation_alpha() const;
     void present_test_frame();
+    godot::Dictionary get_presentation_state() const;
+    bool test_interpolation_history() const;
     int get_particle_count() const;
     int get_spark_count() const;
     int get_tire_particle_count() const;
@@ -95,6 +104,8 @@ class GameHost : public godot::Node, public LoopHooks {
     godot::Vector2 get_race_debug_checkbox_position(int index) const;
     godot::Vector2 get_race_debug_inspect_position(int index) const;
     int get_race_debug_line_count() const;
+    bool request_race_debug_track(const godot::String& track);
+    godot::Vector2 get_race_debug_track_position(int index) const;
     Result invoke(LoopStage stage, float delta_seconds, const InputState& input,
                   LoopState& state) override;
 
@@ -124,7 +135,12 @@ class GameHost : public godot::Node, public LoopHooks {
     bool competition_test_autopilot_{};
     bool competition_{}, competition_requested_{}, race_results_pending_{}, race_completed_{};
     int race_laps_{3}, race_ai_count_{5};
+    std::int64_t diagnostic_race_seed_{1};
     void update_race_debug();
+    void load_race_debug_tracks();
+    bool apply_race_debug_track_request();
+    std::vector<std::string> available_race_tracks_;
+    std::uint64_t race_track_generation_{};
     void show_race_results();
     godot::String game_directory_, track_name_, vehicle_name_{"Animal"};
     std::unique_ptr<GameFiles> files_;
@@ -133,8 +149,11 @@ class GameHost : public godot::Node, public LoopHooks {
     std::unique_ptr<VehicleDynamics> vehicle_;
     // Borrows vehicle_ and race_->collision(); must be destroyed before both.
     std::unique_ptr<RaceSession> session_;
+    std::unique_ptr<CombatAudioAdapter> combat_audio_adapter_;
     void set_mouse_capture(bool enabled);
     bool window_focused_{true}, owns_mouse_capture_{}, ignore_next_mouse_motion_{};
+    OriginalWeaponModifiers weapon_modifiers_;
+    std::set<std::uint64_t> pressed_keyboard_keys_;
     int previous_mouse_mode_{};
     OriginalChaseCamera chase_camera_;
     MouseOrbitCamera orbit_camera_;

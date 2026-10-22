@@ -46,6 +46,30 @@ class Reader : public ResourceReader {
 };
 } // namespace
 int main() {
+    {
+        OriginalTrackCamera camera;
+        MeshObject world;
+        world.position = {10, 0, 0};
+        MeshObject first;
+        first.name = "Camera1";
+        first.position = {0, 5, 0};
+        MeshObject second;
+        second.name = "Camera2";
+        second.position = {100, 9, 0};
+        MeshObject gap;
+        gap.name = "Camera4";
+        gap.position = {200, 0, 0};
+        world.children = {first, second, gap};
+        std::string error;
+        CameraFrame frame;
+        require(camera.load(world, error) == Result::ok && camera.anchors().size() == 2);
+        require(camera.update({100, 2, 0}, frame) == Result::ok);
+        require(frame.transform.origin.x == 110 && frame.transform.origin.y == 9);
+        require(camera.update({60, 2, 0}, frame) == Result::ok && frame.transform.origin.x == 10);
+        require(camera.update({10, 5, 0}, frame) == Result::ok &&
+                std::isfinite(frame.heading_degrees));
+    }
+
     Reader reader;
     const std::string ini = "[CAMERAINFO]\nHOODZ=.7\n";
     for (char c : ini)

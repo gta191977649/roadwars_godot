@@ -156,8 +156,8 @@ void impulses(const VehicleParameters& ap, VehicleState& a, const VehicleParamet
 // RE: 93b4e4c301a5694b55e16977c2e52f4971bd9089659e3d58617c8af2368436c8:function:0041d580
 std::array<Vec3, 4> vehicle_pair_footprint(const VehicleParameters& p, const VehicleState& state) {
     const float half_length = p.length * .5f, half_width = p.width * .5f;
-    std::array<Vec3, 4> corners{{{-half_width, 0, half_length},
-                                 {half_width, 0, half_length},
+    std::array<Vec3, 4> corners{{{-half_width, 0, half_length + p.front_extension},
+                                 {half_width, 0, half_length + p.front_extension},
                                  {half_width, 0, -half_length},
                                  {-half_width, 0, -half_length}}};
     const float radians = state.heading_degrees * kDegreesToRadians;
@@ -181,7 +181,9 @@ std::array<Vec3, 4> vehicle_pair_footprint(const VehicleParameters& p, const Veh
 VehiclePairContact solve_vehicle_collision(const VehicleParameters& ap, VehicleState& a,
                                            const VehicleState& previous_a,
                                            const VehicleParameters& bp, VehicleState& b,
-                                           const VehicleState& previous_b, float dt) {
+                                           const VehicleState& previous_b, float dt,
+                                           const std::function<void(Vec3, Vec3, bool)>& damage,
+                                           const std::function<void(Vec3, Vec3, bool)>& effect) {
     VehiclePairContact result;
     if (!std::isfinite(dt) || dt <= 0 || ap.mass_kg <= 0 || bp.mass_kg <= 0 || ap.length <= 0 ||
         ap.width <= 0 || bp.length <= 0 || bp.width <= 0 || ap.yaw_inertia <= 0 ||
@@ -256,6 +258,8 @@ VehiclePairContact solve_vehicle_collision(const VehicleParameters& ap, VehicleS
         result.point = previous_a.position;
         result.normal = normalized(scale(force, -1));
         result.impact_strength = modulus(force);
+        if (damage)
+            damage(scale(force, -1), result.point, true);
         // Fallback 0041ecc5: first argument is A, so force is received by B.
         impulses(ap, a, bp, b, scale(force, -1), result.point);
     } else {
@@ -281,8 +285,12 @@ VehiclePairContact solve_vehicle_collision(const VehicleParameters& ap, VehicleS
         force = scale(selected.normal, result.impact_strength);
         result.point = selected.point;
         result.normal = selected.receiver_b ? scale(selected.normal, -1) : selected.normal;
+        if (damage)
+            damage(selected.receiver_b ? scale(force, -1) : force, result.point, false);
         impulses(ap, a, bp, b, selected.receiver_b ? scale(force, -1) : force, result.point);
     }
+    if (effect)
+        effect(result.normal, result.point, result.sound_on_b);
     result.removed_seconds = fraction * dt;
     a.position = add(a.position, scale(a.velocity, result.removed_seconds));
     b.position = add(b.position, scale(b.velocity, result.removed_seconds));
@@ -291,14 +299,105 @@ VehiclePairContact solve_vehicle_collision(const VehicleParameters& ap, VehicleS
     return result;
 }
 
+// RE-STUB: 93b4e4c301a5694b55e16977c2e52f4971bd9089659e3d58617c8af2368436c8:function:004215fd
+// Native health then vehicle-owned body/paint mutation, sharing the race CRT stream.
+Result apply_vehicle_collision_damage(VehicleDynamics& receiver, Vec3 force, Vec3 point,
+                                      bool invulnerable, bool player, int difficulty) {
+    auto& health = receiver.equipment();
+    if (invulnerable || health.dying_timer != 0)
+        return Result::ok;
+    const auto& p = receiver.parameters();
+    float amount = (1 / p.mass_kg) * .015978554263710976f * modulus(force);
+    if (amount < .029999999329447746f)
+        return Result::ok;
+    if (player) {
+        constexpr std::array<float, 4> multipliers{.5f, .699999988079071f, .8500000238418579f, 1};
+        amount *= multipliers[static_cast<std::size_t>(std::clamp(difficulty, 0, 3))];
+    }
+    auto local = subtract(point, receiver.state().position);
+    // D3DRMVectorRotate normalizes its result; the following original
+    // VectorScale restores the saved modulus, rather than squaring it.
+    const auto distance = modulus(local);
+    local = normalized(local);
+    const float angle = -receiver.state().heading_degrees * kDegreesToRadians;
+    const float sine = std::sin(angle), cosine = std::cos(angle);
+    local = {distance * (local.x * cosine + local.z * sine), distance * local.y,
+             distance * (local.z * cosine - local.x * sine)};
+    const float width = p.width, length = p.length;
+    std::optional<std::size_t> armor;
+    if (-width < local.x && local.x <= 0 && -length * .33f <= local.z && local.z <= length * .33f)
+        armor = 3;
+    else if (-width < local.x && local.x < width && -length < local.z && local.z < -length * .33f)
+        armor = 2;
+    else if (-width < local.x && local.x < width && length * .33f < local.z && local.z < length)
+        armor = 0;
+    // The duplicated negative-X predicate in original004211a0 leaves its
+    // positive-X branch unreachable. Preserve that observation.
+    const auto previous_hp = health.internal_hp;
+    if (armor) {
+        damage_vehicle_armor(health, *armor, 50 * amount);
+        if (health.armor_hp[*armor] < 0) {
+            damage_vehicle_internal(health, -health.armor_hp[*armor]);
+            health.armor_hp[*armor] = 0;
+        }
+    }
+    const auto elimination = receiver.notify_internal_damage(previous_hp);
+    if (elimination != Result::ok)
+        return elimination;
+    const bool guard = receiver.combat() && receiver.combat()->contact_weapon();
+    const auto result = receiver.apply_damage_visual_contact(
+        {force, point, receiver.state().position, receiver.transform().basis[2],
+         receiver.state().heading_degrees, p.mass_kg, p.width, p.length, invulnerable,
+         health.dying_timer != 0, guard});
+    return result;
+}
 bool resolve_vehicle_collision(VehicleDynamics& a, VehicleDynamics& b,
                                const VehicleState& previous_a, const VehicleState& previous_b,
-                               float dt, std::vector<RaceDebugLine>* debug, float* remaining_seconds) {
+                               float dt, std::vector<RaceDebugLine>* debug,
+                               float* remaining_seconds, const VehiclePairDamageContext* context) {
+    const auto damage_one = [&](VehicleDynamics& receiver, const VehicleDynamics& attacker,
+                                Vec3 force, Vec3 point, bool fallback, bool invulnerable,
+                                bool player) {
+        const auto* weapon = attacker.combat() ? attacker.combat()->contact_weapon() : nullptr;
+        if (weapon && contact_weapon_front_hit(attacker.transform().basis[2],
+                                               attacker.state().position, point)) {
+            Vec3 modified;
+            if (weapon->modify_contact_force(force, modified) == Result::ok)
+                force = modified;
+        }
+        (void)fallback;
+        const auto result = apply_vehicle_collision_damage(receiver, force, point, invulnerable,
+                                                           player, context->difficulty);
+        if (context->damage_visual_result && result != Result::ok)
+            *context->damage_visual_result = result;
+    };
+    const auto damage = [&](Vec3 force, Vec3 point, bool fallback) {
+        if (!context)
+            return;
+        if (!fallback) {
+            if (a.equipment().dying_timer != 0)
+                a.note_disabled_pair_contact();
+            if (b.equipment().dying_timer != 0)
+                b.note_disabled_pair_contact();
+        }
+        damage_one(a, b, force, point, fallback, context->a_invulnerable, context->a_player);
+        damage_one(b, a, scale(force, -1), point, fallback, context->b_invulnerable,
+                   context->b_player);
+    };
+    const auto effect = [&](Vec3 direction, Vec3 point, bool owner_b) {
+        auto& owner = owner_b ? b : a;
+        point.y = owner.state().position.y + owner.parameters().body_local_position.y;
+        direction = scale(direction, owner_b ? -1.f : 1.f);
+        const auto magnitude = modulus(direction);
+        direction = magnitude != 0 ? scale(direction, 1 / magnitude) : Vec3{1, 0, 0};
+        owner.append_particle_impact({point, direction, 1.5f});
+    };
     const auto contact =
         solve_vehicle_collision(a.parameters(), a.collision_state(), previous_a, b.parameters(),
-                                b.collision_state(), previous_b, dt);
+                                b.collision_state(), previous_b, dt, damage, effect);
     if (contact.hit) {
-        if (remaining_seconds) *remaining_seconds = contact.removed_seconds;
+        if (remaining_seconds)
+            *remaining_seconds = contact.removed_seconds;
         a.refresh_after_pair_collision();
         b.refresh_after_pair_collision();
         auto& sound_owner = contact.sound_on_b ? b : a;

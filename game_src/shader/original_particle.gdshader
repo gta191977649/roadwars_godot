@@ -12,8 +12,17 @@ uniform vec2 atlas_v = vec2(.218, .609);
 #include "billboard_basis.gdshaderinc"
 
 void vertex() {
-    VERTEX = (billboard_camera_right(INV_VIEW_MATRIX) * VERTEX.x + vec3(0.0, 1.0, 0.0) * VERTEX.y)
-        * INSTANCE_CUSTOM.x;
+    vec2 local_vertex = VERTEX.xy * INSTANCE_CUSTOM.x;
+#ifdef RW_CUSTOM_GEOMETRY
+    if (INSTANCE_CUSTOM.w > 0.5) {
+        int slot = int(INSTANCE_CUSTOM.z);
+        vec4 ab = slot_triangle_ab[slot];
+        vec2 c = slot_triangle_c[slot].xy;
+        local_vertex = ab.xy * (1.0 - UV.x - UV.y) + ab.zw * UV.x + c * UV.y;
+    }
+#endif
+    VERTEX = billboard_camera_right(INV_VIEW_MATRIX) * local_vertex.x +
+        vec3(0.0, 1.0, 0.0) * local_vertex.y;
     int frame = int(INSTANCE_CUSTOM.y);
     vec2 a;
     vec2 b;

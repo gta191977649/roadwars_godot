@@ -23,6 +23,7 @@ render_mode cull_back
 
 uniform sampler2D diffuse_map : source_color, filter_linear, repeat_enable;
 uniform vec4 tint : source_color = vec4(1.0);
+instance uniform vec4 original_vertex_override = vec4(0.0, 0.0, 0.0, -1.0);
 #ifdef RW_FOG
 uniform vec3 original_fog_color : source_color;
 uniform float original_fog_start;
@@ -59,8 +60,9 @@ vec3 decode_color(vec3 color) {
 
 void fragment() {
     vec4 color = texture(diffuse_map, UV) * tint;
-    color.rgb *= decode_color(COLOR.rgb);
-    color.a *= COLOR.a;
+    vec4 original_color = original_vertex_override.a >= 0.0 ? original_vertex_override : COLOR;
+    color.rgb *= decode_color(original_color.rgb);
+    color.a *= original_color.a;
 #ifdef RW_OPAQUE_ALPHA_ONLY
     if (color.a < 0.99999) discard;
 #else

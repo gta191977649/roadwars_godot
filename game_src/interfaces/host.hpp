@@ -52,10 +52,18 @@ struct ParticleDrawState {
     float size{};
     std::uint32_t color_argb{}, atlas_frame{};
     bool active{};
+    // Optional original per-slot geometry, in the camera-yaw plane.
+    std::array<Vec3, 3> triangle{};
+    bool custom_triangle{};
 };
 struct InputState {
     float steering{}, throttle{}, brake{};
     bool quit_requested{}, reset_requested{}, handbrake{};
+    std::array<bool, 3> weapon_down{}, weapon_requested{};
+    bool nitrous_down{}, nitrous_requested{};
+    bool current_weapon_down{}, current_weapon_requested{}, cycle_weapon_down{},
+        cycle_weapon_requested{};
+    bool any_key_down{};
 };
 enum class Result { ok, invalid_argument, unavailable, not_found };
 class ResourceReader {
@@ -80,6 +88,16 @@ class Renderer {
     virtual void destroy_instance(InstanceHandle instance) = 0;
     virtual void set_instance_visible(InstanceHandle, bool) {}
     virtual void set_instance_static(InstanceHandle, bool) {}
+    // Visual-only discontinuity: do not interpolate an instance across a teleport.
+    virtual void reset_instance_interpolation(InstanceHandle) {}
+    virtual Result set_instance_vertex_color(InstanceHandle, std::uint32_t) {
+        return Result::unavailable;
+    }
+    virtual Result set_instance_mesh(InstanceHandle, MeshHandle) { return Result::unavailable; }
+    virtual Result update_texture(TextureHandle, std::uint32_t, std::uint32_t,
+                                  std::span<const std::byte>) {
+        return Result::unavailable;
+    }
     virtual void destroy_mesh(MeshHandle mesh) = 0;
     virtual void update_camera(const Transform& transform, float vertical_fov_degrees) = 0;
     virtual TextureHandle upload_texture(std::uint32_t, std::uint32_t, std::span<const std::byte>) {
@@ -104,7 +122,9 @@ class Renderer {
     }
     virtual void destroy_material(MaterialHandle) {}
     virtual void destroy_texture(TextureHandle) {}
-    virtual ParticleSystemHandle create_particles(std::uint32_t, MaterialHandle, bool = false) {
+    // Alpha-mixed pools use the lower atlas; flame uses it with additive blending.
+    virtual ParticleSystemHandle create_particles(std::uint32_t, MaterialHandle, bool = false,
+                                                  bool = false) {
         return {};
     }
     virtual Result update_particles(ParticleSystemHandle, std::span<const ParticleDrawState>) {

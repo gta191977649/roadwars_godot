@@ -15,8 +15,78 @@ spec.loader.exec_module(build)
 
 
 class BuildCommandTests(unittest.TestCase):
+    def test_empty_dependency_record_rebuilds_only_its_object(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            target = root / 'build/core/target.cpp.obj'
+            target.parent.mkdir(parents=True)
+            target.write_bytes(b'stale')
+            def compile_again(command):
+                self.assertFalse(target.exists())
+                target.write_bytes(b'rebuilt')
+            with patch.object(build, 'ROOT', root), patch.object(build, 'configure_build'), \
+                 patch.object(build, 'empty_dependency_objects', side_effect=[[target], []]), \
+                 patch.object(build, 'run', side_effect=compile_again):
+                build.build_target('core', 2)
+            self.assertEqual(target.read_bytes(), b'rebuilt')
+
+    def test_dependency_cache_cannot_delete_an_outside_path(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            directory = root / 'build/core'
+            directory.mkdir(parents=True)
+            (directory / 'build.ninja').touch()
+            with patch.object(build, 'ROOT', root), \
+                 patch.object(build.subprocess, 'check_output', return_value='../outside.obj: #deps 0, deps mtime 1 (VALID)\n'), \
+                 self.assertRaisesRegex(ValueError, 'Unsafe object path'):
+                build.empty_dependency_objects('core')
+
+    def test_build_only_by_default_even_for_legacy_launch_selectors(self):
+        for arguments in ([], ['--debug'], ['--race'], ['run'], ['trace', 'Dark Forest']):
+            with self.subTest(arguments=arguments), patch.object(build, 'build_target') as target, \
+                 patch.object(build, 'load_config') as config, patch.object(build, 'run') as run, \
+                 patch.object(sys, 'argv', ['build.py', *arguments]):
+                build.main()
+            target.assert_called_once_with('godot', 4, False)
+            config.assert_not_called()
+            run.assert_not_called()
+
+    def test_incremental_cache_and_changed_profile(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            marker = root / 'platform/godot/third_party/godot-cpp/.roadwars_commit'
+            marker.parent.mkdir(parents=True)
+            marker.touch()
+            profile = root / 'platform/godot/build_profile.json'
+            profile.write_text('{}')
+            (root / 'CMakePresets.json').write_text('{}')
+            directory = root / 'build/godot'
+            directory.mkdir(parents=True)
+            (directory / 'CMakeCache.txt').write_text(
+                f'CMAKE_HOME_DIRECTORY:INTERNAL={root.as_posix()}\n'
+                'CMAKE_GENERATOR:INTERNAL=Ninja\nCMAKE_BUILD_TYPE:STRING=Debug\n'
+                'ROADWARS_BUILD_GODOT:BOOL=ON\n')
+            (directory / 'build.ninja').touch()
+            with patch.object(build, 'ROOT', root), patch.object(build, 'run') as run:
+                build.build_target('godot', 8)
+                build.build_target('godot', 8)
+                self.assertEqual(run.call_count, 2)
+                self.assertTrue(all(call.args[0][:2] == ['cmake', '--build']
+                                    for call in run.call_args_list))
+                profile.write_text('{"enabled_classes":[]}')
+                build.build_target('godot', 8)
+            self.assertEqual(run.call_args_list[-2].args[0], ['cmake', '--preset', 'godot'])
+
+    def test_clean_requests_native_clean_first_without_deleting_cache(self):
+        with patch.object(build, 'configure_build') as configure, patch.object(build, 'run') as run, \
+             patch.object(build, 'empty_dependency_objects', return_value=[]):
+            build.build_target('core', 2, clean=True)
+        configure.assert_called_once_with('core')
+        self.assertEqual(run.call_args.args[0],
+                         ['cmake', '--build', '--preset', 'core', '--parallel', 2, '--clean-first'])
+
     def test_race_defaults_and_explicit_options(self):
-        for arguments in (['--race'], ['run', '--race', '--track', 'dark forest',
+        for arguments in (['--run', '--race'], ['--run', 'run', '--race', '--track', 'dark forest',
                                       '--laps', '1', '--car=avenging angel', '--ai', '0', '--debug']):
             with self.subTest(arguments=arguments), tempfile.TemporaryDirectory() as temporary:
                 root = Path(temporary)
@@ -35,7 +105,7 @@ class BuildCommandTests(unittest.TestCase):
                      patch.object(sys, 'argv', ['build.py', *arguments]):
                     build.main()
                 commands = [call.args[0] for call in run.call_args_list]
-                self.assertIn('-DCMAKE_BUILD_TYPE=Debug', commands[0])
+                self.assertEqual(commands[0], ['cmake', '--preset', 'godot'])
                 launch = commands[-1]
                 self.assertIn('--race', launch)
                 explicit = '--debug' in arguments
@@ -53,7 +123,7 @@ class BuildCommandTests(unittest.TestCase):
                      ['--race', '--laps', '11'], ['--race', '--diagnostic'],
                      ['--race', '--original-loop'], ['--race', '--frontend-screen', 'title'],
                      ['trace', 'Dark Forest', '--race'], ['run', '--laps', '3'],
-                     ['core', '--car', 'Animal'], ['--debug']]
+                     ['core', '--car', 'Animal'], ['core', '--run'], ['test', '--clean'], ['trace']]
         for values in arguments:
             with self.subTest(arguments=values), patch.object(build, 'run') as run, \
                  patch.object(sys, 'argv', ['build.py', *values]), \
@@ -64,6 +134,7 @@ class BuildCommandTests(unittest.TestCase):
     def test_jobs_forwarded_before_or_after_action(self):
         for arguments in (['--jobs', '8', 'core'], ['core', '--jobs', '8']):
             with self.subTest(arguments=arguments), patch.object(build, 'run') as run, \
+                 patch.object(build, 'empty_dependency_objects', return_value=[]), \
                  patch.object(sys, 'argv', ['build.py', *arguments]):
                 build.main()
                 self.assertEqual(run.call_args.args[0],
@@ -95,11 +166,11 @@ class BuildCommandTests(unittest.TestCase):
                  patch.object(build, 'load_config', return_value=config), \
                  patch.object(build, 'run') as run, \
                  patch.object(build.subprocess, 'check_output', return_value='4.7.2.stable.test'), \
-                 patch.object(sys, 'argv', ['build.py', '--debug', 'trace', '--jobs', '8', 'Dark Forest']):
+                 patch.object(sys, 'argv', ['build.py', '--run', '--debug', 'trace', '--jobs', '8', 'Dark Forest']):
                 build.main()
             track.assert_called_once_with('Dark Forest')
             commands = [call.args[0] for call in run.call_args_list]
-            self.assertIn('-DCMAKE_BUILD_TYPE=Debug', commands[0])
+            self.assertEqual(commands[0], ['cmake', '--preset', 'godot'])
             self.assertEqual(commands[1][-2:], ['--parallel', 8])
             self.assertIn('--race-track=Dark Forest', commands[-1])
             self.assertIn('--game-dir=' + str(directory), commands[-1])

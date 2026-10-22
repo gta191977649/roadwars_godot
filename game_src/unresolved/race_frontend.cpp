@@ -87,6 +87,7 @@ std::array<int, 2> FrontendMapSettings::project(Vec3 position, int x, int y) con
 }
 RaceFrontend::~RaceFrontend() { stop(); }
 void RaceFrontend::stop() {
+    equipment_loaded_ = false;
     if (loaded_ || !textures_.empty())
         renderer_.draw_hud({});
     for (auto texture : textures_)
@@ -232,7 +233,7 @@ void RaceFrontend::text(int x, int y, std::string_view value, bool countdown) {
     const auto& texture = countdown ? countdown_texture_ : font_texture_;
     for (unsigned char character : value) {
         if (character == ' ') {
-            x += font.space_width() + 2;
+            x += font.space_width();
             continue;
         }
         const auto& glyph = font.glyph(character);
@@ -255,6 +256,8 @@ void RaceFrontend::text(int x, int y, std::string_view value, bool countdown) {
 // RE: 93b4e4c301a5694b55e16977c2e52f4971bd9089659e3d58617c8af2368436c8:function:0048b648
 // RE: 93b4e4c301a5694b55e16977c2e52f4971bd9089659e3d58617c8af2368436c8:function:0048b7b4
 // RE-STUB: 93b4e4c301a5694b55e16977c2e52f4971bd9089659e3d58617c8af2368436c8:function:0048b120
+// RE-STUB: 93b4e4c301a5694b55e16977c2e52f4971bd9089659e3d58617c8af2368436c8:function:0048cf43
+// RE-STUB: 93b4e4c301a5694b55e16977c2e52f4971bd9089659e3d58617c8af2368436c8:function:004e13f7
 Result RaceFrontend::update(const FrontendFrame& frame) {
     commands_.clear();
     if (!loaded_)
@@ -274,9 +277,24 @@ Result RaceFrontend::update(const FrontendFrame& frame) {
             std::abs((racer.position.x - map_.start.x) * map_.scale) > 100000000 ||
             std::abs((racer.position.z - map_.start.z) * map_.scale) > 100000000)
             return Result::invalid_argument;
+    const auto& player = frame.racers[frame.player_index];
+    if (frame.weapon_lock_warning && !player.eliminated) {
+        // 004823af..00482446: original English localization key006196e4.
+        // The native anchor is300 (0x12c), rather than the other HUD labels'320.
+        constexpr std::string_view label = "WEAPONS LOCKED";
+        int width = -2;
+        for (unsigned char character : label)
+            width += (character == ' ' ? font_.space_width() : font_.glyph(character).width + 2);
+        const auto first = commands_.size();
+        text(300 - width / 2, 5, label);
+        for (auto i = first; i < commands_.size(); ++i)
+            for (std::size_t vertex = 0; vertex < 4; ++vertex)
+                commands_[i].colors[vertex] = {1, vertex < 2 ? 0.f : 1.f, 0, 102.f / 255};
+    }
     if (!visible_)
-        return renderer_.draw_hud({});
-    if (frame.start_countdown && *frame.start_countdown > 0) {
+        return renderer_.draw_hud(commands_);
+    const bool terminal = player.eliminated || player.finished;
+    if (!terminal && frame.start_countdown && *frame.start_countdown > 0) {
         const float remaining = *frame.start_countdown;
         const int digit = static_cast<int>(remaining);
         if (digit < 4) {
@@ -303,7 +321,7 @@ Result RaceFrontend::update(const FrontendFrame& frame) {
         if (remaining >= 3)
             return renderer_.draw_hud(commands_);
     }
-    if (speedometer_) {
+    if (!terminal && speedometer_) {
         sprite(meter_, {512, 352, meter_.width, meter_.height});
         text(583, 425, std::to_string(static_cast<int>(frame.speed * 2.236997365951538f)));
         sprite(needle_, {546, 398, needle_.width, needle_.height}, 1, 1,
@@ -317,10 +335,10 @@ Result RaceFrontend::update(const FrontendFrame& frame) {
         constexpr std::string_view label = "DEV BUILD BY NURUPO";
         int width = -2;
         for (unsigned char character : label)
-            width += (character == ' ' ? font_.space_width() : font_.glyph(character).width) + 2;
+            width += (character == ' ' ? font_.space_width() : font_.glyph(character).width + 2);
         text((640 - width) / 2, 480 - font_.height() - 5, label);
     }
-    if (lap_update_ && frame.race_info) {
+    if (!terminal && lap_update_ && frame.race_info) {
         const auto& race = *frame.race_info;
         text(5, 5,
              "LAP " + std::to_string(std::min(race.completed_laps + 1, race.total_laps)) + "/" +
@@ -331,10 +349,16 @@ Result RaceFrontend::update(const FrontendFrame& frame) {
     if (!frame.status_text.empty()) {
         int width = -2;
         for (unsigned char character : frame.status_text)
-            width += (character == ' ' ? font_.space_width() : font_.glyph(character).width) + 2;
+            width += (character == ' ' ? font_.space_width() : font_.glyph(character).width + 2);
         text((640 - width) / 2, 100, frame.status_text);
     }
-    if (track_map_) {
+    if (!terminal && frame.equipment) {
+        const auto result = draw_equipment(*frame.equipment);
+        if (result != Result::ok)
+            return result;
+    }
+    if ((terminal || track_map_) &&
+        (terminal || !frame.equipment || frame.equipment->selected_item == 0)) {
         sprite(map_texture_, {0, 352, 128, 128}, 0.7f);
         for (std::size_t i = 0; i < frame.racers.size(); ++i) {
             const auto& racer = frame.racers[i];
@@ -363,6 +387,18 @@ Result RaceFrontend::update(const FrontendFrame& frame) {
             else if (racer.finished)
                 sprite(finished_, rect, 1, tint);
         }
+    }
+    if (player.eliminated) {
+        constexpr std::string_view label = "CAR ELIMINATED";
+        int width = -2;
+        for (unsigned char character : label)
+            width += (character == ' ' ? font_.space_width() : font_.glyph(character).width + 2);
+        const auto first = commands_.size();
+        text((640 - width) / 2, 400, label);
+        for (auto i = first; i < commands_.size(); ++i)
+            for (std::size_t vertex = 0; vertex < 4; ++vertex)
+                commands_[i].colors[vertex] = {229.f / 255, vertex < 2 ? 0.f : 229.f / 255, 0,
+                                               229.f / 255};
     }
     return renderer_.draw_hud(commands_);
 }

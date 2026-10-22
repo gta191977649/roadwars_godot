@@ -37,6 +37,8 @@ target_include_directories(roadwars_imgui PUBLIC ${PROJECT_SOURCE_DIR} ${_imgui}
 set_target_properties(roadwars_imgui PROPERTIES POSITION_INDEPENDENT_CODE ON)
 add_library(roadwars_godot SHARED extension/register_types.cpp extension/game_host.cpp extension/game_files.cpp extension/engine_audio_adapter.cpp extension/sfx_audio_adapter.cpp rendering/server_renderer.cpp)
 target_sources(roadwars_godot PRIVATE extension/debug_overlay.cpp)
+target_sources(roadwars_godot PRIVATE extension/original_weapon_input.cpp)
+target_sources(roadwars_godot PRIVATE extension/combat_audio_adapter.cpp)
 target_sources(roadwars_godot PRIVATE extension/frontend_video_audio.cpp)
 if(WIN32)
   target_link_libraries(roadwars_godot PRIVATE msacm32)

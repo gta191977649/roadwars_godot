@@ -205,11 +205,13 @@ void RaceAi::advance_offset(const RaceRoute& route, const RaceRouteProgress& pro
 Result RaceAi::update(const RaceRoute& route, RaceRouteProgress& progress,
                       const VehicleState& vehicle, const VehicleParameters& parameters,
                       std::span<const RaceAiObstacle> obstacles, float grip, float race_time,
-                      bool refresh, float dt, std::string& error) {
+                      bool refresh, float dt, std::string& error, float internal_hp,
+                      float maximum_internal_hp) {
     if (route.nodes().size() < 4 || !finite(vehicle.position) || !finite(vehicle.velocity) ||
         !std::isfinite(dt) || dt < 0 || !std::isfinite(grip) || grip < 0 ||
         !std::isfinite(race_time) || !std::isfinite(parameters.max_wheel_angle_degrees) ||
-        parameters.max_wheel_angle_degrees <= 0) {
+        parameters.max_wheel_angle_degrees <= 0 || !std::isfinite(internal_hp) ||
+        !std::isfinite(maximum_internal_hp) || internal_hp < 0 || maximum_internal_hp <= 0) {
         error = "Invalid original AI input";
         return Result::invalid_argument;
     }
@@ -224,7 +226,8 @@ Result RaceAi::update(const RaceRoute& route, RaceRouteProgress& progress,
     }
     if (refresh) {
         scan(vehicle, obstacles);
-        state_.behavior = race_ai_behavior(1, 1, state_.front, state_.rear);
+        state_.behavior =
+            race_ai_behavior(internal_hp, maximum_internal_hp, state_.front, state_.rear);
         state_.moving_backward = dot(direction(vehicle.heading_degrees), vehicle.velocity) <= 0;
     }
     advance_offset(route, progress, dt);

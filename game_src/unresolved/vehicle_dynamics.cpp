@@ -129,7 +129,7 @@ Result load_vehicle_geometry(ResourceStore& resources, std::string_view vehicle,
     std::vector<std::byte> bytes;
     const auto prefix = "Cars/" + std::string(vehicle);
     for (auto item : {std::pair{prefix + "/Body/SpatialObject.msh", &body},
-                      std::pair{prefix + "/Tires/Street/SpatialObject.msh", &tire}}) {
+                      std::pair{prefix + "/Tires/" + p.tires.type + "/SpatialObject.msh", &tire}}) {
         if (resources.read(item.first, bytes) != Result::ok) {
             error = "Missing vehicle geometry: " + item.first;
             return Result::not_found;
@@ -173,17 +173,15 @@ Result load_vehicle_geometry(ResourceStore& resources, std::string_view vehicle,
     }
     p.rear_wheel_radius = (upper.y - lower.y) * 0.5f;
     p.tire_half_width = std::min(upper.x - lower.x, upper.z - lower.z) * 0.5f;
-    Configuration tire_scale_config;
     float tire_scale{};
-    if (tire_scale_config.load(resources, prefix + "/Tires/Street/Poor/Data.ini") != Result::ok ||
-        tire_scale_config.number("SCALE", "SCALEX", tire_scale) != Result::ok || tire_scale <= 0) {
-        error = "Original Street/Poor tire scale is unavailable";
+    if (load_wheel_scale(resources, vehicle, p.tires, tire_scale, error) != Result::ok) {
         return Result::invalid_argument;
     }
     const float tire_x_extent = (upper.x - lower.x) * tire_scale;
     const float tire_z_extent = upper.z - lower.z;
     const float tire_width = std::min(tire_x_extent, tire_z_extent);
     const float tire_length = std::max(tire_x_extent, tire_z_extent);
+    p.tire_half_width = tire_width * .5f;
     const float tire_corner = static_cast<float>(
         std::atan(static_cast<double>((tire_width * 0.5f) / (tire_length * 0.5f))) * kRadToDeg);
     p.tire_slip_lower_degrees = tire_corner * 0.5f;
@@ -221,10 +219,22 @@ Result load_vehicle_geometry(ResourceStore& resources, std::string_view vehicle,
     (void)forward;
     p.fixed_angular_radius = (length(a[0]) + length(a[2])) * 0.5f;
     Configuration tires;
-    if (tires.load(resources, "Cars/Shared/Tires/Street/Poor/Data.ini") != Result::ok ||
+    if (tires.load(resources, "Cars/Shared/Tires/" + p.tires.type + "/" + p.tires.quality +
+                                  "/Data.ini") != Result::ok ||
         tires.number("FRICTION", "ADDEDFRICTION", p.added_tire_friction) != Result::ok) {
-        error = "Stock Street/Poor tire friction configuration unavailable";
+        error = "Selected tire friction configuration unavailable";
         return Result::not_found;
+    }
+    const auto kind = ResourceStore::canonical(p.tires.type);
+    if (kind == "STREET")
+        p.tire_kind = 0;
+    else if (kind == "SLICKS")
+        p.tire_kind = 1;
+    else if (kind == "OFF ROAD")
+        p.tire_kind = 2;
+    else {
+        error = "Unknown original tire type: " + p.tires.type;
+        return Result::invalid_argument;
     }
     return finalize_vehicle_parameters(p);
 }
@@ -518,6 +528,7 @@ Result VehicleDynamics::initialize(VehicleParameters parameters, const TrackColl
         return Result::invalid_argument;
     }
     parameters_ = std::move(parameters);
+    disabled_contact_1c_ = 0; // Constructor0040d4cb; diagnostic initialize reconstructs this state.
     track_ = &track;
     state_ = {};
     state_.position = track.spawn().position;
@@ -555,6 +566,7 @@ void VehicleDynamics::update_controlled(float dt, const VehicleControls& control
     update_internal(dt, {}, &controls);
 }
 void VehicleDynamics::reset_to(const TrackSpawn& spawn) {
+    ++pose_generation_;
     state_ = {};
     state_.position = spawn.position;
     state_.heading_degrees = spawn.heading_degrees;
@@ -617,10 +629,10 @@ void VehicleDynamics::begin_update(float dt, const InputState& input,
     for (std::size_t i = 0; i < 4; ++i) {
         float modifier = 0;
         const auto& contact = contacts_[i];
-        if (contact.material_kind == 0)
+        if (contact.material_kind == static_cast<std::uint32_t>(parameters_.tire_kind))
             modifier += parameters_.added_tire_friction + parameters_.added_tire_friction;
         else if (contact.lateral_grip > 0.4f)
-            modifier -= contact.material_kind == 2 ? 0.05f : 0.1f;
+            modifier -= parameters_.tire_kind == 0 && contact.material_kind == 2 ? 0.05f : 0.1f;
         float value = modifier + contact.longitudinal_grip;
         longitudinal[i] = value + value;
         value = modifier + contact.lateral_grip;
@@ -634,10 +646,25 @@ void VehicleDynamics::begin_update(float dt, const InputState& input,
         if (rolling[i] <= 0)
             rolling[i] = 0.01f;
     }
+    apply_oil_slick_grip(oil_contacts_, state_.cached_speed, longitudinal, lateral, rolling);
+    if (equipment_.internal_hp <= 0 && state_.cached_speed < 10 && disabled_contact_1c_ > 0) {
+        const float value = state_.cached_speed * .2f / 10;
+        longitudinal.fill(value);
+        lateral.fill(value);
+        rolling.fill(value);
+    }
+    for (std::size_t wheel = 0; wheel < 4; ++wheel) {
+        longitudinal[wheel] *= equipment_.traction_multiplier;
+        lateral[wheel] *= equipment_.traction_multiplier;
+    }
     const auto limits = vehicle_force_limits(parameters_, longitudinal, lateral, rolling);
     longitudinal_grip_ =
         (longitudinal[0] + longitudinal[1] + longitudinal[2] + longitudinal[3]) * .25f;
-    const float drive = vehicle_drive_force(parameters_, state_.gear_index, 1, limits.traction);
+    const float health_ratio = equipment_.maximum_internal_hp > 0
+                                   ? equipment_.internal_hp / equipment_.maximum_internal_hp
+                                   : 1.0f;
+    const float drive =
+        vehicle_drive_force(parameters_, state_.gear_index, health_ratio, limits.traction);
     apply_vehicle_engine(parameters_, state_, axes.forward, state_.engine_throttle, drive, dt);
     apply_vehicle_gravity(parameters_, state_, wheel_points_, axes.up, dt);
     apply_vehicle_brake(parameters_, state_, limits, state_.brake_amount, dt);
@@ -673,12 +700,14 @@ void VehicleDynamics::begin_update(float dt, const InputState& input,
     step_pending_ = true;
 }
 void VehicleDynamics::solve_race_walls(float dt) {
+    collision_damage_result_ = Result::ok;
     if (!step_pending_)
         return;
     const auto collision_body = [&](const VehicleState& state) {
         CollisionBody body;
         body.position = state.position;
         body.heading_degrees = state.heading_degrees;
+        body.front_extension = parameters_.front_extension;
         const float half_width = parameters_.width * 0.5f, half_length = parameters_.length * 0.5f;
         body.diagonal_radius = std::sqrt(half_width * half_width + half_length * half_length);
         body.corner_angle_degrees = static_cast<float>(
@@ -703,7 +732,8 @@ void VehicleDynamics::solve_race_walls(float dt) {
         // 0042e9e3 pushes refresh=1 before preserving local pre-response speed.
         if (contact.hit && !contact.restore_previous)
             state_.cached_speed = length(state_.velocity);
-        apply_wall_response(parameters_, state_, contact, dt);
+        Vec3 response_force;
+        apply_wall_response(parameters_, state_, contact, dt, &response_force);
         if (contact.restore_previous)
             break;
         // 0042e8f0: the original effect trigger shares a 0.5-second sound/effect gate.
@@ -711,6 +741,14 @@ void VehicleDynamics::solve_race_walls(float dt) {
         position.y = state_.position.y + parameters_.body_local_position.y;
         if (collision_audio_.wall_contact(state_.cached_speed, position)) {
             particle_impacts_.push_back({position, contact.normal, 1.5f});
+            if (particle_impact_handler_)
+                particle_impact_handler_(particle_impacts_.back());
+        }
+        if (iteration == 0 && collision_damage_handler_) {
+            collision_damage_result_ =
+                collision_damage_handler_(scale(response_force, .75f), contact.contact_point);
+            if (collision_damage_result_ != Result::ok)
+                return;
         }
     }
 }

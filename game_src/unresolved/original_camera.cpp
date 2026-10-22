@@ -341,6 +341,67 @@ Result OriginalChaseCamera::update(const VehicleState& vehicle, const VehiclePar
     return Result::ok;
 }
 
+// RE: 93b4e4c301a5694b55e16977c2e52f4971bd9089659e3d58617c8af2368436c8:function:004bb8eb
+Result OriginalTrackCamera::load(const MeshObject& world, std::string& error) {
+    anchors_.clear();
+    const std::function<bool(const MeshObject&, Vec3, std::string_view, Vec3&)> find =
+        [&](const MeshObject& node, Vec3 parent, std::string_view name, Vec3& found) {
+            const auto position = add(parent, node.position);
+            if (node.name == name) {
+                found = position;
+                return true;
+            }
+            for (const auto& child : node.children)
+                if (find(child, position, name, found))
+                    return true;
+            return false;
+        };
+    for (unsigned i = 1; i <= 50; ++i) {
+        Vec3 position;
+        if (!find(world, {}, "Camera" + std::to_string(i), position))
+            break;
+        anchors_.push_back(position);
+    }
+    error.clear();
+    return Result::ok;
+}
+// RE: 93b4e4c301a5694b55e16977c2e52f4971bd9089659e3d58617c8af2368436c8:function:004bb772
+// RE: 93b4e4c301a5694b55e16977c2e52f4971bd9089659e3d58617c8af2368436c8:function:004e401b
+Result OriginalTrackCamera::update(Vec3 target, CameraFrame& output) const {
+    if (!std::isfinite(target.x) || !std::isfinite(target.y) || !std::isfinite(target.z))
+        return Result::invalid_argument;
+    Vec3 anchor{};
+    float best = 999999;
+    if (!anchors_.empty())
+        anchor = anchors_.front();
+    for (const auto point : anchors_) {
+        const float x = target.x - point.x, z = target.z - point.z;
+        const float square = x * x + z * z;
+        if (square < best) {
+            best = square;
+            anchor = point;
+        }
+    }
+    auto direction = subtract(anchor, target);
+    const float pitch = static_cast<float>(
+        -std::atan(static_cast<double>(direction.y + 1) /
+                   std::sqrt(static_cast<double>(direction.x * direction.x +
+                                                 direction.z * direction.z + 1))) *
+        kRadiansToDegrees);
+    const float magnitude = length(direction);
+    direction = magnitude != 0 ? scale(direction, 1 / magnitude) : Vec3{1, 0, 0};
+    float heading =
+        static_cast<float>(std::acos(static_cast<double>(direction.z)) * kRadiansToDegrees + 180);
+    if (direction.x < 0)
+        heading = 360 - heading;
+    if (heading < 0)
+        heading += 360;
+    else if (heading >= 360)
+        heading -= 360;
+    output = original_camera_frame(anchor, target, heading, pitch);
+    return Result::ok;
+}
+
 void MouseOrbitCamera::reset() {
     yaw_offset_ = pitch_offset_ = idle_ = 0;
     orbit_heading_ = orbit_pitch_ = radius_ = 0;

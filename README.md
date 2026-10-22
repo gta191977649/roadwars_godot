@@ -18,10 +18,10 @@ With the original installation configured, normal launch plays both publisher vi
 the developer logo and Title, then enters the animated main menu:
 
 ```powershell
-python scripts/build.py run
-python scripts/build.py run --frontend-screen modify_vehicle --frontend-variant tires --frontend-time 2
-python scripts/build.py run --frontend-screen race_results --frontend-time 4
-python scripts/build.py run --diagnostic
+python scripts/build.py --run
+python scripts/build.py --run --frontend-screen modify_vehicle --frontend-variant tires --frontend-time 2
+python scripts/build.py --run --frontend-screen race_results --frontend-time 4
+python scripts/build.py --run --diagnostic
 python scripts/smoke_frontend.py --default-config
 ```
 
@@ -46,8 +46,8 @@ The no-weapons competition debug entry supports original AI, car collisions,
 checkpoints, laps, ranking and a live result page:
 
 ```powershell
-.\build.ps1 --race --track "Dark Forest" --laps 3 --car animal --ai 5 --debug
-.\build.ps1 run --race --car "Avenging Angel" --laps 1 --ai 3
+.\build.ps1 --run --race --track "Dark Forest" --laps 3 --car animal --ai 5 --debug
+.\build.ps1 --run --race --car "Avenging Angel" --laps 1 --ai 3
 ```
 
 Defaults are Dark Forest, Animal, three laps and five AI. Laps accept1..10 and AI
@@ -64,8 +64,8 @@ Copy `config.example.json` to ignored `config.local.json` and set `game_dir` to 
 
 ```powershell
 python scripts/build.py deps
-.\build.ps1 --debug trace "Dark Forest"
-.\build.ps1 --jobs 8 --debug trace "Dark Forest"
+.\build.ps1 --run --debug trace "Dark Forest"
+.\build.ps1 --run --jobs 8 --debug trace "Dark Forest"
 ```
 
 `--jobs N` sets CMake build parallelism for `core`, `godot` and `trace` (default4).
@@ -98,7 +98,7 @@ deployment is still unavailable. See the evidence files for exact coverage.
 python scripts/generate_classes.py
 python scripts/progress.py update
 python scripts/generate_classes.py --check
-python scripts/build.py run --original-loop
+python scripts/build.py --run --original-loop
 ```
 
 Generated output currently covers 132 confirmed types and their 262 associated functions. Original source directories remain unconfirmed, so files use `game_src/unresolved/types`. Most known RTTI types are library types; unassigned gameplay functions remain unresolved. Each stub prints original identity and source location, asserts, and aborts even in release mode. Strict launch intentionally stops at the first unimplemented original-loop stage. Default launch runs the frontend; the triangle requires `--diagnostic`.
@@ -117,12 +117,36 @@ python scripts/build.py godot
 python scripts/build.py test --preset godot
 ```
 
+`./build.ps1` (or `python scripts/build.py`) builds the Godot extension incrementally
+without launching it. Add `--run` to build and launch; even the legacy positional
+`run` and `trace` selectors require this flag. `--race`, track/car selection and
+`--debug` select launch settings and never start the game by themselves.
+
+```powershell
+.\build.ps1 --jobs 8
+.\build.ps1 --run --race --track "Dark Forest" --debug
+.\build.ps1 --clean --jobs 8
+python scripts/build.py core --clean
+```
+
+Existing CMake/Ninja configurations, compiled objects and fetched dependencies are
+reused. The script reconfigures when preset, dependency lock or Godot build-profile
+content changes; Ninja handles source/header and CMake-file dependencies. This
+avoids regenerating godot-cpp's trimmed API on every invocation, which previously
+made every generated binding dirty. `--clean` asks CMake to clean build targets
+before rebuilding; it retains configuration, dependencies and original assets.
+Builds through this script are serialized per preset. Before reusing objects it
+also checks Ninja's header-dependency records and rebuilds any object with an
+empty record; a build that still has incomplete records fails explicitly. Use the
+script for concurrent build requests rather than running direct CMake/Ninja
+builds against the same directory simultaneously.
+
 `deps` downloads godot-cpp at the immutable commit and archive checksum in `scripts/dependencies.lock.json`. That commit supports multiple API versions; the build explicitly selects the included **4.7** API for the 4.7.2 engine. Missing or mismatched dependencies fail with an actionable error. For a different CMake generator, configure a separate build directory rather than changing an existing cache.
 
 The explicit diagnostic triangle needs no original installation. Frontend and free-driving require `game_dir` in the same local configuration. Optional executable and Ghidra paths are reserved for analysis tools. Do not commit machine paths or assets.
 
 ```powershell
-python scripts/build.py run
+python scripts/build.py --run
 python scripts/smoke_godot.py --headless
 python scripts/smoke_godot.py
 ```

@@ -1,5 +1,6 @@
 #include "game_src/unresolved/mesh_scene.hpp"
 #include "game_src/unresolved/binary_reader.hpp"
+#include "game_src/unresolved/contact_orientation.hpp"
 #include <algorithm>
 #include <charconv>
 #include <cmath>
@@ -19,9 +20,9 @@ MeshObject read_object(BinaryReader& stream, unsigned depth, std::size_t& vertic
         throw std::runtime_error("Invalid MSH child count");
     if (object.type == 4) {
         // Type-4 dummy stores three basis vectors followed by a position.
-        stream.take(12);
-        const auto forward = vector(stream);
-        stream.take(12);
+        for (auto& basis : object.serialized_dummy_basis)
+            basis = vector(stream);
+        const auto forward = object.serialized_dummy_basis[1];
         object.position = vector(stream);
         const auto length =
             std::sqrt(forward.x * forward.x + forward.y * forward.y + forward.z * forward.z);
@@ -59,6 +60,7 @@ MeshObject read_object(BinaryReader& stream, unsigned depth, std::size_t& vertic
                 const auto u = std::bit_cast<float>(stream.u32());
                 const auto v = std::bit_cast<float>(stream.u32());
                 part.uv.push_back({u, v});
+                part.native_uv.push_back({u, v});
                 stream.take(8);
             }
             const auto triangles = stream.u32();
@@ -94,6 +96,56 @@ MeshObject read_object(BinaryReader& stream, unsigned depth, std::size_t& vertic
     return object;
 }
 } // namespace
+// RE-STUB: 93b4e4c301a5694b55e16977c2e52f4971bd9089659e3d58617c8af2368436c8:function:004d3ee3
+// Typed live-angle path; native cached-position flag0x200 handling remains caller-owned.
+Transform original_mesh_node_pose(const MeshObject& root, std::span<const std::size_t> path,
+                                  Vec3 position, Vec3 angles,
+                                  std::span<const MeshNodeEulerOverride> overrides) {
+    const MeshObject* node = &root;
+    std::vector<const MeshObject*> nodes{node};
+    for (const auto index : path) {
+        if (index >= node->children.size())
+            throw std::out_of_range("Original mesh node path outside hierarchy");
+        node = &node->children[index];
+        nodes.push_back(node);
+    }
+    Vec3 world{};
+    for (std::size_t depth = nodes.size(); depth-- > 1;) {
+        const auto parent_angles =
+            original_mesh_node_angles(root, path.first(depth - 1), angles, overrides);
+        const auto parent =
+            original_vehicle_transform({}, parent_angles.x, parent_angles.y, parent_angles.z);
+        const auto p = nodes[depth]->position;
+        world.x += parent.basis[0].x * p.x + parent.basis[1].x * p.y + parent.basis[2].x * p.z;
+        world.y += parent.basis[0].y * p.x + parent.basis[1].y * p.y + parent.basis[2].y * p.z;
+        world.z += parent.basis[0].z * p.x + parent.basis[1].z * p.y + parent.basis[2].z * p.z;
+    }
+    world = {world.x + position.x, world.y + position.y, world.z + position.z};
+    const auto total = original_mesh_node_angles(root, path, angles, overrides);
+    return original_vehicle_transform(world, total.x, total.y, total.z);
+}
+// RE-STUB: 93b4e4c301a5694b55e16977c2e52f4971bd9089659e3d58617c8af2368436c8:function:004d5790
+// RE-STUB: 93b4e4c301a5694b55e16977c2e52f4971bd9089659e3d58617c8af2368436c8:function:004d57e0
+// RE-STUB: 93b4e4c301a5694b55e16977c2e52f4971bd9089659e3d58617c8af2368436c8:function:004d5830
+Vec3 original_mesh_node_angles(const MeshObject& root, std::span<const std::size_t> path,
+                               Vec3 angles, std::span<const MeshNodeEulerOverride> overrides) {
+    const MeshObject* node = &root;
+    std::vector<Vec3> locals;
+    for (const auto index : path) {
+        if (index >= node->children.size())
+            throw std::out_of_range("Original mesh node path outside hierarchy");
+        node = &node->children[index];
+        auto local = node->angles_degrees;
+        for (const auto& override : overrides)
+            if (override.name == node->name)
+                local = override.angles_degrees;
+        locals.push_back(local);
+    }
+    Vec3 total{};
+    for (auto it = locals.rbegin(); it != locals.rend(); ++it)
+        total = {total.x + it->x, total.y + it->y, total.z + it->z};
+    return {total.x + angles.x, total.y + angles.y, total.z + angles.z};
+}
 // RE-STUB: 93b4e4c301a5694b55e16977c2e52f4971bd9089659e3d58617c8af2368436c8:function:004d9aca
 // Portable serialized-object reader; rendering allocation and bounding caches are separate.
 Result decode_msh(std::span<const std::byte> bytes, MeshObject& output, std::string& error) {

@@ -69,6 +69,7 @@ class DebugOverlay {
     std::size_t race_debug_line_count() const { return race_debug_line_count_; }
     std::array<float, 2> race_checkbox_position(int index) const;
     std::array<float, 2> race_inspect_position(int index) const;
+    std::array<float, 2> race_track_position(int index) const;
 
   private:
     void current() const;
@@ -85,5 +86,6 @@ class DebugOverlay {
     std::array<std::array<float, 2>, 5> race_checkbox_positions_{};
     std::array<std::array<float, 2>, 7> race_inspect_positions_{};
     std::size_t race_debug_line_count_{};
+    std::vector<std::array<float, 2>> race_track_positions_;
 };
 } // namespace roadwars::extensions

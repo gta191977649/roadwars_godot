@@ -8,6 +8,8 @@ Vec3 add(Vec3 a, Vec3 b) { return {a.x + b.x, a.y + b.y, a.z + b.z}; }
 Vec3 scale(Vec3 v, float scalar) { return {v.x * scalar, v.y * scalar, v.z * scalar}; }
 } // namespace
 std::uint32_t ParticleRandom::next() {
+    if (draw_)
+        return draw_();
     state_ = state_ * 0x343fdu + 0x269ec3u;
     return (state_ >> 16) & 0x7fffu;
 }

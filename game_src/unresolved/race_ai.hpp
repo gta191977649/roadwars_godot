@@ -38,7 +38,8 @@ class RaceAi {
     Result update(const RaceRoute&, RaceRouteProgress&, const VehicleState&,
                   const VehicleParameters&, std::span<const RaceAiObstacle>,
                   float longitudinal_grip, float race_time, bool refresh_obstacles,
-                  float delta_seconds, std::string& error);
+                  float delta_seconds, std::string& error, float internal_hp = 1,
+                  float maximum_internal_hp = 1);
     void reset() {
         state_ = {};
         output_ = {};

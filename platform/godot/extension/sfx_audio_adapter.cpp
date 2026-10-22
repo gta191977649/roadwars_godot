@@ -1,5 +1,7 @@
 #include "platform/godot/extension/sfx_audio_adapter.hpp"
 #include <algorithm>
+#include <limits>
+#include <stdexcept>
 
 namespace roadwars {
 void SfxAudioAdapter::set_tire_sample(const WavePcm& sample) {
@@ -11,11 +13,23 @@ void SfxAudioAdapter::submit_tire(const EngineAudioCommand& command) {
         tire_->submit(command);
 }
 void SfxAudioAdapter::play_one_shot(const WavePcm& sample, const EngineAudioCommand& command,
-                                    std::string_view name) {
+                                    std::string_view name, std::uint32_t extra_repeats) {
     if (command.action != EngineVoiceAction::start)
         return;
+    WavePcm repeated;
+    const WavePcm* output = &sample;
+    if (extra_repeats) {
+        const auto plays = static_cast<std::size_t>(extra_repeats) + 1;
+        if (plays > 33 || sample.data.size() > std::numeric_limits<std::size_t>::max() / plays)
+            throw std::runtime_error("Unsupported finite original sound repeat count");
+        repeated = sample;
+        repeated.data.reserve(sample.data.size() * plays);
+        for (std::uint32_t i = 0; i < extra_repeats; ++i)
+            repeated.data.insert(repeated.data.end(), sample.data.begin(), sample.data.end());
+        output = &repeated;
+    }
     auto voice = std::make_unique<EngineAudioAdapter>(
-        owner_, sample, false, std::string(name) + "_" + std::to_string(one_shots_started_));
+        owner_, *output, false, std::string(name) + "_" + std::to_string(one_shots_started_));
     voice->submit(command);
     one_shots_.push_back(std::move(voice));
     ++one_shots_started_;

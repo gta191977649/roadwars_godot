@@ -1,0 +1,1976 @@
+{
+  "binary_sha256": "93b4e4c301a5694b55e16977c2e52f4971bd9089659e3d58617c8af2368436c8",
+  "functions": [
+    {
+      "address": "004ffa25",
+      "metadata": {
+        "isThunk": false,
+        "isExternal": false,
+        "hasVarArgs": false,
+        "stackFrameSize": 128,
+        "callingConvention": "unknown",
+        "parameterCount": 0
+      },
+      "functionName": "FUN_004ffa25",
+      "signature": "undefined FUN_004ffa25()",
+      "programName": "RoadWars",
+      "success": true,
+      "decompilation": "\r\nvoid __thiscall FUN_004ffa25(int param_1,undefined4 *param_2)\r\n\r\n{\r\n  int iVar1;\r\n  float *pfVar2;\r\n  int iVar3;\r\n  float *pfVar4;\r\n  undefined4 *puVar5;\r\n  undefined4 auStack_ec [24];\r\n  undefined4 uStack_8c;\r\n  int *piStack_88;\r\n  int local_74;\r\n  float local_70 [26];\r\n  int local_8;\r\n  \r\n  piStack_88 = (int *)0x4ffa38;\r\n  iVar1 = IsEmpty();\r\n  if (iVar1 == 0) {\r\n    if (*(int *)(param_1 + 0x24) == 0) {\r\n      piStack_88 = (int *)0x4ffa69;\r\n      local_74 = FUN_00500c60();\r\n    }\r\n    else {\r\n      local_74 = *(int *)(param_1 + 0x24);\r\n    }\r\n    local_8 = 0;\r\n    while (iVar1 = local_74, local_74 != 0) {\r\n      piStack_88 = &local_74;\r\n      uStack_8c = 0x4ffa9a;\r\n      pfVar2 = (float *)FUN_00500c80();\r\n      pfVar4 = local_70;\r\n      for (iVar3 = 0x1a; iVar3 != 0; iVar3 = iVar3 + -1) {\r\n        *pfVar4 = *pfVar2;\r\n        pfVar2 = pfVar2 + 1;\r\n        pfVar4 = pfVar4 + 1;\r\n      }\r\n      if ((float)param_2[1] <= local_70[1]) {\r\n        if (local_8 != 0) {\r\n          *(int *)(param_1 + 0x24) = iVar1;\r\n          puVar5 = auStack_ec;\r\n          for (iVar3 = 0x1a; iVar3 != 0; iVar3 = iVar3 + -1) {\r\n            *puVar5 = *param_2;\r\n            param_2 = param_2 + 1;\r\n            puVar5 = puVar5 + 1;\r\n          }\r\n          FUN_00500d40(iVar1);\r\n          return;\r\n        }\r\n        while (iVar1 = local_74, local_74 != 0) {\r\n          piStack_88 = &local_74;\r\n          uStack_8c = 0x4ffad8;\r\n          pfVar2 = (float *)FUN_00500ce0();\r\n          pfVar4 = local_70;\r\n          for (iVar3 = 0x1a; iVar3 != 0; iVar3 = iVar3 + -1) {\r\n            *pfVar4 = *pfVar2;\r\n            pfVar2 = pfVar2 + 1;\r\n            pfVar4 = pfVar4 + 1;\r\n          }\r\n          if (local_70[1] <= (float)param_2[1]) {\r\n            *(int *)(param_1 + 0x24) = iVar1;\r\n            puVar5 = auStack_ec;\r\n            for (iVar3 = 0x1a; iVar3 != 0; iVar3 = iVar3 + -1) {\r\n              *puVar5 = *param_2;\r\n              param_2 = param_2 + 1;\r\n              puVar5 = puVar5 + 1;\r\n            }\r\n            FUN_00500e40(iVar1);\r\n            return;\r\n          }\r\n        }\r\n      }\r\n      local_8 = 1;\r\n    }\r\n    puVar5 = auStack_ec;\r\n    for (iVar1 = 0x1a; iVar1 != 0; iVar1 = iVar1 + -1) {\r\n      *puVar5 = *param_2;\r\n      param_2 = param_2 + 1;\r\n      puVar5 = puVar5 + 1;\r\n    }\r\n    FUN_00500b50();\r\n  }\r\n  else {\r\n    puVar5 = auStack_ec;\r\n    for (iVar1 = 0x1a; iVar1 != 0; iVar1 = iVar1 + -1) {\r\n      *puVar5 = *param_2;\r\n      param_2 = param_2 + 1;\r\n      puVar5 = puVar5 + 1;\r\n    }\r\n    FUN_00500ad0();\r\n  }\r\n  return;\r\n}\r\n\r\n",
+      "entryPoint": "004ffa25"
+    },
+    {
+      "address": "004ffbd0",
+      "metadata": {
+        "isThunk": false,
+        "isExternal": false,
+        "hasVarArgs": false,
+        "stackFrameSize": 45140,
+        "callingConvention": "unknown",
+        "parameterCount": 0
+      },
+      "functionName": "FUN_004ffb96",
+      "signature": "undefined FUN_004ffb96()",
+      "programName": "RoadWars",
+      "success": true,
+      "decompilation": "\r\nvoid FUN_004ffb96(void)\r\n\r\n{\r\n  int iVar1;\r\n  undefined4 *puVar2;\r\n  int extraout_ECX;\r\n  char *pcVar3;\r\n  int local_b048;\r\n  char local_b040 [8];\r\n  undefined1 local_b038 [84];\r\n  int local_afe4;\r\n  uint local_afe0;\r\n  undefined4 *local_afdc;\r\n  undefined2 local_afd8 [1500];\r\n  int local_a420;\r\n  int local_a41c;\r\n  undefined2 local_a418 [20982];\r\n  undefined4 uStack_2c;\r\n  undefined4 uStack_28;\r\n  undefined4 uStack_24;\r\n  undefined2 *puStack_20;\r\n  int iStack_1c;\r\n  undefined2 *puStack_18;\r\n  undefined1 *puStack_14;\r\n  int *piStack_10;\r\n  \r\n  FUN_005170f0();\r\n  piStack_10 = (int *)0x4ffbb6;\r\n  iVar1 = IsEmpty();\r\n  if (iVar1 == 0) {\r\n    piStack_10 = (int *)0x4ffbca;\r\n    local_a420 = FUN_00500c60();\r\n    local_a41c = 0;\r\n    local_b048 = 0;\r\n    piStack_10 = (int *)0x4;\r\n    puStack_14 = (undefined1 *)0x15;\r\n    puStack_18 = (undefined2 *)0x4ffbff;\r\n    FUN_004dd1d0();\r\n    piStack_10 = (int *)0x1;\r\n    puStack_14 = (undefined1 *)0x1b;\r\n    puStack_18 = (undefined2 *)0x4ffc0b;\r\n    FUN_004dd1d0();\r\n    piStack_10 = (int *)0x0;\r\n    puStack_14 = (undefined1 *)0xe;\r\n    puStack_18 = (undefined2 *)0x4ffc17;\r\n    FUN_004dd1d0();\r\n    piStack_10 = (int *)0x5;\r\n    puStack_14 = (undefined1 *)0x13;\r\n    puStack_18 = (undefined2 *)0x4ffc23;\r\n    FUN_004dd1d0();\r\n    piStack_10 = (int *)0x6;\r\n    puStack_14 = (undefined1 *)0x14;\r\n    puStack_18 = (undefined2 *)0x4ffc2f;\r\n    FUN_004dd1d0();\r\n    piStack_10 = (int *)0x4ffc37;\r\n    FUN_004dbe9e();\r\n    *(undefined1 *)(extraout_ECX + 0x20) = 1;\r\n    *(undefined4 *)(extraout_ECX + 0x1c) = 0;\r\n    while (local_a420 != 0) {\r\n      piStack_10 = &local_a420;\r\n      puStack_14 = (undefined1 *)0x4ffc80;\r\n      puVar2 = (undefined4 *)FUN_00500c80();\r\n      pcVar3 = local_b040;\r\n      for (iVar1 = 0x1a; iVar1 != 0; iVar1 = iVar1 + -1) {\r\n        *(undefined4 *)pcVar3 = *puVar2;\r\n        puVar2 = puVar2 + 1;\r\n        pcVar3 = pcVar3 + 4;\r\n      }\r\n      if (local_b040[0] == '\\x01') {\r\n        if ((local_afe4 != *(int *)(extraout_ECX + 0x1c)) ||\r\n           ((local_afe0 & 0xff) != (uint)*(byte *)(extraout_ECX + 0x20))) {\r\n          if ((0 < local_b048) && (*(int *)(extraout_ECX + 0x1c) != 0)) {\r\n            piStack_10 = (int *)0x0;\r\n            puStack_14 = (undefined1 *)(local_b048 * 3);\r\n            puStack_18 = local_afd8;\r\n            iStack_1c = local_a41c;\r\n            puStack_20 = local_a418;\r\n            uStack_24 = 0x144;\r\n            uStack_28 = 4;\r\n            uStack_2c = 0x4ffd13;\r\n            FUN_004dd100();\r\n          }\r\n          if (local_afe4 != *(int *)(extraout_ECX + 0x1c)) {\r\n            *(int *)(extraout_ECX + 0x1c) = local_afe4;\r\n            piStack_10 = *(int **)(extraout_ECX + 0x1c);\r\n            puStack_14 = (undefined1 *)0x0;\r\n            puStack_18 = (undefined2 *)0x4ffd47;\r\n            FUN_004dd270();\r\n          }\r\n          if ((local_afe0 & 0xff) != (uint)*(byte *)(extraout_ECX + 0x20)) {\r\n            *(undefined1 *)(extraout_ECX + 0x20) = (undefined1)local_afe0;\r\n            if (*(char *)(extraout_ECX + 0x20) == '\\0') {\r\n              piStack_10 = (int *)0x5;\r\n              puStack_14 = (undefined1 *)0x13;\r\n              puStack_18 = (undefined2 *)0x4ffd8c;\r\n              FUN_004dd1d0();\r\n              piStack_10 = (int *)0x2;\r\n              puStack_14 = (undefined1 *)0x14;\r\n              puStack_18 = (undefined2 *)0x4ffd98;\r\n              FUN_004dd1d0();\r\n            }\r\n            else {\r\n              piStack_10 = (int *)0x5;\r\n              puStack_14 = (undefined1 *)0x13;\r\n              puStack_18 = (undefined2 *)0x4ffda6;\r\n              FUN_004dd1d0();\r\n              piStack_10 = (int *)0x6;\r\n              puStack_14 = (undefined1 *)0x14;\r\n              puStack_18 = (undefined2 *)0x4ffdb2;\r\n              FUN_004dd1d0();\r\n            }\r\n          }\r\n          local_b048 = 0;\r\n          local_a41c = 0;\r\n        }\r\n        puStack_14 = local_b038;\r\n        puStack_18 = local_a418 + local_a41c * 0xe;\r\n        iStack_1c = 0x4ffde7;\r\n        piStack_10 = (int *)0x54;\r\n        FUN_005179f0();\r\n        local_afd8[local_a41c] = (undefined2)local_a41c;\r\n        local_a41c = local_a41c + 1;\r\n        local_afd8[local_a41c] = (undefined2)local_a41c;\r\n        local_a41c = local_a41c + 1;\r\n        local_afd8[local_a41c] = (undefined2)local_a41c;\r\n        local_a41c = local_a41c + 1;\r\n        local_b048 = local_b048 + 1;\r\n        if (400 < local_b048) {\r\n          piStack_10 = (int *)0x0;\r\n          puStack_14 = (undefined1 *)(local_b048 * 3);\r\n          puStack_18 = local_afd8;\r\n          puStack_20 = local_a418;\r\n          uStack_24 = 0x144;\r\n          uStack_28 = 4;\r\n          uStack_2c = 0x4ffea1;\r\n          iStack_1c = local_a41c;\r\n          FUN_004dd100();\r\n          local_a41c = 0;\r\n          local_b048 = 0;\r\n        }\r\n      }\r\n      else if (local_b040[0] == '\\x02') {\r\n        if (0 < local_b048) {\r\n          piStack_10 = (int *)0x0;\r\n          puStack_14 = (undefined1 *)(local_b048 * 3);\r\n          puStack_18 = local_afd8;\r\n          iStack_1c = local_a41c;\r\n          puStack_20 = local_a418;\r\n          uStack_24 = 0x144;\r\n          uStack_28 = 4;\r\n          uStack_2c = 0x4fff05;\r\n          FUN_004dd100();\r\n          local_a41c = 0;\r\n          local_b048 = 0;\r\n        }\r\n        piStack_10 = (int *)0x0;\r\n        puStack_14 = (undefined1 *)0x4fff2d;\r\n        (**(code **)*local_afdc)();\r\n        *(undefined4 *)(extraout_ECX + 0x1c) = 0;\r\n        if (*(char *)(extraout_ECX + 0x20) == '\\0') {\r\n          piStack_10 = (int *)0x5;\r\n          puStack_14 = (undefined1 *)0x13;\r\n          puStack_18 = (undefined2 *)0x4fff55;\r\n          FUN_004dd1d0();\r\n          piStack_10 = (int *)0x2;\r\n          puStack_14 = (undefined1 *)0x14;\r\n          puStack_18 = (undefined2 *)0x4fff61;\r\n          FUN_004dd1d0();\r\n        }\r\n        else {\r\n          piStack_10 = (int *)0x5;\r\n          puStack_14 = (undefined1 *)0x13;\r\n          puStack_18 = (undefined2 *)0x4fff6f;\r\n          FUN_004dd1d0();\r\n          piStack_10 = (int *)0x6;\r\n          puStack_14 = (undefined1 *)0x14;\r\n          puStack_18 = (undefined2 *)0x4fff7b;\r\n          FUN_004dd1d0();\r\n        }\r\n        piStack_10 = (int *)0x0;\r\n        puStack_14 = (undefined1 *)0xe;\r\n        puStack_18 = (undefined2 *)0x4fff87;\r\n        FUN_004dd1d0();\r\n        piStack_10 = (int *)0x4fff8f;\r\n        FUN_004dbe9e();\r\n        piStack_10 = (int *)0x0;\r\n        puStack_14 = (undefined1 *)0x18;\r\n        puStack_18 = (undefined2 *)0x4fff9b;\r\n        FUN_004dd1d0();\r\n        piStack_10 = (int *)0x5;\r\n        puStack_14 = (undefined1 *)0x19;\r\n        puStack_18 = (undefined2 *)0x4fffa7;\r\n        FUN_004dd1d0();\r\n      }\r\n    }\r\n    if (0 < local_b048) {\r\n      piStack_10 = (int *)0x0;\r\n      puStack_14 = (undefined1 *)(local_b048 * 3);\r\n      puStack_18 = local_afd8;\r\n      iStack_1c = local_a41c;\r\n      puStack_20 = local_a418;\r\n      uStack_24 = 0x144;\r\n      uStack_28 = 4;\r\n      uStack_2c = 0x4fffe5;\r\n      FUN_004dd100();\r\n    }\r\n    piStack_10 = (int *)0x1;\r\n    puStack_14 = (undefined1 *)0xe;\r\n    puStack_18 = (undefined2 *)0x4ffff1;\r\n    FUN_004dd1d0();\r\n    piStack_10 = (int *)0x5;\r\n    puStack_14 = (undefined1 *)0x13;\r\n    puStack_18 = (undefined2 *)0x4ffffd;\r\n    FUN_004dd1d0();\r\n    piStack_10 = (int *)0x6;\r\n    puStack_14 = (undefined1 *)0x14;\r\n    puStack_18 = (undefined2 *)0x500009;\r\n    FUN_004dd1d0();\r\n    piStack_10 = (int *)0x500011;\r\n    FUN_004dbe3c();\r\n  }\r\n  return;\r\n}\r\n\r\n",
+      "entryPoint": "004ffb96"
+    },
+    {
+      "address": "004e689a",
+      "metadata": {
+        "isThunk": false,
+        "isExternal": false,
+        "hasVarArgs": false,
+        "stackFrameSize": 12,
+        "callingConvention": "unknown",
+        "parameterCount": 0
+      },
+      "functionName": "FUN_004e689a",
+      "signature": "undefined FUN_004e689a()",
+      "programName": "RoadWars",
+      "success": true,
+      "decompilation": "\r\nvoid __thiscall FUN_004e689a(int param_1,undefined4 *param_2)\r\n\r\n{\r\n  int iVar1;\r\n  \r\n  *(undefined4 *)(param_1 + 0xe0) = *(undefined4 *)(param_1 + 0xd4);\r\n  *(float *)(param_1 + 0xe8) = -*(float *)(param_1 + 0xd8);\r\n  *(undefined4 *)(param_1 + 0x100) = *(undefined4 *)(param_1 + 0xd8);\r\n  *(undefined4 *)(param_1 + 0x108) = *(undefined4 *)(param_1 + 0xd4);\r\n  *(undefined4 *)(param_1 + 0x110) = *param_2;\r\n  *(undefined4 *)(param_1 + 0x114) = param_2[1];\r\n  *(undefined4 *)(param_1 + 0x118) = param_2[2];\r\n  (**(code **)(**(int **)(*(int *)(param_1 + 4) + 0x77c) + 0x2c))\r\n            (*(undefined4 *)(*(int *)(param_1 + 4) + 0x77c),1,param_1 + 0xe0);\r\n  iVar1 = FUN_00500393(*(undefined4 *)(param_1 + 4),param_2 + 10,param_1 + 0x58);\r\n  if (iVar1 != 0) {\r\n    *(undefined4 *)(param_1 + 0x54) = *(undefined4 *)(param_1 + 100);\r\n    *(undefined4 *)(param_1 + 0xac) = *(undefined4 *)(param_1 + 400);\r\n    *(undefined1 *)(param_1 + 0xb0) = 0;\r\n    FUN_004ffa25(param_1 + 0x50);\r\n  }\r\n  return;\r\n}\r\n\r\n",
+      "entryPoint": "004e689a"
+    },
+    {
+      "address": "004f97a7",
+      "metadata": {
+        "isThunk": false,
+        "isExternal": false,
+        "hasVarArgs": false,
+        "stackFrameSize": 12,
+        "callingConvention": "unknown",
+        "parameterCount": 0
+      },
+      "functionName": "FUN_004f97a7",
+      "signature": "undefined FUN_004f97a7()",
+      "programName": "RoadWars",
+      "success": true,
+      "decompilation": "\r\nvoid __thiscall FUN_004f97a7(int param_1,undefined4 *param_2)\r\n\r\n{\r\n  int iVar1;\r\n  \r\n  *(undefined4 *)(param_1 + 0x4bb4) = *(undefined4 *)(param_1 + 0x4ba8);\r\n  *(float *)(param_1 + 0x4bbc) = -*(float *)(param_1 + 0x4bac);\r\n  *(undefined4 *)(param_1 + 0x4bd4) = *(undefined4 *)(param_1 + 0x4bac);\r\n  *(undefined4 *)(param_1 + 0x4bdc) = *(undefined4 *)(param_1 + 0x4ba8);\r\n  *(undefined4 *)(param_1 + 0x4be4) = *param_2;\r\n  *(undefined4 *)(param_1 + 0x4be8) = param_2[1];\r\n  *(undefined4 *)(param_1 + 0x4bec) = param_2[2];\r\n  (**(code **)(**(int **)(*(int *)(param_1 + 4) + 0x77c) + 0x2c))\r\n            (*(undefined4 *)(*(int *)(param_1 + 4) + 0x77c),1,param_1 + 0x4bb4);\r\n  iVar1 = FUN_00500393(*(undefined4 *)(param_1 + 4),param_2 + 6,param_1 + 0x4b2c);\r\n  if (iVar1 != 0) {\r\n    *(undefined4 *)(param_1 + 0x4b28) = *(undefined4 *)(param_1 + 0x4b38);\r\n    *(undefined4 *)(param_1 + 0x4b80) = *(undefined4 *)(param_1 + 0x4c58);\r\n    *(undefined1 *)(param_1 + 0x4b84) = 1;\r\n    FUN_004ffa25(param_1 + 0x4b24);\r\n  }\r\n  return;\r\n}\r\n\r\n",
+      "entryPoint": "004f97a7"
+    },
+    {
+      "address": "004fabd9",
+      "metadata": {
+        "isThunk": false,
+        "isExternal": false,
+        "hasVarArgs": false,
+        "stackFrameSize": 12,
+        "callingConvention": "unknown",
+        "parameterCount": 0
+      },
+      "functionName": "FUN_004fabd9",
+      "signature": "undefined FUN_004fabd9()",
+      "programName": "RoadWars",
+      "success": true,
+      "decompilation": "\r\nvoid __thiscall FUN_004fabd9(int *param_1,int *param_2)\r\n\r\n{\r\n  int iVar1;\r\n  \r\n  param_1[0x242] = param_1[0x240];\r\n  param_1[0x244] = (int)-(float)param_1[0x241];\r\n  param_1[0x24a] = param_1[0x241];\r\n  param_1[0x24c] = param_1[0x240];\r\n  param_1[0x24e] = *param_2;\r\n  param_1[0x24f] = param_2[1];\r\n  param_1[0x250] = param_2[2];\r\n  (**(code **)(**(int **)(*param_1 + 0x77c) + 0x2c))\r\n            (*(undefined4 *)(*param_1 + 0x77c),1,param_1 + 0x242);\r\n  iVar1 = FUN_00500393(*param_1,param_2 + 9,param_1 + 0x221);\r\n  if (iVar1 != 0) {\r\n    param_1[0x220] = param_1[0x224];\r\n    param_1[0x236] = param_1[0x26b];\r\n    *(undefined1 *)(param_1 + 0x237) = 1;\r\n    FUN_004ffa25(param_1 + 0x21f);\r\n  }\r\n  return;\r\n}\r\n\r\n",
+      "entryPoint": "004fabd9"
+    },
+    {
+      "address": "0040c41e",
+      "metadata": {
+        "isThunk": false,
+        "isExternal": false,
+        "hasVarArgs": false,
+        "stackFrameSize": 796,
+        "callingConvention": "unknown",
+        "parameterCount": 0
+      },
+      "functionName": "FUN_0040c41e",
+      "signature": "undefined FUN_0040c41e()",
+      "programName": "RoadWars",
+      "success": true,
+      "decompilation": "\r\nvoid __thiscall FUN_0040c41e(int param_1,undefined4 param_2)\r\n\r\n{\r\n  undefined4 uVar1;\r\n  int iVar2;\r\n  char *pcVar3;\r\n  char *pcVar4;\r\n  undefined4 *puVar5;\r\n  undefined1 local_314 [260];\r\n  undefined1 local_210 [260];\r\n  char local_10c [21];\r\n  undefined4 local_f7;\r\n  int local_8;\r\n  \r\n  thunk_FUN_004cf29a(param_2,0x3dcccccd,0x3dcccccd,0x42340000);\r\n  pcVar3 = s_Cars_Shared_Weapons__006126e0;\r\n  pcVar4 = local_10c;\r\n  for (iVar2 = 5; iVar2 != 0; iVar2 = iVar2 + -1) {\r\n    *(undefined4 *)pcVar4 = *(undefined4 *)pcVar3;\r\n    pcVar3 = pcVar3 + 4;\r\n    pcVar4 = pcVar4 + 4;\r\n  }\r\n  *pcVar4 = *pcVar3;\r\n  puVar5 = &local_f7;\r\n  for (iVar2 = 0x3b; iVar2 != 0; iVar2 = iVar2 + -1) {\r\n    *puVar5 = 0;\r\n    puVar5 = puVar5 + 1;\r\n  }\r\n  *(undefined2 *)puVar5 = 0;\r\n  *(undefined1 *)((int)puVar5 + 2) = 0;\r\n  FUN_00516af0(local_10c,param_1 + 0xc);\r\n  FUN_00516af0(local_10c,&DAT_006126f8);\r\n  FUN_00516af0(local_10c,param_1 + 0x110);\r\n  FUN_00516af0(local_10c,s__SpatialObject_d3d_006126fc);\r\n  FUN_00516ae0(local_314,s_Cars_Shared_Textures_LowRes__00612710);\r\n  FUN_00516ae0(local_210,s_Cars_Shared_Textures__00612730);\r\n  FUN_004d76b8(local_10c,2,local_314,param_2);\r\n  FUN_00516ae0(local_10c,s_Cars_Shared_Weapons__00612748);\r\n  FUN_00516af0(local_10c,param_1 + 0xc);\r\n  FUN_00516af0(local_10c,&DAT_00612760);\r\n  FUN_00516af0(local_10c,param_1 + 0x110);\r\n  FUN_00516af0(local_10c,s__AmmoSpatialObject_d3d_00612764);\r\n  for (local_8 = 0; local_8 < 5; local_8 = local_8 + 1) {\r\n    thunk_FUN_0047dd34(param_1,local_10c,s_Cars_Shared_Textures__0061277c,param_2,DAT_0062a118,0,0,0\r\n                      );\r\n  }\r\n  *(undefined4 *)(param_1 + 0x13a8) = 0;\r\n  *(undefined4 *)(param_1 + 0x13ac) = 1;\r\n  uVar1 = FUN_004d78ff(s_295ULFire_00612794,0,0,0,0);\r\n  *(undefined4 *)(param_1 + 0x13b8) = uVar1;\r\n  FUN_004d28b0();\r\n  *(undefined4 *)(param_1 + 0x13b0) = 0;\r\n  *(undefined4 *)(param_1 + 0x13b4) = 0x3f800000;\r\n  *(undefined4 *)(param_1 + 0x538) = 0;\r\n  return;\r\n}\r\n\r\n",
+      "entryPoint": "0040c41e"
+    },
+    {
+      "address": "0045b060",
+      "metadata": {
+        "isThunk": false,
+        "isExternal": false,
+        "hasVarArgs": false,
+        "stackFrameSize": 796,
+        "callingConvention": "unknown",
+        "parameterCount": 0
+      },
+      "functionName": "FUN_0045af2e",
+      "signature": "undefined FUN_0045af2e()",
+      "programName": "RoadWars",
+      "success": true,
+      "decompilation": "\r\nvoid __thiscall FUN_0045af2e(int param_1,undefined4 param_2)\r\n\r\n{\r\n  undefined4 uVar1;\r\n  int iVar2;\r\n  char *pcVar3;\r\n  char *pcVar4;\r\n  undefined4 *puVar5;\r\n  undefined1 local_314 [260];\r\n  undefined1 local_210 [260];\r\n  char local_10c [21];\r\n  undefined4 local_f7;\r\n  int local_8;\r\n  \r\n  thunk_FUN_004cf29a(param_2,0x3dcccccd,0x3dcccccd,0x42340000);\r\n  pcVar3 = s_Cars_Shared_Weapons__00616a8c;\r\n  pcVar4 = local_10c;\r\n  for (iVar2 = 5; iVar2 != 0; iVar2 = iVar2 + -1) {\r\n    *(undefined4 *)pcVar4 = *(undefined4 *)pcVar3;\r\n    pcVar3 = pcVar3 + 4;\r\n    pcVar4 = pcVar4 + 4;\r\n  }\r\n  *pcVar4 = *pcVar3;\r\n  puVar5 = &local_f7;\r\n  for (iVar2 = 0x3b; iVar2 != 0; iVar2 = iVar2 + -1) {\r\n    *puVar5 = 0;\r\n    puVar5 = puVar5 + 1;\r\n  }\r\n  *(undefined2 *)puVar5 = 0;\r\n  *(undefined1 *)((int)puVar5 + 2) = 0;\r\n  FUN_00516af0(local_10c,param_1 + 0xc);\r\n  FUN_00516af0(local_10c,&DAT_00616aa4);\r\n  FUN_00516af0(local_10c,param_1 + 0x110);\r\n  FUN_00516af0(local_10c,s__SpatialObject_d3d_00616aa8);\r\n  FUN_00516ae0(local_314,s_Cars_Shared_Textures_LowRes__00616abc);\r\n  FUN_00516ae0(local_210,s_Cars_Shared_Textures__00616adc);\r\n  FUN_004d76b8(local_10c,2,local_314,param_2);\r\n  FUN_00516ae0(local_10c,s_Cars_Shared_Weapons__00616af4);\r\n  FUN_00516af0(local_10c,param_1 + 0xc);\r\n  FUN_00516af0(local_10c,&DAT_00616b0c);\r\n  FUN_00516af0(local_10c,param_1 + 0x110);\r\n  FUN_00516af0(local_10c,s__AmmoSpatialObject_d3d_00616b10);\r\n  for (local_8 = 0; local_8 < 0xf; local_8 = local_8 + 1) {\r\n    thunk_FUN_0047dd34(param_1,local_10c,s_Cars_Shared_Textures__00616b28,param_2,DAT_0062a118,0,0,0\r\n                      );\r\n  }\r\n  *(undefined4 *)(param_1 + 0x3068) = 0;\r\n  *(undefined4 *)(param_1 + 0x306c) = 1;\r\n  uVar1 = FUN_004d78ff(s_295ULFireLeft_00616b40,0,0,0,0);\r\n  *(undefined4 *)(param_1 + 0x3070) = uVar1;\r\n  uVar1 = FUN_004d78ff(s_295ULFireRight_00616b50,0,0,0,0);\r\n  *(undefined4 *)(param_1 + 0x3074) = uVar1;\r\n  FUN_004d28b0();\r\n  FUN_004d28b0();\r\n  *(undefined4 *)(param_1 + 0x3078) = 0;\r\n  *(undefined4 *)(param_1 + 0x307c) = 0;\r\n  *(undefined4 *)(param_1 + 0x3080) = 0x3f800000;\r\n  *(undefined4 *)(param_1 + 0x3084) = 0x3f800000;\r\n  *(undefined4 *)(param_1 + 0x3088) = 0;\r\n  *(undefined4 *)(param_1 + 0x538) = 0;\r\n  return;\r\n}\r\n\r\n",
+      "entryPoint": "0045af2e"
+    },
+    {
+      "address": "004ce67e",
+      "metadata": {
+        "isThunk": false,
+        "isExternal": false,
+        "hasVarArgs": false,
+        "stackFrameSize": 796,
+        "callingConvention": "unknown",
+        "parameterCount": 0
+      },
+      "functionName": "FUN_004ce67e",
+      "signature": "undefined FUN_004ce67e()",
+      "programName": "RoadWars",
+      "success": true,
+      "decompilation": "\r\nvoid __thiscall FUN_004ce67e(int param_1,undefined4 param_2)\r\n\r\n{\r\n  undefined4 uVar1;\r\n  int iVar2;\r\n  char *pcVar3;\r\n  char *pcVar4;\r\n  undefined4 *puVar5;\r\n  undefined1 local_314 [260];\r\n  undefined1 local_210 [260];\r\n  char local_10c [21];\r\n  undefined4 local_f7;\r\n  int local_8;\r\n  \r\n  thunk_FUN_004cf29a(param_2,0x3dcccccd,0x3dcccccd,0x42340000);\r\n  pcVar3 = s_Cars_Shared_Weapons__0061e578;\r\n  pcVar4 = local_10c;\r\n  for (iVar2 = 5; iVar2 != 0; iVar2 = iVar2 + -1) {\r\n    *(undefined4 *)pcVar4 = *(undefined4 *)pcVar3;\r\n    pcVar3 = pcVar3 + 4;\r\n    pcVar4 = pcVar4 + 4;\r\n  }\r\n  *pcVar4 = *pcVar3;\r\n  puVar5 = &local_f7;\r\n  for (iVar2 = 0x3b; iVar2 != 0; iVar2 = iVar2 + -1) {\r\n    *puVar5 = 0;\r\n    puVar5 = puVar5 + 1;\r\n  }\r\n  *(undefined2 *)puVar5 = 0;\r\n  *(undefined1 *)((int)puVar5 + 2) = 0;\r\n  FUN_00516af0(local_10c,param_1 + 0xc);\r\n  FUN_00516af0(local_10c,&DAT_0061e590);\r\n  FUN_00516af0(local_10c,param_1 + 0x110);\r\n  FUN_00516af0(local_10c,s__SpatialObject_d3d_0061e594);\r\n  FUN_00516ae0(local_314,s_Cars_Shared_Textures_LowRes__0061e5a8);\r\n  FUN_00516ae0(local_210,s_Cars_Shared_Textures__0061e5c8);\r\n  FUN_004d76b8(local_10c,2,local_314,param_2);\r\n  FUN_00516ae0(local_10c,s_Cars_Shared_Weapons__0061e5e0);\r\n  FUN_00516af0(local_10c,param_1 + 0xc);\r\n  FUN_00516af0(local_10c,&DAT_0061e5f8);\r\n  FUN_00516af0(local_10c,param_1 + 0x110);\r\n  FUN_00516af0(local_10c,s__AmmoSpatialObject_d3d_0061e5fc);\r\n  for (local_8 = 0; local_8 < 5; local_8 = local_8 + 1) {\r\n    thunk_FUN_0047dd34(param_1,local_10c,s_Cars_Shared_Textures__0061e614,param_2,DAT_0062a134,1,0,1\r\n                      );\r\n  }\r\n  *(undefined4 *)(param_1 + 0x13a8) = 0;\r\n  *(undefined4 *)(param_1 + 0x13ac) = 1;\r\n  uVar1 = FUN_004d78ff(s_295ULFire_0061e62c,0,0,0,0);\r\n  *(undefined4 *)(param_1 + 0x13b8) = uVar1;\r\n  FUN_004d28b0();\r\n  *(undefined4 *)(param_1 + 0x13b0) = 0;\r\n  *(undefined4 *)(param_1 + 0x13b4) = 0x3f800000;\r\n  *(undefined4 *)(param_1 + 0x538) = 0;\r\n  return;\r\n}\r\n\r\n",
+      "entryPoint": "004ce67e"
+    },
+    {
+      "address": "0044c83e",
+      "metadata": {
+        "isThunk": false,
+        "isExternal": false,
+        "hasVarArgs": false,
+        "stackFrameSize": 1060,
+        "callingConvention": "unknown",
+        "parameterCount": 0
+      },
+      "functionName": "FUN_0044c83e",
+      "signature": "undefined FUN_0044c83e()",
+      "programName": "RoadWars",
+      "success": true,
+      "decompilation": "\r\nvoid __thiscall FUN_0044c83e(int param_1,undefined4 param_2)\r\n\r\n{\r\n  undefined4 uVar1;\r\n  int iVar2;\r\n  char *pcVar3;\r\n  char *pcVar4;\r\n  undefined4 *puVar5;\r\n  undefined1 local_41c [260];\r\n  undefined1 local_318 [260];\r\n  char local_214 [21];\r\n  undefined4 local_1ff;\r\n  int local_110;\r\n  char local_10c [260];\r\n  int local_8;\r\n  \r\n  thunk_FUN_004cf29a(param_2,0x3dcccccd,0x3dcccccd,0x42340000);\r\n  pcVar3 = s_Cars_Shared_Weapons__00615ba0;\r\n  pcVar4 = local_214;\r\n  for (iVar2 = 5; iVar2 != 0; iVar2 = iVar2 + -1) {\r\n    *(undefined4 *)pcVar4 = *(undefined4 *)pcVar3;\r\n    pcVar3 = pcVar3 + 4;\r\n    pcVar4 = pcVar4 + 4;\r\n  }\r\n  *pcVar4 = *pcVar3;\r\n  puVar5 = &local_1ff;\r\n  for (iVar2 = 0x3b; iVar2 != 0; iVar2 = iVar2 + -1) {\r\n    *puVar5 = 0;\r\n    puVar5 = puVar5 + 1;\r\n  }\r\n  *(undefined2 *)puVar5 = 0;\r\n  *(undefined1 *)((int)puVar5 + 2) = 0;\r\n  FUN_00516af0(local_214,param_1 + 0xc);\r\n  FUN_00516af0(local_214,&DAT_00615bb8);\r\n  FUN_00516af0(local_214,param_1 + 0x110);\r\n  FUN_00516af0(local_214,s__SpatialObject_d3d_00615bbc);\r\n  FUN_00516ae0(local_41c,s_Cars_Shared_Textures_LowRes__00615bd0);\r\n  FUN_00516ae0(local_318,s_Cars_Shared_Textures__00615bf0);\r\n  FUN_004d76b8(local_214,2,local_41c,param_2);\r\n  FUN_00516ae0(local_214,s_Cars_Shared_Weapons__00615c08);\r\n  FUN_00516af0(local_214,param_1 + 0xc);\r\n  FUN_00516af0(local_214,&DAT_00615c20);\r\n  FUN_00516af0(local_214,param_1 + 0x110);\r\n  FUN_00516af0(local_214,s__AmmoSpatialObject_d3d_00615c24);\r\n  for (local_8 = 0; local_8 < 0x1e; local_8 = local_8 + 1) {\r\n    thunk_FUN_0047dd34(param_1,local_214,s_Cars_Shared_Textures__00615c3c,param_2,DAT_0062a118,0,0,0\r\n                      );\r\n  }\r\n  *(undefined4 *)(param_1 + 0x5b88) = 0;\r\n  *(undefined4 *)(param_1 + 0x5b8c) = 1;\r\n  for (local_110 = 0; local_110 < 5; local_110 = local_110 + 1) {\r\n    FUN_00516ae0(local_214,s_295ULFire_00615c54);\r\n    __itoa(local_110 + 1,local_10c,10);\r\n    FUN_00516af0(local_214,local_10c);\r\n    uVar1 = FUN_004d78ff(local_214,0,0,0,0);\r\n    *(undefined4 *)(param_1 + 0x5b90 + local_110 * 4) = uVar1;\r\n    FUN_004d28b0();\r\n    *(undefined4 *)(param_1 + 0x5ba4 + local_110 * 4) = 0;\r\n    *(undefined4 *)(param_1 + 0x5bb8 + local_110 * 4) = 0x3f800000;\r\n  }\r\n  *(undefined4 *)(param_1 + 0x5bcc) = 0;\r\n  *(undefined4 *)(param_1 + 0x538) = 0;\r\n  return;\r\n}\r\n\r\n",
+      "entryPoint": "0044c83e"
+    },
+    {
+      "address": "004e6a76",
+      "metadata": {
+        "isThunk": false,
+        "isExternal": false,
+        "hasVarArgs": false,
+        "stackFrameSize": 12,
+        "callingConvention": "unknown",
+        "parameterCount": 0
+      },
+      "functionName": "FUN_004e6a76",
+      "signature": "undefined FUN_004e6a76()",
+      "programName": "RoadWars",
+      "success": true,
+      "decompilation": "\r\nvoid FUN_004e6a76(int param_1,undefined4 param_2)\r\n\r\n{\r\n  FUN_004e6271(0,0,1,*(undefined4 *)(param_1 + 0x44),param_2);\r\n  return;\r\n}\r\n\r\n",
+      "entryPoint": "004e6a76"
+    }
+  ],
+  "listings": [
+    {
+      "id": "0044ed00listing",
+      "programName": "RoadWars",
+      "startAddress": "0044ed00",
+      "instructions": [
+        {
+          "address": "0044ed00",
+          "type": "instruction",
+          "mnemonic": "MOV",
+          "operands": "ECX, dword ptr [ECX + 0x2dc]",
+          "bytes": "8b89dc020000"
+        },
+        {
+          "address": "0044ed06",
+          "type": "instruction",
+          "mnemonic": "ADD",
+          "operands": "ECX, EAX",
+          "bytes": "03c8"
+        },
+        {
+          "address": "0044ed08",
+          "type": "instruction",
+          "mnemonic": "CALL",
+          "operands": "0x004e5e99",
+          "bytes": "e88c710900"
+        },
+        {
+          "address": "0044ed0d",
+          "type": "instruction",
+          "mnemonic": "PUSH",
+          "operands": "0x41000000",
+          "bytes": "6800000041"
+        },
+        {
+          "address": "0044ed12",
+          "type": "instruction",
+          "mnemonic": "PUSH",
+          "operands": "0x3dcccccd",
+          "bytes": "68cdcccc3d"
+        },
+        {
+          "address": "0044ed17",
+          "type": "instruction",
+          "mnemonic": "MOV",
+          "operands": "EDX, dword ptr [EBP + 0xfffffc8c]",
+          "bytes": "8b958cfcffff"
+        },
+        {
+          "address": "0044ed1d",
+          "type": "instruction",
+          "mnemonic": "FLD",
+          "operands": "float ptr [0x005f55e8]",
+          "bytes": "d905e8555f00"
+        },
+        {
+          "address": "0044ed23",
+          "type": "instruction",
+          "mnemonic": "FDIV",
+          "operands": "float ptr [EDX + 0x288]",
+          "bytes": "d8b288020000"
+        },
+        {
+          "address": "0044ed29",
+          "type": "instruction",
+          "mnemonic": "CALL",
+          "operands": "0x005167bc",
+          "bytes": "e88e7a0c00"
+        },
+        {
+          "address": "0044ed2e",
+          "type": "instruction",
+          "mnemonic": "PUSH",
+          "operands": "EAX",
+          "bytes": "50"
+        },
+        {
+          "address": "0044ed2f",
+          "type": "instruction",
+          "mnemonic": "MOV",
+          "operands": "EAX, dword ptr [EBP + 0xfffffc8c]",
+          "bytes": "8b858cfcffff"
+        },
+        {
+          "address": "0044ed35",
+          "type": "instruction",
+          "mnemonic": "MOV",
+          "operands": "ECX, dword ptr [EAX + 0x4]",
+          "bytes": "8b4804"
+        },
+        {
+          "address": "0044ed38",
+          "type": "instruction",
+          "mnemonic": "PUSH",
+          "operands": "ECX",
+          "bytes": "51"
+        },
+        {
+          "address": "0044ed39",
+          "type": "instruction",
+          "mnemonic": "PUSH",
+          "operands": "0x615fa8",
+          "bytes": "68a85f6100"
+        },
+        {
+          "address": "0044ed3e",
+          "type": "instruction",
+          "mnemonic": "PUSH",
+          "operands": "0x3d4ccccd",
+          "bytes": "68cdcc4c3d"
+        },
+        {
+          "address": "0044ed43",
+          "type": "instruction",
+          "mnemonic": "PUSH",
+          "operands": "0x3eb33333",
+          "bytes": "683333b33e"
+        },
+        {
+          "address": "0044ed48",
+          "type": "instruction",
+          "mnemonic": "PUSH",
+          "operands": "0x41700000",
+          "bytes": "6800007041"
+        },
+        {
+          "address": "0044ed4d",
+          "type": "instruction",
+          "mnemonic": "PUSH",
+          "operands": "-0x4",
+          "bytes": "6afc"
+        },
+        {
+          "address": "0044ed4f",
+          "type": "instruction",
+          "mnemonic": "PUSH",
+          "operands": "0x1",
+          "bytes": "6a01"
+        },
+        {
+          "address": "0044ed51",
+          "type": "instruction",
+          "mnemonic": "MOV",
+          "operands": "EDX, dword ptr [EBP + -0x18]",
+          "bytes": "8b55e8"
+        },
+        {
+          "address": "0044ed54",
+          "type": "instruction",
+          "mnemonic": "IMUL",
+          "operands": "EDX, EDX, 0x1b8",
+          "bytes": "69d2b8010000"
+        },
+        {
+          "address": "0044ed5a",
+          "type": "instruction",
+          "mnemonic": "MOV",
+          "operands": "EAX, dword ptr [EBP + 0xfffffc8c]",
+          "bytes": "8b858cfcffff"
+        },
+        {
+          "address": "0044ed60",
+          "type": "instruction",
+          "mnemonic": "MOV",
+          "operands": "ECX, dword ptr [EAX + 0x2d8]",
+          "bytes": "8b88d8020000"
+        },
+        {
+          "address": "0044ed66",
+          "type": "instruction",
+          "mnemonic": "ADD",
+          "operands": "ECX, EDX",
+          "bytes": "03ca"
+        },
+        {
+          "address": "0044ed68",
+          "type": "instruction",
+          "mnemonic": "CALL",
+          "operands": "0x004e5e99",
+          "bytes": "e82c710900"
+        },
+        {
+          "address": "0044ed6d",
+          "type": "instruction",
+          "mnemonic": "JMP",
+          "operands": "0x0044eee7",
+          "bytes": "e975010000"
+        },
+        {
+          "address": "0044ed72",
+          "type": "instruction",
+          "mnemonic": "PUSH",
+          "operands": "0x615fb4",
+          "bytes": "68b45f6100",
+          "label": "LAB_0044ed72"
+        },
+        {
+          "address": "0044ed77",
+          "type": "instruction",
+          "mnemonic": "MOV",
+          "operands": "ECX, dword ptr [EBP + 0xfffffc8c]",
+          "bytes": "8b8d8cfcffff"
+        },
+        {
+          "address": "0044ed7d",
+          "type": "instruction",
+          "mnemonic": "ADD",
+          "operands": "ECX, 0x110",
+          "bytes": "81c110010000"
+        },
+        {
+          "address": "0044ed83",
+          "type": "instruction",
+          "mnemonic": "PUSH",
+          "operands": "ECX",
+          "bytes": "51"
+        },
+        {
+          "address": "0044ed84",
+          "type": "instruction",
+          "mnemonic": "CALL",
+          "operands": "0x0052bdc0",
+          "bytes": "e837d00d00"
+        },
+        {
+          "address": "0044ed89",
+          "type": "instruction",
+          "mnemonic": "ADD",
+          "operands": "ESP, 0x8",
+          "bytes": "83c408"
+        },
+        {
+          "address": "0044ed8c",
+          "type": "instruction",
+          "mnemonic": "TEST",
+          "operands": "EAX, EAX",
+          "bytes": "85c0"
+        },
+        {
+          "address": "0044ed8e",
+          "type": "instruction",
+          "mnemonic": "JNZ",
+          "operands": "0x0044ee40",
+          "bytes": "0f85ac000000"
+        },
+        {
+          "address": "0044ed94",
+          "type": "instruction",
+          "mnemonic": "PUSH",
+          "operands": "0x3f800000",
+          "bytes": "680000803f"
+        },
+        {
+          "address": "0044ed99",
+          "type": "instruction",
+          "mnemonic": "PUSH",
+          "operands": "0x3dcccccd",
+          "bytes": "68cdcccc3d"
+        },
+        {
+          "address": "0044ed9e",
+          "type": "instruction",
+          "mnemonic": "PUSH",
+          "operands": "0x96",
+          "bytes": "6896000000"
+        },
+        {
+          "address": "0044eda3",
+          "type": "instruction",
+          "mnemonic": "MOV",
+          "operands": "EDX, dword ptr [EBP + 0x8]",
+          "bytes": "8b5508"
+        },
+        {
+          "address": "0044eda6",
+          "type": "instruction",
+          "mnemonic": "PUSH",
+          "operands": "EDX",
+          "bytes": "52"
+        },
+        {
+          "address": "0044eda7",
+          "type": "instruction",
+          "mnemonic": "PUSH",
+          "operands": "0x615fc0",
+          "bytes": "68c05f6100"
+        },
+        {
+          "address": "0044edac",
+          "type": "instruction",
+          "mnemonic": "PUSH",
+          "operands": "0x3f800000",
+          "bytes": "680000803f"
+        },
+        {
+          "address": "0044edb1",
+          "type": "instruction",
+          "mnemonic": "PUSH",
+          "operands": "0x3f000000",
+          "bytes": "680000003f"
+        },
+        {
+          "address": "0044edb6",
+          "type": "instruction",
+          "mnemonic": "PUSH",
+          "operands": "0x40000000",
+          "bytes": "6800000040"
+        },
+        {
+          "address": "0044edbb",
+          "type": "instruction",
+          "mnemonic": "PUSH",
+          "operands": "0x1",
+          "bytes": "6a01"
+        },
+        {
+          "address": "0044edbd",
+          "type": "instruction",
+          "mnemonic": "PUSH",
+          "operands": "0x0",
+          "bytes": "6a00"
+        },
+        {
+          "address": "0044edbf",
+          "type": "instruction",
+          "mnemonic": "MOV",
+          "operands": "EAX, dword ptr [EBP + -0x18]",
+          "bytes": "8b45e8"
+        },
+        {
+          "address": "0044edc2",
+          "type": "instruction",
+          "mnemonic": "IMUL",
+          "operands": "EAX, EAX, 0x1b8",
+          "bytes": "69c0b8010000"
+        },
+        {
+          "address": "0044edc8",
+          "type": "instruction",
+          "mnemonic": "MOV",
+          "operands": "ECX, dword ptr [EBP + 0xfffffc8c]",
+          "bytes": "8b8d8cfcffff"
+        },
+        {
+          "address": "0044edce",
+          "type": "instruction",
+          "mnemonic": "MOV",
+          "operands": "ECX, dword ptr [ECX + 0x2dc]",
+          "bytes": "8b89dc020000"
+        },
+        {
+          "address": "0044edd4",
+          "type": "instruction",
+          "mnemonic": "ADD",
+          "operands": "ECX, EAX",
+          "bytes": "03c8"
+        }
+      ],
+      "count": 50
+    },
+    {
+      "id": "0044ed20listing",
+      "programName": "RoadWars",
+      "startAddress": "0044ed20",
+      "instructions": [
+        {
+          "address": "0044ed23",
+          "type": "instruction",
+          "mnemonic": "FDIV",
+          "operands": "float ptr [EDX + 0x288]",
+          "bytes": "d8b288020000"
+        },
+        {
+          "address": "0044ed29",
+          "type": "instruction",
+          "mnemonic": "CALL",
+          "operands": "0x005167bc",
+          "bytes": "e88e7a0c00"
+        },
+        {
+          "address": "0044ed2e",
+          "type": "instruction",
+          "mnemonic": "PUSH",
+          "operands": "EAX",
+          "bytes": "50"
+        },
+        {
+          "address": "0044ed2f",
+          "type": "instruction",
+          "mnemonic": "MOV",
+          "operands": "EAX, dword ptr [EBP + 0xfffffc8c]",
+          "bytes": "8b858cfcffff"
+        },
+        {
+          "address": "0044ed35",
+          "type": "instruction",
+          "mnemonic": "MOV",
+          "operands": "ECX, dword ptr [EAX + 0x4]",
+          "bytes": "8b4804"
+        },
+        {
+          "address": "0044ed38",
+          "type": "instruction",
+          "mnemonic": "PUSH",
+          "operands": "ECX",
+          "bytes": "51"
+        },
+        {
+          "address": "0044ed39",
+          "type": "instruction",
+          "mnemonic": "PUSH",
+          "operands": "0x615fa8",
+          "bytes": "68a85f6100"
+        },
+        {
+          "address": "0044ed3e",
+          "type": "instruction",
+          "mnemonic": "PUSH",
+          "operands": "0x3d4ccccd",
+          "bytes": "68cdcc4c3d"
+        },
+        {
+          "address": "0044ed43",
+          "type": "instruction",
+          "mnemonic": "PUSH",
+          "operands": "0x3eb33333",
+          "bytes": "683333b33e"
+        },
+        {
+          "address": "0044ed48",
+          "type": "instruction",
+          "mnemonic": "PUSH",
+          "operands": "0x41700000",
+          "bytes": "6800007041"
+        },
+        {
+          "address": "0044ed4d",
+          "type": "instruction",
+          "mnemonic": "PUSH",
+          "operands": "-0x4",
+          "bytes": "6afc"
+        },
+        {
+          "address": "0044ed4f",
+          "type": "instruction",
+          "mnemonic": "PUSH",
+          "operands": "0x1",
+          "bytes": "6a01"
+        },
+        {
+          "address": "0044ed51",
+          "type": "instruction",
+          "mnemonic": "MOV",
+          "operands": "EDX, dword ptr [EBP + -0x18]",
+          "bytes": "8b55e8"
+        },
+        {
+          "address": "0044ed54",
+          "type": "instruction",
+          "mnemonic": "IMUL",
+          "operands": "EDX, EDX, 0x1b8",
+          "bytes": "69d2b8010000"
+        },
+        {
+          "address": "0044ed5a",
+          "type": "instruction",
+          "mnemonic": "MOV",
+          "operands": "EAX, dword ptr [EBP + 0xfffffc8c]",
+          "bytes": "8b858cfcffff"
+        },
+        {
+          "address": "0044ed60",
+          "type": "instruction",
+          "mnemonic": "MOV",
+          "operands": "ECX, dword ptr [EAX + 0x2d8]",
+          "bytes": "8b88d8020000"
+        },
+        {
+          "address": "0044ed66",
+          "type": "instruction",
+          "mnemonic": "ADD",
+          "operands": "ECX, EDX",
+          "bytes": "03ca"
+        },
+        {
+          "address": "0044ed68",
+          "type": "instruction",
+          "mnemonic": "CALL",
+          "operands": "0x004e5e99",
+          "bytes": "e82c710900"
+        },
+        {
+          "address": "0044ed6d",
+          "type": "instruction",
+          "mnemonic": "JMP",
+          "operands": "0x0044eee7",
+          "bytes": "e975010000"
+        },
+        {
+          "address": "0044ed72",
+          "type": "instruction",
+          "mnemonic": "PUSH",
+          "operands": "0x615fb4",
+          "bytes": "68b45f6100",
+          "label": "LAB_0044ed72"
+        },
+        {
+          "address": "0044ed77",
+          "type": "instruction",
+          "mnemonic": "MOV",
+          "operands": "ECX, dword ptr [EBP + 0xfffffc8c]",
+          "bytes": "8b8d8cfcffff"
+        },
+        {
+          "address": "0044ed7d",
+          "type": "instruction",
+          "mnemonic": "ADD",
+          "operands": "ECX, 0x110",
+          "bytes": "81c110010000"
+        },
+        {
+          "address": "0044ed83",
+          "type": "instruction",
+          "mnemonic": "PUSH",
+          "operands": "ECX",
+          "bytes": "51"
+        },
+        {
+          "address": "0044ed84",
+          "type": "instruction",
+          "mnemonic": "CALL",
+          "operands": "0x0052bdc0",
+          "bytes": "e837d00d00"
+        },
+        {
+          "address": "0044ed89",
+          "type": "instruction",
+          "mnemonic": "ADD",
+          "operands": "ESP, 0x8",
+          "bytes": "83c408"
+        },
+        {
+          "address": "0044ed8c",
+          "type": "instruction",
+          "mnemonic": "TEST",
+          "operands": "EAX, EAX",
+          "bytes": "85c0"
+        },
+        {
+          "address": "0044ed8e",
+          "type": "instruction",
+          "mnemonic": "JNZ",
+          "operands": "0x0044ee40",
+          "bytes": "0f85ac000000"
+        },
+        {
+          "address": "0044ed94",
+          "type": "instruction",
+          "mnemonic": "PUSH",
+          "operands": "0x3f800000",
+          "bytes": "680000803f"
+        },
+        {
+          "address": "0044ed99",
+          "type": "instruction",
+          "mnemonic": "PUSH",
+          "operands": "0x3dcccccd",
+          "bytes": "68cdcccc3d"
+        },
+        {
+          "address": "0044ed9e",
+          "type": "instruction",
+          "mnemonic": "PUSH",
+          "operands": "0x96",
+          "bytes": "6896000000"
+        },
+        {
+          "address": "0044eda3",
+          "type": "instruction",
+          "mnemonic": "MOV",
+          "operands": "EDX, dword ptr [EBP + 0x8]",
+          "bytes": "8b5508"
+        },
+        {
+          "address": "0044eda6",
+          "type": "instruction",
+          "mnemonic": "PUSH",
+          "operands": "EDX",
+          "bytes": "52"
+        },
+        {
+          "address": "0044eda7",
+          "type": "instruction",
+          "mnemonic": "PUSH",
+          "operands": "0x615fc0",
+          "bytes": "68c05f6100"
+        },
+        {
+          "address": "0044edac",
+          "type": "instruction",
+          "mnemonic": "PUSH",
+          "operands": "0x3f800000",
+          "bytes": "680000803f"
+        },
+        {
+          "address": "0044edb1",
+          "type": "instruction",
+          "mnemonic": "PUSH",
+          "operands": "0x3f000000",
+          "bytes": "680000003f"
+        },
+        {
+          "address": "0044edb6",
+          "type": "instruction",
+          "mnemonic": "PUSH",
+          "operands": "0x40000000",
+          "bytes": "6800000040"
+        },
+        {
+          "address": "0044edbb",
+          "type": "instruction",
+          "mnemonic": "PUSH",
+          "operands": "0x1",
+          "bytes": "6a01"
+        },
+        {
+          "address": "0044edbd",
+          "type": "instruction",
+          "mnemonic": "PUSH",
+          "operands": "0x0",
+          "bytes": "6a00"
+        },
+        {
+          "address": "0044edbf",
+          "type": "instruction",
+          "mnemonic": "MOV",
+          "operands": "EAX, dword ptr [EBP + -0x18]",
+          "bytes": "8b45e8"
+        },
+        {
+          "address": "0044edc2",
+          "type": "instruction",
+          "mnemonic": "IMUL",
+          "operands": "EAX, EAX, 0x1b8",
+          "bytes": "69c0b8010000"
+        },
+        {
+          "address": "0044edc8",
+          "type": "instruction",
+          "mnemonic": "MOV",
+          "operands": "ECX, dword ptr [EBP + 0xfffffc8c]",
+          "bytes": "8b8d8cfcffff"
+        },
+        {
+          "address": "0044edce",
+          "type": "instruction",
+          "mnemonic": "MOV",
+          "operands": "ECX, dword ptr [ECX + 0x2dc]",
+          "bytes": "8b89dc020000"
+        },
+        {
+          "address": "0044edd4",
+          "type": "instruction",
+          "mnemonic": "ADD",
+          "operands": "ECX, EAX",
+          "bytes": "03c8"
+        },
+        {
+          "address": "0044edd6",
+          "type": "instruction",
+          "mnemonic": "CALL",
+          "operands": "0x004e5e99",
+          "bytes": "e8be700900"
+        },
+        {
+          "address": "0044eddb",
+          "type": "instruction",
+          "mnemonic": "PUSH",
+          "operands": "0x3f800000",
+          "bytes": "680000803f"
+        },
+        {
+          "address": "0044ede0",
+          "type": "instruction",
+          "mnemonic": "PUSH",
+          "operands": "0x3dcccccd",
+          "bytes": "68cdcccc3d"
+        },
+        {
+          "address": "0044ede5",
+          "type": "instruction",
+          "mnemonic": "MOV",
+          "operands": "EDX, dword ptr [EBP + 0xfffffc8c]",
+          "bytes": "8b958cfcffff"
+        },
+        {
+          "address": "0044edeb",
+          "type": "instruction",
+          "mnemonic": "FLD",
+          "operands": "float ptr [0x005f55e8]",
+          "bytes": "d905e8555f00"
+        },
+        {
+          "address": "0044edf1",
+          "type": "instruction",
+          "mnemonic": "FDIV",
+          "operands": "float ptr [EDX + 0x288]",
+          "bytes": "d8b288020000"
+        },
+        {
+          "address": "0044edf7",
+          "type": "instruction",
+          "mnemonic": "CALL",
+          "operands": "0x005167bc",
+          "bytes": "e8c0790c00"
+        }
+      ],
+      "count": 50
+    },
+    {
+      "id": "0044ee00listing",
+      "programName": "RoadWars",
+      "startAddress": "0044ee00",
+      "instructions": [
+        {
+          "address": "0044ee03",
+          "type": "instruction",
+          "mnemonic": "MOV",
+          "operands": "ECX, dword ptr [EAX + 0x4]",
+          "bytes": "8b4804"
+        },
+        {
+          "address": "0044ee06",
+          "type": "instruction",
+          "mnemonic": "PUSH",
+          "operands": "ECX",
+          "bytes": "51"
+        },
+        {
+          "address": "0044ee07",
+          "type": "instruction",
+          "mnemonic": "PUSH",
+          "operands": "0x615fcc",
+          "bytes": "68cc5f6100"
+        },
+        {
+          "address": "0044ee0c",
+          "type": "instruction",
+          "mnemonic": "PUSH",
+          "operands": "0x3d4ccccd",
+          "bytes": "68cdcc4c3d"
+        },
+        {
+          "address": "0044ee11",
+          "type": "instruction",
+          "mnemonic": "PUSH",
+          "operands": "0x3eb33333",
+          "bytes": "683333b33e"
+        },
+        {
+          "address": "0044ee16",
+          "type": "instruction",
+          "mnemonic": "PUSH",
+          "operands": "0x41700000",
+          "bytes": "6800007041"
+        },
+        {
+          "address": "0044ee1b",
+          "type": "instruction",
+          "mnemonic": "PUSH",
+          "operands": "0x2",
+          "bytes": "6a02"
+        },
+        {
+          "address": "0044ee1d",
+          "type": "instruction",
+          "mnemonic": "PUSH",
+          "operands": "0x1",
+          "bytes": "6a01"
+        },
+        {
+          "address": "0044ee1f",
+          "type": "instruction",
+          "mnemonic": "MOV",
+          "operands": "EDX, dword ptr [EBP + -0x18]",
+          "bytes": "8b55e8"
+        },
+        {
+          "address": "0044ee22",
+          "type": "instruction",
+          "mnemonic": "IMUL",
+          "operands": "EDX, EDX, 0x1b8",
+          "bytes": "69d2b8010000"
+        },
+        {
+          "address": "0044ee28",
+          "type": "instruction",
+          "mnemonic": "MOV",
+          "operands": "EAX, dword ptr [EBP + 0xfffffc8c]",
+          "bytes": "8b858cfcffff"
+        },
+        {
+          "address": "0044ee2e",
+          "type": "instruction",
+          "mnemonic": "MOV",
+          "operands": "ECX, dword ptr [EAX + 0x2d8]",
+          "bytes": "8b88d8020000"
+        },
+        {
+          "address": "0044ee34",
+          "type": "instruction",
+          "mnemonic": "ADD",
+          "operands": "ECX, EDX",
+          "bytes": "03ca"
+        },
+        {
+          "address": "0044ee36",
+          "type": "instruction",
+          "mnemonic": "CALL",
+          "operands": "0x004e5e99",
+          "bytes": "e85e700900"
+        },
+        {
+          "address": "0044ee3b",
+          "type": "instruction",
+          "mnemonic": "JMP",
+          "operands": "0x0044eee7",
+          "bytes": "e9a7000000"
+        },
+        {
+          "address": "0044ee40",
+          "type": "instruction",
+          "mnemonic": "PUSH",
+          "operands": "0x3f800000",
+          "bytes": "680000803f",
+          "label": "LAB_0044ee40"
+        },
+        {
+          "address": "0044ee45",
+          "type": "instruction",
+          "mnemonic": "PUSH",
+          "operands": "0x3dcccccd",
+          "bytes": "68cdcccc3d"
+        },
+        {
+          "address": "0044ee4a",
+          "type": "instruction",
+          "mnemonic": "PUSH",
+          "operands": "0x96",
+          "bytes": "6896000000"
+        },
+        {
+          "address": "0044ee4f",
+          "type": "instruction",
+          "mnemonic": "MOV",
+          "operands": "ECX, dword ptr [EBP + 0x8]",
+          "bytes": "8b4d08"
+        },
+        {
+          "address": "0044ee52",
+          "type": "instruction",
+          "mnemonic": "PUSH",
+          "operands": "ECX",
+          "bytes": "51"
+        },
+        {
+          "address": "0044ee53",
+          "type": "instruction",
+          "mnemonic": "PUSH",
+          "operands": "0x615fd8",
+          "bytes": "68d85f6100"
+        },
+        {
+          "address": "0044ee58",
+          "type": "instruction",
+          "mnemonic": "PUSH",
+          "operands": "0x3f800000",
+          "bytes": "680000803f"
+        },
+        {
+          "address": "0044ee5d",
+          "type": "instruction",
+          "mnemonic": "PUSH",
+          "operands": "0x3f000000",
+          "bytes": "680000003f"
+        },
+        {
+          "address": "0044ee62",
+          "type": "instruction",
+          "mnemonic": "PUSH",
+          "operands": "0x40000000",
+          "bytes": "6800000040"
+        },
+        {
+          "address": "0044ee67",
+          "type": "instruction",
+          "mnemonic": "PUSH",
+          "operands": "0x2",
+          "bytes": "6a02"
+        },
+        {
+          "address": "0044ee69",
+          "type": "instruction",
+          "mnemonic": "PUSH",
+          "operands": "0x0",
+          "bytes": "6a00"
+        },
+        {
+          "address": "0044ee6b",
+          "type": "instruction",
+          "mnemonic": "MOV",
+          "operands": "EDX, dword ptr [EBP + -0x18]",
+          "bytes": "8b55e8"
+        },
+        {
+          "address": "0044ee6e",
+          "type": "instruction",
+          "mnemonic": "IMUL",
+          "operands": "EDX, EDX, 0x1b8",
+          "bytes": "69d2b8010000"
+        },
+        {
+          "address": "0044ee74",
+          "type": "instruction",
+          "mnemonic": "MOV",
+          "operands": "EAX, dword ptr [EBP + 0xfffffc8c]",
+          "bytes": "8b858cfcffff"
+        },
+        {
+          "address": "0044ee7a",
+          "type": "instruction",
+          "mnemonic": "MOV",
+          "operands": "ECX, dword ptr [EAX + 0x2dc]",
+          "bytes": "8b88dc020000"
+        },
+        {
+          "address": "0044ee80",
+          "type": "instruction",
+          "mnemonic": "ADD",
+          "operands": "ECX, EDX",
+          "bytes": "03ca"
+        },
+        {
+          "address": "0044ee82",
+          "type": "instruction",
+          "mnemonic": "CALL",
+          "operands": "0x004e5e99",
+          "bytes": "e812700900"
+        },
+        {
+          "address": "0044ee87",
+          "type": "instruction",
+          "mnemonic": "PUSH",
+          "operands": "0x3f800000",
+          "bytes": "680000803f"
+        },
+        {
+          "address": "0044ee8c",
+          "type": "instruction",
+          "mnemonic": "PUSH",
+          "operands": "0x3dcccccd",
+          "bytes": "68cdcccc3d"
+        },
+        {
+          "address": "0044ee91",
+          "type": "instruction",
+          "mnemonic": "MOV",
+          "operands": "ECX, dword ptr [EBP + 0xfffffc8c]",
+          "bytes": "8b8d8cfcffff"
+        },
+        {
+          "address": "0044ee97",
+          "type": "instruction",
+          "mnemonic": "FLD",
+          "operands": "float ptr [0x005f55e8]",
+          "bytes": "d905e8555f00"
+        },
+        {
+          "address": "0044ee9d",
+          "type": "instruction",
+          "mnemonic": "FDIV",
+          "operands": "float ptr [ECX + 0x288]",
+          "bytes": "d8b188020000"
+        },
+        {
+          "address": "0044eea3",
+          "type": "instruction",
+          "mnemonic": "CALL",
+          "operands": "0x005167bc",
+          "bytes": "e814790c00"
+        },
+        {
+          "address": "0044eea8",
+          "type": "instruction",
+          "mnemonic": "PUSH",
+          "operands": "EAX",
+          "bytes": "50"
+        },
+        {
+          "address": "0044eea9",
+          "type": "instruction",
+          "mnemonic": "MOV",
+          "operands": "EDX, dword ptr [EBP + 0xfffffc8c]",
+          "bytes": "8b958cfcffff"
+        },
+        {
+          "address": "0044eeaf",
+          "type": "instruction",
+          "mnemonic": "MOV",
+          "operands": "EAX, dword ptr [EDX + 0x4]",
+          "bytes": "8b4204"
+        },
+        {
+          "address": "0044eeb2",
+          "type": "instruction",
+          "mnemonic": "PUSH",
+          "operands": "EAX",
+          "bytes": "50"
+        },
+        {
+          "address": "0044eeb3",
+          "type": "instruction",
+          "mnemonic": "PUSH",
+          "operands": "0x615fe4",
+          "bytes": "68e45f6100"
+        },
+        {
+          "address": "0044eeb8",
+          "type": "instruction",
+          "mnemonic": "PUSH",
+          "operands": "0x3d4ccccd",
+          "bytes": "68cdcc4c3d"
+        },
+        {
+          "address": "0044eebd",
+          "type": "instruction",
+          "mnemonic": "PUSH",
+          "operands": "0x3eb33333",
+          "bytes": "683333b33e"
+        },
+        {
+          "address": "0044eec2",
+          "type": "instruction",
+          "mnemonic": "PUSH",
+          "operands": "0x41700000",
+          "bytes": "6800007041"
+        },
+        {
+          "address": "0044eec7",
+          "type": "instruction",
+          "mnemonic": "PUSH",
+          "operands": "-0x2",
+          "bytes": "6afe"
+        },
+        {
+          "address": "0044eec9",
+          "type": "instruction",
+          "mnemonic": "PUSH",
+          "operands": "0x1",
+          "bytes": "6a01"
+        },
+        {
+          "address": "0044eecb",
+          "type": "instruction",
+          "mnemonic": "MOV",
+          "operands": "ECX, dword ptr [EBP + -0x18]",
+          "bytes": "8b4de8"
+        },
+        {
+          "address": "0044eece",
+          "type": "instruction",
+          "mnemonic": "IMUL",
+          "operands": "ECX, ECX, 0x1b8",
+          "bytes": "69c9b8010000"
+        }
+      ],
+      "count": 50
+    },
+    {
+      "id": "0044ee80listing",
+      "programName": "RoadWars",
+      "startAddress": "0044ee80",
+      "instructions": [
+        {
+          "address": "0044ee80",
+          "type": "instruction",
+          "mnemonic": "ADD",
+          "operands": "ECX, EDX",
+          "bytes": "03ca"
+        },
+        {
+          "address": "0044ee82",
+          "type": "instruction",
+          "mnemonic": "CALL",
+          "operands": "0x004e5e99",
+          "bytes": "e812700900"
+        },
+        {
+          "address": "0044ee87",
+          "type": "instruction",
+          "mnemonic": "PUSH",
+          "operands": "0x3f800000",
+          "bytes": "680000803f"
+        },
+        {
+          "address": "0044ee8c",
+          "type": "instruction",
+          "mnemonic": "PUSH",
+          "operands": "0x3dcccccd",
+          "bytes": "68cdcccc3d"
+        },
+        {
+          "address": "0044ee91",
+          "type": "instruction",
+          "mnemonic": "MOV",
+          "operands": "ECX, dword ptr [EBP + 0xfffffc8c]",
+          "bytes": "8b8d8cfcffff"
+        },
+        {
+          "address": "0044ee97",
+          "type": "instruction",
+          "mnemonic": "FLD",
+          "operands": "float ptr [0x005f55e8]",
+          "bytes": "d905e8555f00"
+        },
+        {
+          "address": "0044ee9d",
+          "type": "instruction",
+          "mnemonic": "FDIV",
+          "operands": "float ptr [ECX + 0x288]",
+          "bytes": "d8b188020000"
+        },
+        {
+          "address": "0044eea3",
+          "type": "instruction",
+          "mnemonic": "CALL",
+          "operands": "0x005167bc",
+          "bytes": "e814790c00"
+        },
+        {
+          "address": "0044eea8",
+          "type": "instruction",
+          "mnemonic": "PUSH",
+          "operands": "EAX",
+          "bytes": "50"
+        },
+        {
+          "address": "0044eea9",
+          "type": "instruction",
+          "mnemonic": "MOV",
+          "operands": "EDX, dword ptr [EBP + 0xfffffc8c]",
+          "bytes": "8b958cfcffff"
+        },
+        {
+          "address": "0044eeaf",
+          "type": "instruction",
+          "mnemonic": "MOV",
+          "operands": "EAX, dword ptr [EDX + 0x4]",
+          "bytes": "8b4204"
+        },
+        {
+          "address": "0044eeb2",
+          "type": "instruction",
+          "mnemonic": "PUSH",
+          "operands": "EAX",
+          "bytes": "50"
+        },
+        {
+          "address": "0044eeb3",
+          "type": "instruction",
+          "mnemonic": "PUSH",
+          "operands": "0x615fe4",
+          "bytes": "68e45f6100"
+        },
+        {
+          "address": "0044eeb8",
+          "type": "instruction",
+          "mnemonic": "PUSH",
+          "operands": "0x3d4ccccd",
+          "bytes": "68cdcc4c3d"
+        },
+        {
+          "address": "0044eebd",
+          "type": "instruction",
+          "mnemonic": "PUSH",
+          "operands": "0x3eb33333",
+          "bytes": "683333b33e"
+        },
+        {
+          "address": "0044eec2",
+          "type": "instruction",
+          "mnemonic": "PUSH",
+          "operands": "0x41700000",
+          "bytes": "6800007041"
+        },
+        {
+          "address": "0044eec7",
+          "type": "instruction",
+          "mnemonic": "PUSH",
+          "operands": "-0x2",
+          "bytes": "6afe"
+        },
+        {
+          "address": "0044eec9",
+          "type": "instruction",
+          "mnemonic": "PUSH",
+          "operands": "0x1",
+          "bytes": "6a01"
+        },
+        {
+          "address": "0044eecb",
+          "type": "instruction",
+          "mnemonic": "MOV",
+          "operands": "ECX, dword ptr [EBP + -0x18]",
+          "bytes": "8b4de8"
+        },
+        {
+          "address": "0044eece",
+          "type": "instruction",
+          "mnemonic": "IMUL",
+          "operands": "ECX, ECX, 0x1b8",
+          "bytes": "69c9b8010000"
+        },
+        {
+          "address": "0044eed4",
+          "type": "instruction",
+          "mnemonic": "MOV",
+          "operands": "EDX, dword ptr [EBP + 0xfffffc8c]",
+          "bytes": "8b958cfcffff"
+        },
+        {
+          "address": "0044eeda",
+          "type": "instruction",
+          "mnemonic": "MOV",
+          "operands": "EAX, dword ptr [EDX + 0x2d8]",
+          "bytes": "8b82d8020000"
+        },
+        {
+          "address": "0044eee0",
+          "type": "instruction",
+          "mnemonic": "ADD",
+          "operands": "ECX, EAX",
+          "bytes": "03c8"
+        },
+        {
+          "address": "0044eee2",
+          "type": "instruction",
+          "mnemonic": "CALL",
+          "operands": "0x004e5e99",
+          "bytes": "e8b26f0900"
+        },
+        {
+          "address": "0044eee7",
+          "type": "instruction",
+          "mnemonic": "PUSH",
+          "operands": "0x0",
+          "bytes": "6a00",
+          "label": "LAB_0044eee7"
+        },
+        {
+          "address": "0044eee9",
+          "type": "instruction",
+          "mnemonic": "PUSH",
+          "operands": "0x0",
+          "bytes": "6a00"
+        },
+        {
+          "address": "0044eeeb",
+          "type": "instruction",
+          "mnemonic": "PUSH",
+          "operands": "0x0",
+          "bytes": "6a00"
+        },
+        {
+          "address": "0044eeed",
+          "type": "instruction",
+          "mnemonic": "PUSH",
+          "operands": "0x0",
+          "bytes": "6a00"
+        },
+        {
+          "address": "0044eeef",
+          "type": "instruction",
+          "mnemonic": "PUSH",
+          "operands": "0x615ff0",
+          "bytes": "68f05f6100"
+        },
+        {
+          "address": "0044eef4",
+          "type": "instruction",
+          "mnemonic": "MOV",
+          "operands": "ECX, dword ptr [EBP + -0x18]",
+          "bytes": "8b4de8"
+        },
+        {
+          "address": "0044eef7",
+          "type": "instruction",
+          "mnemonic": "IMUL",
+          "operands": "ECX, ECX, 0x268",
+          "bytes": "69c968020000"
+        },
+        {
+          "address": "0044eefd",
+          "type": "instruction",
+          "mnemonic": "MOV",
+          "operands": "EDX, dword ptr [EBP + 0xfffffc8c]",
+          "bytes": "8b958cfcffff"
+        },
+        {
+          "address": "0044ef03",
+          "type": "instruction",
+          "mnemonic": "MOV",
+          "operands": "EAX, dword ptr [EDX + 0x2d4]",
+          "bytes": "8b82d4020000"
+        },
+        {
+          "address": "0044ef09",
+          "type": "instruction",
+          "mnemonic": "ADD",
+          "operands": "ECX, EAX",
+          "bytes": "03c8"
+        },
+        {
+          "address": "0044ef0b",
+          "type": "instruction",
+          "mnemonic": "CALL",
+          "operands": "0x004d78ff",
+          "bytes": "e8ef890800"
+        },
+        {
+          "address": "0044ef10",
+          "type": "instruction",
+          "mnemonic": "MOV",
+          "operands": "ECX, dword ptr [EBP + -0x18]",
+          "bytes": "8b4de8"
+        },
+        {
+          "address": "0044ef13",
+          "type": "instruction",
+          "mnemonic": "MOV",
+          "operands": "EDX, dword ptr [EBP + 0xfffffc8c]",
+          "bytes": "8b958cfcffff"
+        },
+        {
+          "address": "0044ef19",
+          "type": "instruction",
+          "mnemonic": "MOV",
+          "operands": "dword ptr [EDX + ECX*0x4 + 0x310], EAX",
+          "bytes": "89848a10030000"
+        },
+        {
+          "address": "0044ef20",
+          "type": "instruction",
+          "mnemonic": "MOV",
+          "operands": "EAX, dword ptr [EBP + -0x18]",
+          "bytes": "8b45e8"
+        },
+        {
+          "address": "0044ef23",
+          "type": "instruction",
+          "mnemonic": "MOV",
+          "operands": "ECX, dword ptr [EBP + 0xfffffc8c]",
+          "bytes": "8b8d8cfcffff"
+        },
+        {
+          "address": "0044ef29",
+          "type": "instruction",
+          "mnemonic": "MOV",
+          "operands": "ECX, dword ptr [ECX + EAX*0x4 + 0x310]",
+          "bytes": "8b8c8110030000"
+        },
+        {
+          "address": "0044ef30",
+          "type": "instruction",
+          "mnemonic": "CALL",
+          "operands": "0x004d28b0",
+          "bytes": "e87b390800"
+        },
+        {
+          "address": "0044ef35",
+          "type": "instruction",
+          "mnemonic": "JMP",
+          "operands": "0x0044ec51",
+          "bytes": "e917fdffff"
+        },
+        {
+          "address": "0044ef3a",
+          "type": "instruction",
+          "mnemonic": "LEA",
+          "operands": "EDX, [EBP + 0xfffffc90]",
+          "bytes": "8d9590fcffff",
+          "label": "LAB_0044ef3a"
+        },
+        {
+          "address": "0044ef40",
+          "type": "instruction",
+          "mnemonic": "PUSH",
+          "operands": "EDX",
+          "bytes": "52"
+        },
+        {
+          "address": "0044ef41",
+          "type": "instruction",
+          "mnemonic": "MOV",
+          "operands": "EAX, dword ptr [EBP + 0xfffffc8c]",
+          "bytes": "8b858cfcffff"
+        },
+        {
+          "address": "0044ef47",
+          "type": "instruction",
+          "mnemonic": "MOV",
+          "operands": "ECX, dword ptr [EAX + 0x2d4]",
+          "bytes": "8b88d4020000"
+        },
+        {
+          "address": "0044ef4d",
+          "type": "instruction",
+          "mnemonic": "ADD",
+          "operands": "ECX, 0xc",
+          "bytes": "83c10c"
+        },
+        {
+          "address": "0044ef50",
+          "type": "instruction",
+          "mnemonic": "CALL",
+          "operands": "0x004d414f",
+          "bytes": "e8fa510800"
+        },
+        {
+          "address": "0044ef55",
+          "type": "instruction",
+          "mnemonic": "MOV",
+          "operands": "ESI, EAX",
+          "bytes": "8bf0"
+        }
+      ],
+      "count": 50
+    },
+    {
+      "id": "0044eddclisting",
+      "programName": "RoadWars",
+      "startAddress": "0044eddc",
+      "instructions": [
+        {
+          "address": "0044ede0",
+          "type": "instruction",
+          "mnemonic": "PUSH",
+          "operands": "0x3dcccccd",
+          "bytes": "68cdcccc3d"
+        },
+        {
+          "address": "0044ede5",
+          "type": "instruction",
+          "mnemonic": "MOV",
+          "operands": "EDX, dword ptr [EBP + 0xfffffc8c]",
+          "bytes": "8b958cfcffff"
+        },
+        {
+          "address": "0044edeb",
+          "type": "instruction",
+          "mnemonic": "FLD",
+          "operands": "float ptr [0x005f55e8]",
+          "bytes": "d905e8555f00"
+        },
+        {
+          "address": "0044edf1",
+          "type": "instruction",
+          "mnemonic": "FDIV",
+          "operands": "float ptr [EDX + 0x288]",
+          "bytes": "d8b288020000"
+        },
+        {
+          "address": "0044edf7",
+          "type": "instruction",
+          "mnemonic": "CALL",
+          "operands": "0x005167bc",
+          "bytes": "e8c0790c00"
+        },
+        {
+          "address": "0044edfc",
+          "type": "instruction",
+          "mnemonic": "PUSH",
+          "operands": "EAX",
+          "bytes": "50"
+        },
+        {
+          "address": "0044edfd",
+          "type": "instruction",
+          "mnemonic": "MOV",
+          "operands": "EAX, dword ptr [EBP + 0xfffffc8c]",
+          "bytes": "8b858cfcffff"
+        },
+        {
+          "address": "0044ee03",
+          "type": "instruction",
+          "mnemonic": "MOV",
+          "operands": "ECX, dword ptr [EAX + 0x4]",
+          "bytes": "8b4804"
+        },
+        {
+          "address": "0044ee06",
+          "type": "instruction",
+          "mnemonic": "PUSH",
+          "operands": "ECX",
+          "bytes": "51"
+        },
+        {
+          "address": "0044ee07",
+          "type": "instruction",
+          "mnemonic": "PUSH",
+          "operands": "0x615fcc",
+          "bytes": "68cc5f6100"
+        },
+        {
+          "address": "0044ee0c",
+          "type": "instruction",
+          "mnemonic": "PUSH",
+          "operands": "0x3d4ccccd",
+          "bytes": "68cdcc4c3d"
+        },
+        {
+          "address": "0044ee11",
+          "type": "instruction",
+          "mnemonic": "PUSH",
+          "operands": "0x3eb33333",
+          "bytes": "683333b33e"
+        },
+        {
+          "address": "0044ee16",
+          "type": "instruction",
+          "mnemonic": "PUSH",
+          "operands": "0x41700000",
+          "bytes": "6800007041"
+        },
+        {
+          "address": "0044ee1b",
+          "type": "instruction",
+          "mnemonic": "PUSH",
+          "operands": "0x2",
+          "bytes": "6a02"
+        },
+        {
+          "address": "0044ee1d",
+          "type": "instruction",
+          "mnemonic": "PUSH",
+          "operands": "0x1",
+          "bytes": "6a01"
+        },
+        {
+          "address": "0044ee1f",
+          "type": "instruction",
+          "mnemonic": "MOV",
+          "operands": "EDX, dword ptr [EBP + -0x18]",
+          "bytes": "8b55e8"
+        },
+        {
+          "address": "0044ee22",
+          "type": "instruction",
+          "mnemonic": "IMUL",
+          "operands": "EDX, EDX, 0x1b8",
+          "bytes": "69d2b8010000"
+        },
+        {
+          "address": "0044ee28",
+          "type": "instruction",
+          "mnemonic": "MOV",
+          "operands": "EAX, dword ptr [EBP + 0xfffffc8c]",
+          "bytes": "8b858cfcffff"
+        },
+        {
+          "address": "0044ee2e",
+          "type": "instruction",
+          "mnemonic": "MOV",
+          "operands": "ECX, dword ptr [EAX + 0x2d8]",
+          "bytes": "8b88d8020000"
+        },
+        {
+          "address": "0044ee34",
+          "type": "instruction",
+          "mnemonic": "ADD",
+          "operands": "ECX, EDX",
+          "bytes": "03ca"
+        },
+        {
+          "address": "0044ee36",
+          "type": "instruction",
+          "mnemonic": "CALL",
+          "operands": "0x004e5e99",
+          "bytes": "e85e700900"
+        },
+        {
+          "address": "0044ee3b",
+          "type": "instruction",
+          "mnemonic": "JMP",
+          "operands": "0x0044eee7",
+          "bytes": "e9a7000000"
+        },
+        {
+          "address": "0044ee40",
+          "type": "instruction",
+          "mnemonic": "PUSH",
+          "operands": "0x3f800000",
+          "bytes": "680000803f",
+          "label": "LAB_0044ee40"
+        },
+        {
+          "address": "0044ee45",
+          "type": "instruction",
+          "mnemonic": "PUSH",
+          "operands": "0x3dcccccd",
+          "bytes": "68cdcccc3d"
+        },
+        {
+          "address": "0044ee4a",
+          "type": "instruction",
+          "mnemonic": "PUSH",
+          "operands": "0x96",
+          "bytes": "6896000000"
+        },
+        {
+          "address": "0044ee4f",
+          "type": "instruction",
+          "mnemonic": "MOV",
+          "operands": "ECX, dword ptr [EBP + 0x8]",
+          "bytes": "8b4d08"
+        },
+        {
+          "address": "0044ee52",
+          "type": "instruction",
+          "mnemonic": "PUSH",
+          "operands": "ECX",
+          "bytes": "51"
+        },
+        {
+          "address": "0044ee53",
+          "type": "instruction",
+          "mnemonic": "PUSH",
+          "operands": "0x615fd8",
+          "bytes": "68d85f6100"
+        },
+        {
+          "address": "0044ee58",
+          "type": "instruction",
+          "mnemonic": "PUSH",
+          "operands": "0x3f800000",
+          "bytes": "680000803f"
+        },
+        {
+          "address": "0044ee5d",
+          "type": "instruction",
+          "mnemonic": "PUSH",
+          "operands": "0x3f000000",
+          "bytes": "680000003f"
+        },
+        {
+          "address": "0044ee62",
+          "type": "instruction",
+          "mnemonic": "PUSH",
+          "operands": "0x40000000",
+          "bytes": "6800000040"
+        },
+        {
+          "address": "0044ee67",
+          "type": "instruction",
+          "mnemonic": "PUSH",
+          "operands": "0x2",
+          "bytes": "6a02"
+        },
+        {
+          "address": "0044ee69",
+          "type": "instruction",
+          "mnemonic": "PUSH",
+          "operands": "0x0",
+          "bytes": "6a00"
+        },
+        {
+          "address": "0044ee6b",
+          "type": "instruction",
+          "mnemonic": "MOV",
+          "operands": "EDX, dword ptr [EBP + -0x18]",
+          "bytes": "8b55e8"
+        },
+        {
+          "address": "0044ee6e",
+          "type": "instruction",
+          "mnemonic": "IMUL",
+          "operands": "EDX, EDX, 0x1b8",
+          "bytes": "69d2b8010000"
+        },
+        {
+          "address": "0044ee74",
+          "type": "instruction",
+          "mnemonic": "MOV",
+          "operands": "EAX, dword ptr [EBP + 0xfffffc8c]",
+          "bytes": "8b858cfcffff"
+        },
+        {
+          "address": "0044ee7a",
+          "type": "instruction",
+          "mnemonic": "MOV",
+          "operands": "ECX, dword ptr [EAX + 0x2dc]",
+          "bytes": "8b88dc020000"
+        },
+        {
+          "address": "0044ee80",
+          "type": "instruction",
+          "mnemonic": "ADD",
+          "operands": "ECX, EDX",
+          "bytes": "03ca"
+        },
+        {
+          "address": "0044ee82",
+          "type": "instruction",
+          "mnemonic": "CALL",
+          "operands": "0x004e5e99",
+          "bytes": "e812700900"
+        },
+        {
+          "address": "0044ee87",
+          "type": "instruction",
+          "mnemonic": "PUSH",
+          "operands": "0x3f800000",
+          "bytes": "680000803f"
+        },
+        {
+          "address": "0044ee8c",
+          "type": "instruction",
+          "mnemonic": "PUSH",
+          "operands": "0x3dcccccd",
+          "bytes": "68cdcccc3d"
+        },
+        {
+          "address": "0044ee91",
+          "type": "instruction",
+          "mnemonic": "MOV",
+          "operands": "ECX, dword ptr [EBP + 0xfffffc8c]",
+          "bytes": "8b8d8cfcffff"
+        },
+        {
+          "address": "0044ee97",
+          "type": "instruction",
+          "mnemonic": "FLD",
+          "operands": "float ptr [0x005f55e8]",
+          "bytes": "d905e8555f00"
+        },
+        {
+          "address": "0044ee9d",
+          "type": "instruction",
+          "mnemonic": "FDIV",
+          "operands": "float ptr [ECX + 0x288]",
+          "bytes": "d8b188020000"
+        },
+        {
+          "address": "0044eea3",
+          "type": "instruction",
+          "mnemonic": "CALL",
+          "operands": "0x005167bc",
+          "bytes": "e814790c00"
+        },
+        {
+          "address": "0044eea8",
+          "type": "instruction",
+          "mnemonic": "PUSH",
+          "operands": "EAX",
+          "bytes": "50"
+        },
+        {
+          "address": "0044eea9",
+          "type": "instruction",
+          "mnemonic": "MOV",
+          "operands": "EDX, dword ptr [EBP + 0xfffffc8c]",
+          "bytes": "8b958cfcffff"
+        },
+        {
+          "address": "0044eeaf",
+          "type": "instruction",
+          "mnemonic": "MOV",
+          "operands": "EAX, dword ptr [EDX + 0x4]",
+          "bytes": "8b4204"
+        },
+        {
+          "address": "0044eeb2",
+          "type": "instruction",
+          "mnemonic": "PUSH",
+          "operands": "EAX",
+          "bytes": "50"
+        },
+        {
+          "address": "0044eeb3",
+          "type": "instruction",
+          "mnemonic": "PUSH",
+          "operands": "0x615fe4",
+          "bytes": "68e45f6100"
+        }
+      ],
+      "count": 50
+    }
+  ],
+  "constants": {
+    "005f55e8": 150
+  }
+}

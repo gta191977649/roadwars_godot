@@ -130,6 +130,78 @@ int main(int argc, char** argv) {
     frame.player_index = 1;
     assert(hud.update(frame) == Result::invalid_argument);
     frame.player_index = 0;
+    assert(hud.update(frame) == Result::ok);
+    const auto unlocked_frame = renderer.frame;
+    frame.weapon_lock_warning = true;
+    assert(hud.update(frame) == Result::ok);
+    constexpr std::string_view warning = "WEAPONS LOCKED";
+    constexpr auto warning_count = warning.size() - 1;
+    assert(renderer.frame.size() == unlocked_frame.size() + warning_count);
+    const auto& warning_left = renderer.frame.front();
+    const auto& warning_right = renderer.frame[warning_count - 1];
+    // Native004823f2 anchor300, y5, horizontal-only integer centering.
+    assert(std::abs((warning_left.positions[0][0] + warning_right.positions[2][0]) / 2 - 300) <=
+           .5f);
+    for (std::size_t i = 0; i < warning_count; ++i) {
+        assert(renderer.frame[i].positions[0][1] == 5);
+        assert((renderer.frame[i].colors[0] == std::array<float, 4>{1, 0, 0, 102.f / 255}));
+        assert((renderer.frame[i].colors[2] == std::array<float, 4>{1, 1, 0, 102.f / 255}));
+    }
+    hud.set_visible(false);
+    assert(hud.update(frame) == Result::ok && renderer.frame.size() == warning_count);
+    racers[0].finished = true;
+    assert(hud.update(frame) == Result::ok && renderer.frame.size() == warning_count);
+    racers[0].finished = false;
+    racers[0].eliminated = true;
+    assert(hud.update(frame) == Result::ok && renderer.frame.empty());
+    racers[0].eliminated = false;
+    hud.set_visible(true);
+    frame.weapon_lock_warning = false;
+    assert(hud.update(frame) == Result::ok && renderer.frame.size() == unlocked_frame.size());
+    const std::array<std::string, 3> weapons{"Machine Gun", "Guided Missile", "Land Mines"};
+    assert(hud.configure_equipment(resources, "Animal", weapons, error) == Result::ok);
+    FrontendEquipmentFrame equipment;
+    equipment.selected_item = 1;
+    equipment.internal_hp = 25;
+    equipment.maximum_internal_hp = 100;
+    equipment.armor_hp = {100, 50, 0, -20};
+    equipment.maximum_armor_hp = {100, 100, 100, 100};
+    equipment.present = {true, true, true};
+    equipment.ammunition = {120, 12, 5};
+    frame.equipment = equipment;
+    assert(hud.update(frame) == Result::ok);
+    // Original Animal damage rect14,28..53,101, shiftedX31 and panelY352.
+    const auto& internal = renderer.frame[renderer.frame.size() - 5];
+    assert(internal.positions[0][0] == 45 && internal.positions[0][1] == 380);
+    assert(internal.positions[2][0] == 84 && internal.positions[2][1] == 453);
+    assert(internal.colors[0][0] == 1 && internal.colors[0][1] == 127.f / 255 &&
+           internal.colors[0][2] == 0);
+    const auto& rear = renderer.frame[renderer.frame.size() - 2];
+    assert(rear.colors[0][0] == 1 && rear.colors[0][1] == 0);
+    frame.equipment->selected_item = 3;
+    frame.equipment->weapons_unlocked = false;
+    assert(hud.update(frame) == Result::ok);
+    const auto& icon = renderer.frame[renderer.frame.size() - 4];
+    assert(icon.positions[0][0] == 0 && icon.positions[0][1] == 352 &&
+           icon.colors[0][0] == 100.f / 255);
+    assert(renderer.frame.back().colors[0][3] == 178.f / 255);
+    frame.equipment->weapons_unlocked = true;
+    assert(hud.update(frame) == Result::ok && renderer.frame.back().colors[0][0] == 1);
+    frame.equipment->selected_item = 7;
+    assert(hud.update(frame) == Result::invalid_argument);
+    frame.equipment->selected_item = 3;
+    racers[0].eliminated = true;
+    assert(hud.update(frame) == Result::ok);
+    assert(renderer.frame.front().positions[0][0] == 0 &&
+           renderer.frame.front().positions[0][1] == 352);
+    assert(renderer.frame.back().colors[0][0] == 229.f / 255 &&
+           renderer.frame.back().colors[0][1] == 0 &&
+           renderer.frame.back().colors[2][1] == 229.f / 255);
+    racers[0].eliminated = false;
+    racers[0].finished = true;
+    assert(hud.update(frame) == Result::ok && renderer.frame.size() == 5);
+    racers[0].finished = false;
+    frame.equipment.reset();
     hud.set_visible(false);
     assert(hud.update(frame) == Result::ok && renderer.frame.empty());
     hud.stop();

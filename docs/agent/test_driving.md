@@ -13,7 +13,7 @@ The portable core receives only ResourceReader and resource-relative names.
 Do not add alternate absolute paths, discovery guesses or per-tool root settings.
 
 ```powershell
-.\build.ps1 --debug trace "Dark Forest"
+.\build.ps1 --run --debug trace "Dark Forest"
 ```
 
 The word after `trace` is a track name. The launcher validates installed track names

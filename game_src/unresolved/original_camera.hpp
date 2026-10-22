@@ -43,6 +43,18 @@ class OriginalChaseCamera {
     float obstruction_distance_{};
 };
 
+// Native race-controller mode5 selects nearest track CameraN and camera mode7.
+// Original class/source name remains unresolved.
+class OriginalTrackCamera {
+  public:
+    Result load(const MeshObject& world, std::string& error);
+    Result update(Vec3 target, CameraFrame& output) const;
+    std::span<const Vec3> anchors() const { return anchors_; }
+
+  private:
+    std::vector<Vec3> anchors_;
+};
+
 // Explicitly new host feature. These values are not reverse-engineered original constants.
 struct MouseOrbitSettings {
     float degrees_per_pixel{0.15f};

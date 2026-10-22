@@ -3,14 +3,6 @@
 #include "game_src/core/not_implemented.hpp"
 
 namespace roadwars::recovered {
-// RE-STUB: 93b4e4c301a5694b55e16977c2e52f4971bd9089659e3d58617c8af2368436c8:function:004020e0
-void CDialog_00620670::unresolved_create_indirect_004020e0() {
-    not_implemented("93b4e4c301a5694b55e16977c2e52f4971bd9089659e3d58617c8af2368436c8:function:004020e0", "CDialog::CreateIndirect");
-}
-// RE-STUB: 93b4e4c301a5694b55e16977c2e52f4971bd9089659e3d58617c8af2368436c8:function:004081e3
-void CDialog_00620670::unresolved_create_indirect_004081e3() {
-    not_implemented("93b4e4c301a5694b55e16977c2e52f4971bd9089659e3d58617c8af2368436c8:function:004081e3", "CDialog::CreateIndirect");
-}
 // RE-STUB: 93b4e4c301a5694b55e16977c2e52f4971bd9089659e3d58617c8af2368436c8:function:00577b2c
 void CDialog_00620670::unresolved_create_indirect_00577b2c() {
     not_implemented("93b4e4c301a5694b55e16977c2e52f4971bd9089659e3d58617c8af2368436c8:function:00577b2c", "CDialog::CreateIndirect");

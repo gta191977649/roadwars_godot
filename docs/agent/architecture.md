@@ -60,13 +60,18 @@ Windows x64 is the initial validated host. The core builds without fetching Godo
 
 ## New diagnostic extensions
 
-The explicit no-weapons competition entry adds a portable RaceSession inferred
-from original race/vehicle links. It owns route, AI, progress and ranking, borrows
-the player's physics and shared collision track, and releases before either owner.
-Vehicle begin/wall/finish phases preserve multi-car scheduling while trace still
-executes them consecutively. Godot renders independent per-car visual state and
-passes read-only diagnostics to the optional ImGui extension. Actual race results
-switch back to the portable frontend. See evidence/race_session.md for limits.
+The diagnostic Single Race entry owns portable RaceSession, route/AI/progression,
+world attack objects and the shared original CRT stream. VehicleDynamics owns each
+vehicle's actual equipment/health and VehicleCombat coordinator. Original class
+names remain unresolved. New portable owners stay under unresolved with address
+and object-field evidence; no Godot host type owns weapon algorithms.
+
+RaceSession applies original equipment ordering, immediate factory initialization,
+track-selected tires, player/AI command gates, shared callbacks and scene attacks.
+RacePresentation consumes actual selected meshes, transforms and particle pools;
+Godot adapts input, RenderingServer and PCM audio only. Diagnostic seeds and AI
+counts below the original five opponents remain explicitly labeled extensions.
+See evidence/single_race_combat_status.md for the current verification boundary.
 
 `game_src/extensions/` contains the optional portable Dear ImGui/imgui-console UI
 and C++ stream logging. It is new infrastructure, has no RE mappings and is built

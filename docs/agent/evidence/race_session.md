@@ -1,4 +1,9 @@
-# Portable no-weapons competition
+# Portable competition baseline
+
+This document preserves the earlier no-weapons baseline evidence. Live weapon,
+item, shared-RNG, health, ending, and world-phase integration is documented in
+[race_session_combat_live.md](race_session_combat_live.md); its scoped findings
+supersede the earlier no-weapons limitations below.
 
 Reference SHA256: `93b4e4c301a5694b55e16977c2e52f4971bd9089659e3d58617c8af2368436c8`.
 Read-only decompilation is retained in `race_session_ghidra.json` and

@@ -2,7 +2,12 @@
 
 ## Current evidence and output
 
-`scripts/generate_classes.py` reads the canonical registry, the retained Ghidra inventory and `class_layout.json`. It generates one header/source pair for each of the 132 currently confirmed types and 262 functions with exact class associations. Many of these are MFC/D3DX/library types, not newly recovered gameplay classes. Their generated presence does not make library recreation a gameplay requirement or change existing scope exclusions. Unassigned functions are retained in the CSV and are never arbitrarily attached to a class.
+`scripts/generate_classes.py` reads the canonical registry, the retained Ghidra inventory and `class_layout.json`. It generates one header/source pair for each of the 132 currently confirmed types and 260 functions with retained class associations. Many of these are MFC/D3DX/library types, not newly recovered gameplay classes. Their generated presence does not make library recreation a gameplay requirement or change existing scope exclusions. Unassigned functions are retained in the CSV and are never arbitrarily attached to a class.
+
+The weapon audit removed the CDialog association from004081e3 and its004020e0
+thunk. Their Ghidra library FID name CreateIndirect is contradicted by the weapon
+activation call to004cf5ed. The historical inventory name remains recorded; no
+replacement original class name is asserted. See evidence/weapon_ownership_audit_ghidra.json.
 
 The type inventory includes 121 RTTI types and 11 additional Ghidra symbols explicitly typed Class (retained in evidence/class_namespace_symbols.json). Additional class IDs use a recorded member-address anchor because their class symbol has NO ADDRESS; never re-anchor these IDs when more members are found.
 
@@ -43,7 +48,7 @@ game implementations. The new frontend host mode is not an original mode value o
 proof of a complete race dispatcher. To enter strict original-stage tracing:
 
 ```text
-python scripts/build.py run --original-loop
+python scripts/build.py --run --original-loop
 ```
 
 Strict mode intentionally prints the first missing stage and terminates, currently initialization at `0045c8ab`. Do not describe it as a playable original loop. Implement each stage and its classes against evidence until the original game path can advance. Stage addresses stay visible throughout this process.

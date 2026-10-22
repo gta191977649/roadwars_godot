@@ -3,7 +3,23 @@ add_library(roadwars_core STATIC core/runtime.cpp unresolved/game_entry.cpp
   unresolved/frontend_video.cpp unresolved/frontend_localization.cpp
   unresolved/frontend_scene.cpp
   unresolved/race_frontend.cpp
+  unresolved/race_frontend_equipment.cpp unresolved/skeletal_mesh_runtime.cpp
   unresolved/race_music.cpp unresolved/race_start.cpp
+  unresolved/race_loadout.cpp
+  unresolved/vehicle_equipment_effects.cpp unresolved/race_ai_combat.cpp
+  unresolved/weapon_runtime.cpp unresolved/turret_runtime.cpp
+  unresolved/race_turrets.cpp unresolved/weapon_projectiles.cpp
+  unresolved/rear_weapon_effects.cpp
+  unresolved/guided_weapon_runtime.cpp
+  unresolved/special_weapon_effects.cpp
+  unresolved/contact_weapon_runtime.cpp unresolved/rear_weapon_instances.cpp
+  unresolved/scene_turret_combat.cpp unresolved/weapon_trails.cpp unresolved/vehicle_combat.cpp
+  unresolved/weapon_rear_blasts.cpp
+  unresolved/race_callback_registry.cpp unresolved/combat_audio.cpp
+  unresolved/scene_electron_traps.cpp
+  unresolved/scene_weather.cpp
+  unresolved/vehicle_damage_particles.cpp unresolved/chimney_particles.cpp
+  unresolved/vehicle_damage_visuals.cpp
   unresolved/race_route.cpp unresolved/race_ai.cpp unresolved/race_session.cpp unresolved/race_collision.cpp
   unresolved/resource_store.cpp unresolved/mesh_scene.cpp unresolved/bitmap.cpp
   unresolved/track_collision.cpp unresolved/game_initialization.cpp

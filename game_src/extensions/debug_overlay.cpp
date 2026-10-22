@@ -108,6 +108,7 @@ void DebugOverlay::draw_race_debug(float width, float height) {
     race_debug_line_count_ = 0;
     race_checkbox_positions_ = {};
     race_inspect_positions_ = {};
+    race_track_positions_.clear();
     if (!race_debug_)
         return;
     const auto& race = *race_debug_;
@@ -125,11 +126,29 @@ void DebugOverlay::draw_race_debug(float width, float height) {
         ImVec2(std::max(200.0f, std::min(370 * scale_, width - 24 * scale_)), 0),
         ImGuiCond_FirstUseEver);
     if (ImGui::Begin("Race Debug", nullptr, ImGuiWindowFlags_NoSavedSettings)) {
-        ImGui::Text("Track: %s", race.track.c_str());
+        const auto record_track = [&] {
+            const auto low = ImGui::GetItemRectMin(), high = ImGui::GetItemRectMax();
+            race_track_positions_.push_back({(low.x + high.x) * .5f, (low.y + high.y) * .5f});
+        };
+        const bool open_track = ImGui::BeginCombo("Track##RaceDebugTrack", race.track.c_str());
+        record_track();
+        if (open_track) {
+            for (std::size_t index = 0; index < race.available_tracks.size(); ++index) {
+                const auto& track = race.available_tracks[index];
+                if (ImGui::Selectable(track.c_str(),
+                                      static_cast<int>(index) == race.selected_track) &&
+                    static_cast<int>(index) != race.selected_track)
+                    options.requested_track = track;
+                record_track();
+            }
+            ImGui::EndCombo();
+        }
         ImGui::Text("Phase: %s", race.phase.c_str());
         ImGui::Text("Laps: %d  Racers: %d", race.total_laps, race.participant_count);
         ImGui::Text("Tick: %llu  Time: %.3f s",
                     static_cast<unsigned long long>(race.simulation_ticks), race.race_time);
+        if (!race.combat_status.empty())
+            ImGui::TextWrapped("Combat: %s", race.combat_status.c_str());
         const auto checkbox = [&](int i, const char* label, bool& value) {
             ImGui::Checkbox(label, &value);
             const auto low = ImGui::GetItemRectMin(), high = ImGui::GetItemRectMax();
@@ -170,6 +189,49 @@ void DebugOverlay::draw_race_debug(float width, float height) {
         }
         ImGui::TextWrapped("Route: cyan  Branch: magenta  Checkpoint: yellow  Collision: red");
         ImGui::TextDisabled("` / F8: UI/game focus. Speed values: m/s.");
+        if (ImGui::CollapsingHeader("Selected equipment"))
+            for (const auto& item : race.equipment) {
+                ImGui::PushID(item.participant);
+                if (ImGui::TreeNode(item.character.c_str())) {
+                    ImGui::Text("Tires: %s", item.tires.c_str());
+                    ImGui::Text("Armor: %s", item.armor.c_str());
+                    ImGui::Text("HP: %.1f / %.1f  Nitro ammo: %d", item.internal_hp,
+                                item.maximum_internal_hp, item.nitrous_ammo);
+                    ImGui::Text("Armor HP F/R/Rear/L: %.1f / %.1f / %.1f / %.1f", item.armor_hp[0],
+                                item.armor_hp[1], item.armor_hp[2], item.armor_hp[3]);
+                    ImGui::TextWrapped("Selected front: %s", item.selected_weapons[0].c_str());
+                    ImGui::TextWrapped("Selected side: %s", item.selected_weapons[1].c_str());
+                    ImGui::TextWrapped("Selected rear: %s", item.selected_weapons[2].c_str());
+                    for (const auto& weapon : item.weapons)
+                        if (weapon.present) {
+                            ImGui::Text("%s: ammo %d  active %d  ready %d  pending %d",
+                                        weapon.name.c_str(), weapon.ammunition, weapon.active,
+                                        weapon.ready, weapon.pending);
+                            if (weapon.elapsed)
+                                ImGui::Text("Native timer %.3f s", *weapon.elapsed);
+                            ImGui::Text("Deployment roll %.1f  latched target %d",
+                                        weapon.deployment_roll, weapon.target);
+                            if (weapon.query_target >= 0 || weapon.target >= 0)
+                                ImGui::Text("Query target %d", weapon.query_target);
+                        }
+                    ImGui::Text("Nitro timer %.3f  dying timer %.3f", item.nitrous_timer,
+                                item.dying_timer);
+                    ImGui::Text("AI side delay %.3f  rear timer %.3f", item.ai_side_delay,
+                                item.ai_rear_timer);
+                    for (const auto& upgrade : item.drivetrain)
+                        ImGui::TextWrapped("%s", upgrade.c_str());
+                    ImGui::TreePop();
+                }
+                ImGui::PopID();
+            }
+        if (ImGui::CollapsingHeader("Scene turrets")) {
+            ImGui::Text("Projectiles %llu  vehicle hits %llu",
+                        static_cast<unsigned long long>(race.turret_launched),
+                        static_cast<unsigned long long>(race.turret_impacts));
+            for (const auto& turret : race.turrets)
+                ImGui::Text("%s: target %d  heading %.1f  pitch %.1f", turret.name.c_str(),
+                            turret.target, turret.heading, turret.pitch);
+        }
     }
     ImGui::End();
     if (options.show_ai_states) {
@@ -565,6 +627,11 @@ std::array<float, 2> DebugOverlay::console_input_position() const {
     return {window->Pos.x + ImGui::GetStyle().WindowPadding.x + 20 * scale_,
             window->Pos.y + window->SizeFull.y - ImGui::GetStyle().WindowPadding.y -
                 ImGui::GetFrameHeight() * 0.5f};
+}
+std::array<float, 2> DebugOverlay::race_track_position(int index) const {
+    return index >= 0 && static_cast<std::size_t>(index) < race_track_positions_.size()
+               ? race_track_positions_[static_cast<std::size_t>(index)]
+               : std::array<float, 2>{};
 }
 const unsigned char* DebugOverlay::font_pixels(int& width, int& height) {
     current();

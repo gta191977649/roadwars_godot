@@ -12,12 +12,22 @@ struct VehiclePairContact {
     unsigned rollback_iterations{};
 };
 std::array<Vec3, 4> vehicle_pair_footprint(const VehicleParameters&, const VehicleState&);
-VehiclePairContact solve_vehicle_collision(const VehicleParameters& a_parameters, VehicleState& a,
-                                           const VehicleState& previous_a,
-                                           const VehicleParameters& b_parameters, VehicleState& b,
-                                           const VehicleState& previous_b, float delta_seconds);
+VehiclePairContact
+solve_vehicle_collision(const VehicleParameters& a_parameters, VehicleState& a,
+                        const VehicleState& previous_a, const VehicleParameters& b_parameters,
+                        VehicleState& b, const VehicleState& previous_b, float delta_seconds,
+                        const std::function<void(Vec3, Vec3, bool)>& damage = {},
+                        const std::function<void(Vec3, Vec3, bool)>& effect = {});
+Result apply_vehicle_collision_damage(VehicleDynamics&, Vec3 force, Vec3 point, bool invulnerable,
+                                      bool player, int difficulty);
+struct VehiclePairDamageContext {
+    bool a_invulnerable{}, b_invulnerable{}, a_player{}, b_player{};
+    int difficulty{3};
+    Result* damage_visual_result{};
+};
 bool resolve_vehicle_collision(VehicleDynamics& a, VehicleDynamics& b,
                                const VehicleState& previous_a, const VehicleState& previous_b,
                                float delta_seconds, std::vector<RaceDebugLine>* debug = nullptr,
-                               float* remaining_seconds = nullptr);
+                               float* remaining_seconds = nullptr,
+                               const VehiclePairDamageContext* damage_context = nullptr);
 } // namespace roadwars

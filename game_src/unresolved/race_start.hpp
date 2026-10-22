@@ -9,7 +9,8 @@ class RaceStart {
     Result load(ResourceStore&, const MeshObject&, std::string_view car,
                 std::span<const TrackSpawn>, const TrackCollision&, std::string& error);
     void reset();
-    Result update(float remaining, float dt, const VehicleDynamics&, const TrackCollision&);
+    Result update(float remaining, float dt, const VehicleDynamics&, const TrackCollision&,
+                  bool finished = false);
     const CameraFrame& camera() const { return camera_; }
     std::span<const int> sounds() const { return pending_sounds_; }
     void clear_sounds() { pending_sounds_.clear(); }
@@ -24,6 +25,7 @@ class RaceStart {
     Vec3 center_{}, eye_{}, velocity_{};
     CameraFrame camera_{};
     OriginalChaseCamera chase_;
+    OriginalTrackCamera track_camera_;
     std::array<WavePcm, 4> samples_;
     std::array<bool, 4> sounded_{};
     std::vector<int> pending_sounds_;
