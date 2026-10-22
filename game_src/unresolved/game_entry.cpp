@@ -34,7 +34,7 @@ Result GameEntry::advance_step(double delta_seconds, const InputState& input) {
     // Legacy reference clamp only. Modern callers supply a constant simulation step.
     // 005f50b0 = float 0.1, verified against hash-bound PE bytes.
     float delta = static_cast<float>(delta_seconds);
-    if (delta > 0.1f)
+    if (timing_ != Timing::frontend_realtime && delta > 0.1f)
         delta = 0.1f;
     auto invoke = [&](LoopStage stage) {
         if (state_.quit_requested)
@@ -65,6 +65,9 @@ Result GameEntry::advance_step(double delta_seconds, const InputState& input) {
         break;
     case GameMode::season:
         result = invoke(LoopStage::season_004a16b0);
+        break;
+    case GameMode::frontend:
+        result = invoke(LoopStage::frontend_004ab60d);
         break;
     default:
         running_ = false;
@@ -104,6 +107,7 @@ const char* GameEntry::original_address(LoopStage stage) {
     case LoopStage::season_004a16b0:
         return "004a16b0";
     case LoopStage::transition_004ab60d:
+    case LoopStage::frontend_004ab60d:
         return "004ab60d";
     }
     return "unknown";

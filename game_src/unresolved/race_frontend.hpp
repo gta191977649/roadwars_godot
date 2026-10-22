@@ -30,6 +30,7 @@ struct FrontendRaceInfo {
 struct FrontendFrame {
     bool developer_build{};
     std::span<const FrontendRacer> racers;
+    std::span<const std::size_t> ranking;
     std::size_t player_index{};
     // Speed is the original cached modulus in metres/second.
     float speed{}, rpm{};
@@ -37,6 +38,8 @@ struct FrontendFrame {
     bool reverse{};
     // No fabricated lap/rank data in the free-driving profile.
     std::optional<FrontendRaceInfo> race_info;
+    std::string status_text;
+    std::optional<float> start_countdown;
 };
 struct FrontendMapSettings {
     Vec3 start;
@@ -66,12 +69,13 @@ class RaceFrontend {
     Result load_sprite(ResourceStore&, const std::string&, Sprite&, Bitmap* decoded = nullptr);
     void sprite(const Sprite&, HudRect destination, float alpha = 1, float tint = 1,
                 float degrees = 0, std::array<float, 2> pivot = {});
-    void text(int x, int y, std::string_view);
+    void text(int x, int y, std::string_view, bool countdown = false);
     Renderer& renderer_;
     bool loaded_{}, visible_{true}, speedometer_{}, track_map_{}, lap_update_{};
     FrontendMapSettings map_;
-    HudBitmapFont font_;
-    Sprite meter_, needle_, map_texture_, border_, font_texture_, eliminated_, finished_;
+    HudBitmapFont font_, countdown_font_;
+    Sprite meter_, needle_, map_texture_, border_, font_texture_, countdown_texture_, eliminated_,
+        finished_;
     std::vector<Sprite> dots_, portraits_;
     std::vector<TextureHandle> textures_;
     std::vector<HudQuad> commands_;

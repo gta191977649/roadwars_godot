@@ -1,4 +1,5 @@
 #include "game_src/unresolved/bitmap.hpp"
+#include "game_src/unresolved/mesh_scene.hpp"
 #include "game_src/unresolved/resource_store.hpp"
 #include <map>
 #include <stdexcept>
@@ -25,6 +26,36 @@ class MemoryReader final : public ResourceReader {
 };
 } // namespace
 int main() {
+    // Sarge has unused NaN UVs in an untextured body part. Textured UVs stay strict.
+    const auto mesh_fixture = [](bool textured, bool invalid_position) {
+        std::vector<std::byte> bytes(32);
+        u32(bytes, 1); // mesh
+        u32(bytes, 0); // children
+        for (int i = 0; i < 3; ++i)
+            u32(bytes, 0); // translation
+        u32(bytes, 1);     // parts
+        u32(bytes, 1);     // vertices
+        for (int i = 0; i < 6; ++i)
+            u32(bytes, invalid_position && i == 0 ? 0x7fff0000 : 0); // position, normal
+        u32(bytes, 0xffffffff);                                      // color
+        u32(bytes, 0x7fff0000);                                      // unused UV.u
+        for (int i = 0; i < 3; ++i)
+            u32(bytes, 0); // UV.v, unused fields
+        u32(bytes, 0);     // triangles
+        const auto texture_offset = bytes.size();
+        bytes.resize(bytes.size() + 32);
+        if (textured)
+            bytes[texture_offset] = std::byte{'T'};
+        for (int i = 0; i < 4; ++i)
+            u32(bytes, 0x3f800000);
+        return bytes;
+    };
+    MeshObject mesh;
+    std::string mesh_error;
+    require(decode_msh(mesh_fixture(false, false), mesh, mesh_error) == Result::ok);
+    require(mesh.parts[0].uv[0].x == 0 && mesh.parts[0].uv[0].y == 0);
+    require(decode_msh(mesh_fixture(true, false), mesh, mesh_error) == Result::invalid_argument);
+    require(decode_msh(mesh_fixture(false, true), mesh, mesh_error) == Result::invalid_argument);
     MemoryReader reader;
     auto& index = reader.files["Data.pkh"];
     const std::string name = "Mixed/Case.bin";

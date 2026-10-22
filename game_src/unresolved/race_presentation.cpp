@@ -87,30 +87,8 @@ Result RacePresentation::load(ResourceStore& resources, std::string_view track,
                 throw std::runtime_error("Godot native sky initialization failed");
         }
         upload(resources, world_, world_path, {}, false);
-        upload(resources, vehicle_mesh_, vehicle_path, {}, true);
-        const auto tires_path = "Cars/" + std::string(vehicle) + "/Tires/Street";
-        if (resources.read(tires_path + "/SpatialObject.msh", bytes) != Result::ok)
-            throw std::runtime_error("Missing Street tire MSH");
-        MeshObject tire;
-        if (decode_msh(bytes, tire, error) != Result::ok)
+        if (load_vehicle_visual(resources, vehicle, error) != Result::ok)
             throw std::runtime_error(error);
-        if (load_stock_wheel_scale(resources, vehicle, wheel_scale_x_, error) != Result::ok)
-            throw std::runtime_error(error);
-        wheel_spins_ = {};
-        tire.position = {}; // 00412834 -> 004d2ea1 clears the loaded child transform on attach.
-        const auto attach = [&](const auto& self, const MeshObject& node, Vec3 parent) -> void {
-            const auto position = add(parent, node.position);
-            if (node.name == "Tire1" || node.name == "Tire2" || node.name == "Tire3" ||
-                node.name == "Tire4") {
-                const auto index = static_cast<std::size_t>(node.name.back() - '1');
-                wheel_poses_[index] =
-                    original_wheel_transform(index, position, 0, 0, wheel_scale_x_);
-                upload(resources, tire, tires_path, {}, true, static_cast<int>(index));
-            }
-            for (const auto& child : node.children)
-                self(self, child, position);
-        };
-        attach(attach, vehicle_mesh_, {});
         update_vehicle(collision_.spawn().position, collision_.spawn().heading_degrees);
     } catch (const std::exception& exception) {
         stop();
@@ -120,6 +98,82 @@ Result RacePresentation::load(ResourceStore& resources, std::string_view track,
     error.clear();
     return Result::ok;
 }
+
+Result RacePresentation::load_vehicle_visual(ResourceStore& resources, std::string_view vehicle,
+                                             std::string& error) {
+    const auto vehicle_path = "Cars/" + std::string(vehicle) + "/Body";
+    std::vector<std::byte> bytes;
+    upload(resources, vehicle_mesh_, vehicle_path, {}, true);
+    const auto tires_path = "Cars/" + std::string(vehicle) + "/Tires/Street";
+    if (resources.read(tires_path + "/SpatialObject.msh", bytes) != Result::ok)
+        throw std::runtime_error("Missing Street tire MSH");
+    MeshObject tire;
+    if (decode_msh(bytes, tire, error) != Result::ok)
+        throw std::runtime_error(error);
+    if (load_stock_wheel_scale(resources, vehicle, wheel_scale_x_, error) != Result::ok)
+        throw std::runtime_error(error);
+    wheel_spins_ = {};
+    tire.position = {}; // 00412834 -> 004d2ea1 clears the loaded child transform on attach.
+    const auto attach = [&](const auto& self, const MeshObject& node, Vec3 parent) -> void {
+        const auto position = add(parent, node.position);
+        if (node.name == "Tire1" || node.name == "Tire2" || node.name == "Tire3" ||
+            node.name == "Tire4") {
+            const auto index = static_cast<std::size_t>(node.name.back() - '1');
+            wheel_poses_[index] = original_wheel_transform(index, position, 0, 0, wheel_scale_x_);
+            upload(resources, tire, tires_path, {}, true, static_cast<int>(index));
+        }
+        for (const auto& child : node.children)
+            self(self, child, position);
+    };
+    attach(attach, vehicle_mesh_, {});
+    return Result::ok;
+}
+void RacePresentation::swap_visual(VehicleVisual& value) {
+    vehicle_instances_.swap(value.instances);
+    brake_lights_.swap(value.lights);
+    std::swap(brake_lights_visible_, value.lights_visible);
+    wheel_spins_.swap(value.spins);
+    wheel_poses_.swap(value.wheels);
+    std::swap(wheel_scale_x_, value.wheel_scale);
+}
+Result RacePresentation::add_opponent(ResourceStore& resources, std::string_view vehicle,
+                                      std::string& error) {
+    VehicleVisual player;
+    swap_visual(player);
+    auto player_mesh = std::move(vehicle_mesh_);
+    Result result = Result::ok;
+    try {
+        std::vector<std::byte> bytes;
+        const auto path = "Cars/" + std::string(vehicle) + "/Body/SpatialObject.msh";
+        if (resources.read(path, bytes) != Result::ok ||
+            decode_msh(bytes, vehicle_mesh_, error) != Result::ok)
+            throw std::runtime_error("Opponent mesh unavailable: " + path);
+        initialize_stock_weapon_mounts(vehicle_mesh_);
+        load_vehicle_visual(resources, vehicle, error);
+        opponents_.emplace_back();
+        swap_visual(opponents_.back());
+    } catch (const std::exception& failure) {
+        error = failure.what();
+        result = Result::unavailable;
+    }
+    vehicle_mesh_ = std::move(player_mesh);
+    swap_visual(player);
+    return result;
+}
+void RacePresentation::update_opponent(std::size_t index, const VehicleDynamics& vehicle,
+                                       float delta, bool reset) {
+    auto& visual = opponents_.at(index);
+    swap_visual(visual);
+    update_wheels(vehicle, delta, vehicle.state().brake_amount, reset);
+    update_vehicle(vehicle.transform());
+    swap_visual(visual);
+}
+Result RacePresentation::configure_racers(ResourceStore& resources, std::string_view track,
+                                          std::span<const std::string> characters,
+                                          std::string& error) {
+    return frontend_.load(resources, track, collision_.spawn().position, characters, error);
+}
+
 // RE-STUB: 93b4e4c301a5694b55e16977c2e52f4971bd9089659e3d58617c8af2368436c8:function:004d2fcd
 // RE-STUB: 93b4e4c301a5694b55e16977c2e52f4971bd9089659e3d58617c8af2368436c8:function:004ea597
 MaterialHandle RacePresentation::material(ResourceStore& resources, const std::string& base,
@@ -240,6 +294,11 @@ void RacePresentation::upload(ResourceStore& resources, const MeshObject& object
         const auto instance = renderer_.create_instance(mesh);
         if (!instance.value)
             throw std::runtime_error("Instance upload failed: " + object.name);
+        // 0040ee2c resolves this exact body node; texture names are not lamp identities.
+        if (vehicle && wheel_index < 0 && object.name == "295ULTailL") {
+            brake_lights_.push_back(instance);
+            renderer_.set_instance_visible(instance, false);
+        }
         renderer_.set_instance_static(instance, !vehicle && !world_nodes_[world_node].animated);
         if (vehicle)
             vehicle_instances_.push_back(instances_.size());
@@ -325,6 +384,7 @@ void RacePresentation::configure_view_at(Vec3 eye) {
 void RacePresentation::update_wheels(const VehicleDynamics& vehicle, float dt, float brake,
                                      bool reset) {
     const auto& state = vehicle.state();
+    update_lights(state);
     const auto& parameters = vehicle.parameters();
     if (reset)
         wheel_spins_ = {};
@@ -348,6 +408,16 @@ void RacePresentation::update_wheels(const VehicleDynamics& vehicle, float dt, f
         wheel_poses_[i] = original_wheel_transform(i, anchor, state.steering_degrees,
                                                    wheel_spins_[i], wheel_scale_x_);
     }
+}
+// RE: 93b4e4c301a5694b55e16977c2e52f4971bd9089659e3d58617c8af2368436c8:function:0040fc99
+void RacePresentation::update_lights(const VehicleState& state) {
+    // 00424aa2 enables the overlay on braking; controller release and race reset disable it.
+    const bool visible = state.brake_amount != 0;
+    if (brake_lights_.empty() || visible == brake_lights_visible_)
+        return;
+    brake_lights_visible_ = visible;
+    for (const auto light : brake_lights_)
+        renderer_.set_instance_visible(light, visible);
 }
 Result RacePresentation::configure_particles(ResourceStore& resources, std::uint32_t capacity) {
     if (!capacity)
@@ -443,6 +513,7 @@ Result RacePresentation::update_skid_marks(const std::array<SkidMarkEmitter, 4>&
     return Result::ok;
 }
 void RacePresentation::stop() {
+    opponents_.clear();
     frontend_.stop();
     for (auto& cached : skid_meshes_) {
         if (cached.instance.value)
@@ -468,6 +539,8 @@ void RacePresentation::stop() {
         renderer_.destroy_texture(texture);
     instances_.clear();
     vehicle_instances_.clear();
+    brake_lights_.clear();
+    brake_lights_visible_ = false;
     animated_instances_.clear();
     animated_world_nodes_.clear();
     world_nodes_.clear();

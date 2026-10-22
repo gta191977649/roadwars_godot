@@ -177,6 +177,7 @@ void DebugOverlayAdapter::render(ImDrawData* data) {
                 draw_items_.push_back(item);
             }
             const auto& item = draw_items_[used++];
+            server->canvas_item_set_draw_index(item.clip, static_cast<int>(used - 1));
             server->canvas_item_set_visible(item.clip, true);
             server->canvas_item_clear(item.triangles);
             server->canvas_item_set_custom_rect(

@@ -53,9 +53,12 @@ MeshObject read_object(BinaryReader& stream, unsigned depth, std::size_t& vertic
                     part.normals.push_back(vector(stream));
                 const auto color = stream.u32();
                 part.colors.push_back({((color >> 16) & 255) / 255.0f,
-                    ((color >> 8) & 255) / 255.0f, (color & 255) / 255.0f,
-                    ((color >> 24) & 255) / 255.0f});
-                part.uv.push_back({stream.f32(), stream.f32()});
+                                       ((color >> 8) & 255) / 255.0f, (color & 255) / 255.0f,
+                                       ((color >> 24) & 255) / 255.0f});
+                // Texture identity follows vertices. Validate UVs after reading that identity.
+                const auto u = std::bit_cast<float>(stream.u32());
+                const auto v = std::bit_cast<float>(stream.u32());
+                part.uv.push_back({u, v});
                 stream.take(8);
             }
             const auto triangles = stream.u32();
@@ -69,11 +72,20 @@ MeshObject read_object(BinaryReader& stream, unsigned depth, std::size_t& vertic
                 part.indices.push_back(vertex);
             }
             part.texture = stream.text(32);
+            for (auto& uv : part.uv) {
+                if (std::isfinite(uv.x) && std::isfinite(uv.y))
+                    continue;
+                // Sarge's untextured black body part contains unused NaN UVs.
+                if (!part.texture.empty())
+                    throw std::runtime_error("Nonfinite textured MSH coordinate");
+                uv = {};
+            }
             for (auto& channel : part.color)
                 channel = stream.f32();
             object.parts.push_back(std::move(part));
         }
-        if (!lit) object.flags |= 4;
+        if (!lit)
+            object.flags |= 4;
     } else if (object.type != 0) {
         throw std::runtime_error("Unsupported MSH object type " + std::to_string(object.type));
     }

@@ -65,6 +65,10 @@ def main():
     log = log_path.read_text(encoding='utf-8', errors='replace') if log_path.is_file() else ''
     output = result.stdout + '\n' + result.stderr + '\n' + log
     print(output)
+    if not args.headless and not any('Vulkan ' in line and ' - Forward+ - ' in line
+                                     for line in output.splitlines()):
+        print('Expected the default Vulkan Forward+ renderer', file=sys.stderr)
+        return 1
     marker = 'ROADWARS_MUSIC_SMOKE_OK' if args.music else 'ROADWARS_FRONTEND_SMOKE_OK' if args.frontend else 'ROADWARS_TIMING_SMOKE_OK' if args.timing else 'ROADWARS_SFX_SMOKE_OK' if args.sfx else 'ROADWARS_AUDIO_SMOKE_OK' if args.audio else 'ROADWARS_CAMERA_SMOKE_OK' if args.camera else 'ROADWARS_PARTICLE_SMOKE_OK' if args.particles else ('ROADWARS_RACE_SMOKE_OK' if args.preview else 'ROADWARS_DRIVE_SMOKE_OK')
     if result.returncode or 'ERROR:' in output or 'leaked' in output.lower() or marker not in output:
         return 1

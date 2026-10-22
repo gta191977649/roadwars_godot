@@ -526,6 +526,7 @@ Result VehicleDynamics::initialize(VehicleParameters parameters, const TrackColl
     wall_contact_count_ = 0;
     particle_impacts_.clear();
     collision_audio_.reset();
+    tire_audio_input_ = {};
     tire_particle_sources_ = {};
     for (std::size_t i = 0; i < 4; ++i)
         local_wheel_heights_[i] = parameters_.wheel_ground_anchors[i].y;
@@ -548,6 +549,33 @@ void VehicleDynamics::cache_wheels(bool sample_contacts) {
 // RE-STUB: 93b4e4c301a5694b55e16977c2e52f4971bd9089659e3d58617c8af2368436c8:function:0042da4b
 // RE-STUB: 93b4e4c301a5694b55e16977c2e52f4971bd9089659e3d58617c8af2368436c8:function:00480b40
 void VehicleDynamics::update(float dt, const InputState& input) {
+    update_internal(dt, input, nullptr);
+}
+void VehicleDynamics::update_controlled(float dt, const VehicleControls& controls) {
+    update_internal(dt, {}, &controls);
+}
+void VehicleDynamics::reset_to(const TrackSpawn& spawn) {
+    state_ = {};
+    state_.position = spawn.position;
+    state_.heading_degrees = spawn.heading_degrees;
+    body_ = {};
+    collision_audio_.reset();
+    particle_impacts_.clear();
+    tire_particle_sources_ = {};
+    tire_audio_input_ = {};
+    for (std::size_t i = 0; i < 4; ++i)
+        local_wheel_heights_[i] = parameters_.wheel_ground_anchors[i].y;
+    cache_wheels();
+}
+void VehicleDynamics::update_internal(float dt, const InputState& input,
+                                      const VehicleControls* controls) {
+    begin_update(dt, input, controls);
+    solve_race_walls(dt);
+    finish_race_update(dt);
+}
+void VehicleDynamics::begin_update(float dt, const InputState& input,
+                                   const VehicleControls* controls) {
+    step_pending_ = false;
     particle_impacts_.clear();
     tire_particle_sources_ = {};
     if (!track_ || !std::isfinite(dt) || dt < 0)
@@ -562,12 +590,12 @@ void VehicleDynamics::update(float dt, const InputState& input) {
         not_implemented("collision_audio_delta", "Invalid collision audio time step");
     if (dt == 0)
         return;
-    const auto previous = state_;
+    step_previous_ = state_;
     const auto axes = vehicle_axes(parameters_, state_, wheel_points_);
     // 00424d3e refreshes 5ba0 before force integration; 0042d533 may refresh it again.
     state_.cached_slip_angle = angle(axes.forward, state_.velocity);
-    const auto effect_contacts = contacts_;
-    const float material_effect_speed = state_.cached_speed;
+    step_effect_contacts_ = contacts_;
+    step_effect_speed_ = state_.cached_speed;
     state_.steering_degrees =
         advance_keyboard_steering(state_.steering_degrees, parameters_.max_wheel_angle_degrees,
                                   (input.steering > 0) - (input.steering < 0), dt);
@@ -576,6 +604,11 @@ void VehicleDynamics::update(float dt, const InputState& input) {
                                  state_.cached_slip_angle, state_.brake_amount, dt);
     state_.engine_throttle = command.engine_throttle;
     state_.brake_amount = input.handbrake ? 1.0f : command.brake_amount;
+    if (controls) {
+        state_.engine_throttle = controls->engine_throttle;
+        state_.brake_amount = controls->brake_amount;
+        state_.steering_degrees = controls->steering_degrees;
+    }
     if (command.force_first_gear)
         state_.gear_index = 0;
     state_.reverse_engaged = state_.engine_throttle < 0;
@@ -602,6 +635,8 @@ void VehicleDynamics::update(float dt, const InputState& input) {
             rolling[i] = 0.01f;
     }
     const auto limits = vehicle_force_limits(parameters_, longitudinal, lateral, rolling);
+    longitudinal_grip_ =
+        (longitudinal[0] + longitudinal[1] + longitudinal[2] + longitudinal[3]) * .25f;
     const float drive = vehicle_drive_force(parameters_, state_.gear_index, 1, limits.traction);
     apply_vehicle_engine(parameters_, state_, axes.forward, state_.engine_throttle, drive, dt);
     apply_vehicle_gravity(parameters_, state_, wheel_points_, axes.up, dt);
@@ -626,10 +661,20 @@ void VehicleDynamics::update(float dt, const InputState& input) {
         clamp_tilt(state_.roll_degrees, state_.roll_rate);
     }
     cache_wheels();
-    if (update_contact_orientation(state_, body_, wheel_points_, contacts_, dt) != Result::ok)
+    if (update_contact_orientation(state_, body_, wheel_points_, contacts_, dt) != Result::ok) {
+        if (respawn_handler_) {
+            reset_to(respawn_handler_());
+            return;
+        }
         not_implemented(
             "93b4e4c301a5694b55e16977c2e52f4971bd9089659e3d58617c8af2368436c8:function:004185fe",
             "Original missing-ground lap-based respawn");
+    }
+    step_pending_ = true;
+}
+void VehicleDynamics::solve_race_walls(float dt) {
+    if (!step_pending_)
+        return;
     const auto collision_body = [&](const VehicleState& state) {
         CollisionBody body;
         body.position = state.position;
@@ -649,9 +694,9 @@ void VehicleDynamics::update(float dt, const InputState& input) {
     // 0047fff6 decrements the original 42d8 cooldown immediately before wall handling.
     for (unsigned iteration = 0; iteration < 101; ++iteration) {
         const auto walls =
-            track_->nearby_walls(state_.position, previous.position, parameters_.length);
+            track_->nearby_walls(state_.position, step_previous_.position, parameters_.length);
         const auto contact =
-            solve_wall_contact(collision_body(previous), collision_body(state_), walls);
+            solve_wall_contact(collision_body(step_previous_), collision_body(state_), walls);
         if (!contact.hit && !contact.restore_previous)
             break;
         ++wall_contact_count_;
@@ -668,6 +713,12 @@ void VehicleDynamics::update(float dt, const InputState& input) {
             particle_impacts_.push_back({position, contact.normal, 1.5f});
         }
     }
+}
+void VehicleDynamics::finish_race_update(float dt) {
+    (void)dt;
+    if (!step_pending_)
+        return;
+    step_pending_ = false;
     // 00480b40 shifts after force/collision work using the cached preforce RPM.
     state_.cached_speed = length(state_.velocity);
     update_automatic_transmission(parameters_, state_);
@@ -683,24 +734,24 @@ void VehicleDynamics::update(float dt, const InputState& input) {
     // RE-STUB: 93b4e4c301a5694b55e16977c2e52f4971bd9089659e3d58617c8af2368436c8:function:00413425
     // The effect predicates do not change the original physical solver.
     const bool moving = length(state_.velocity) != 0;
-    tire_audio_input_ = {false, effect_contacts[0].longitudinal_grip,
-                         effect_contacts[0].skid_sound_path, state_.position};
+    tire_audio_input_ = {false, step_effect_contacts_[0].longitudinal_grip,
+                         step_effect_contacts_[0].skid_sound_path, state_.position};
     for (std::size_t wheel = 0; wheel < 4; ++wheel) {
         auto& source = tire_particle_sources_[wheel];
         source.position = effect_wheel_points[wheel];
         source.position.y += 0.10000000149011612f;
-        source.color_argb = effect_contacts[wheel].particle_color_argb;
+        source.color_argb = step_effect_contacts_[wheel].particle_color_argb;
         const bool grounded = state_.air_time[wheel] == 0;
         const bool slide = moving && state_.cached_speed > 2.0f &&
                            state_.cached_slip_angle > parameters_.tire_slip_lower_degrees &&
                            state_.cached_slip_angle < parameters_.tire_slip_upper_degrees;
         const bool full_brake = moving && state_.brake_amount >= 1.0f;
         const bool dust =
-            material_effect_speed >= 1.0f && effect_contacts[wheel].particle_dust != 0;
+            step_effect_speed_ >= 1.0f && step_effect_contacts_[wheel].particle_dust != 0;
         source.emitting = grounded && (slide || full_brake || dust);
         source.skid_enabled = grounded && (slide || full_brake);
         tire_audio_input_.any_skid = tire_audio_input_.any_skid || source.skid_enabled;
-        source.skid_color_argb = effect_contacts[wheel].skid_color_argb;
+        source.skid_color_argb = step_effect_contacts_[wheel].skid_color_argb;
     }
 }
 Transform VehicleDynamics::transform() const {

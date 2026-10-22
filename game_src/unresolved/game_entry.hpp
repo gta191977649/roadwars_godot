@@ -4,7 +4,8 @@
 
 namespace roadwars {
 // New host adaptation of the observed global loop, not an original class name.
-enum class GameMode { single_race = 0, multiplayer = 1, season = 2 };
+// frontend is a new host mode; values 0..2 retain their recovered meaning.
+enum class GameMode { single_race = 0, multiplayer = 1, season = 2, frontend = 3 };
 enum class LoopStage {
     initialize_0045c8ab,
     keyboard_004dffdf,
@@ -15,7 +16,8 @@ enum class LoopStage {
     single_race_004a4f57,
     multiplayer_0046d7a0,
     season_004a16b0,
-    transition_004ab60d
+    transition_004ab60d,
+    frontend_004ab60d
 };
 struct LoopState {
     GameMode mode{GameMode::single_race};
@@ -32,12 +34,16 @@ class LoopHooks {
 };
 class GameEntry {
   public:
-    enum class Timing { legacy_reference, fixed_simulation };
+    enum class Timing { legacy_reference, fixed_simulation, frontend_realtime };
     explicit GameEntry(LoopHooks& hooks, Timing timing = Timing::legacy_reference)
         : hooks_(hooks), timing_(timing) {}
     Result start();
     Result advance(double delta_seconds, const InputState& input);
     void stop();
+    void set_timing(Timing timing) {
+        timing_ = timing;
+        clock_.reset();
+    }
     LoopState& state() { return state_; }
     bool running() const { return running_; }
     double interpolation_alpha() const { return clock_.interpolation_alpha(); }

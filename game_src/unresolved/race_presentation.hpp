@@ -24,11 +24,17 @@ class RacePresentation {
     void update_vehicle(Vec3 position, float heading_degrees);
     void update_vehicle(const Transform& pose);
     void update_wheels(const VehicleDynamics&, float delta, float brake, bool reset);
+    void update_lights(const VehicleState&);
     void update_track_animation(float delta);
     void apply_camera(const CameraFrame& frame);
     Result configure_frontend(ResourceStore&, std::string_view track, std::string_view character,
                               std::string& error);
     Result update_frontend(const VehicleState&);
+    Result configure_racers(ResourceStore&, std::string_view track,
+                            std::span<const std::string> characters, std::string& error);
+    Result update_frontend(const FrontendFrame& frame) { return frontend_.update(frame); }
+    Result add_opponent(ResourceStore&, std::string_view vehicle, std::string& error);
+    void update_opponent(std::size_t, const VehicleDynamics&, float delta, bool reset = false);
     const RaceFrontend& frontend() const { return frontend_; }
     void set_developer_build(bool enabled) { developer_build_ = enabled; }
     void configure_view_at(Vec3 eye);
@@ -73,6 +79,8 @@ class RacePresentation {
     MeshObject world_, vehicle_mesh_;
     std::vector<ObjectInstance> instances_;
     std::vector<std::size_t> vehicle_instances_, animated_instances_, animated_world_nodes_;
+    std::vector<InstanceHandle> brake_lights_;
+    bool brake_lights_visible_{};
     struct WorldNode {
         Vec3 local;
         int parent{-1};
@@ -81,6 +89,17 @@ class RacePresentation {
         Vec3 world_angles;
         Transform pose;
     };
+    struct VehicleVisual {
+        std::vector<std::size_t> instances;
+        std::vector<InstanceHandle> lights;
+        bool lights_visible{};
+        std::array<float, 4> spins{};
+        std::array<Transform, 4> wheels{};
+        float wheel_scale{1};
+    };
+    void swap_visual(VehicleVisual&);
+    Result load_vehicle_visual(ResourceStore&, std::string_view vehicle, std::string& error);
+    std::vector<VehicleVisual> opponents_;
     std::vector<WorldNode> world_nodes_;
     std::vector<MeshHandle> meshes_;
     std::map<std::string, MaterialHandle> materials_;

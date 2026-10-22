@@ -2,10 +2,12 @@
 #include "game_src/core/runtime.hpp"
 #include "game_src/unresolved/collision_audio.hpp"
 #include "game_src/unresolved/engine_audio.hpp"
-#include "game_src/unresolved/race_music.hpp"
 #include "game_src/unresolved/game_entry.hpp"
 #include "game_src/unresolved/game_initialization.hpp"
+#include "game_src/unresolved/menu_frontend.hpp"
+#include "game_src/unresolved/race_music.hpp"
 #include "game_src/unresolved/race_presentation.hpp"
+#include "game_src/unresolved/race_session.hpp"
 #include "game_src/unresolved/tire_audio.hpp"
 #include "game_src/unresolved/vehicle_dynamics.hpp"
 #include "platform/godot/extension/debug_overlay.hpp"
@@ -52,6 +54,10 @@ class GameHost : public godot::Node, public LoopHooks {
     double get_view_distance_at(godot::Vector3 position);
     void _exit_tree() override;
     void restart_smoke_scene();
+    godot::String get_frontend_screen() const;
+    godot::String get_frontend_action() const;
+    bool preview_frontend_screen(godot::String id, double seconds, godot::String variant);
+    bool frontend_test_step(double elapsed, godot::String command);
     void start_fog_fixture();
     void start_billboard_fixture();
     void set_billboard_fixture_camera(double heading, double pitch);
@@ -84,6 +90,11 @@ class GameHost : public godot::Node, public LoopHooks {
     int get_skid_vertex_count() const;
     void set_skid_marks_visible(bool);
     void set_particles_visible(bool visible);
+    bool competition_test_step(double delta, bool autopilot);
+    godot::Dictionary get_competition_state() const;
+    godot::Vector2 get_race_debug_checkbox_position(int index) const;
+    godot::Vector2 get_race_debug_inspect_position(int index) const;
+    int get_race_debug_line_count() const;
     Result invoke(LoopStage stage, float delta_seconds, const InputState& input,
                   LoopState& state) override;
 
@@ -94,13 +105,34 @@ class GameHost : public godot::Node, public LoopHooks {
     std::unique_ptr<ServerRenderer> renderer_;
     std::unique_ptr<Runtime> runtime_;
     std::unique_ptr<GameEntry> entry_;
+    std::unique_ptr<MenuFrontend> menu_, pause_menu_;
+    void set_competition_paused(bool paused);
+    bool update_pause_menu(double delta);
+    void return_to_main_menu();
+    bool previous_tree_paused_{};
+    int inspected_camera_{-1};
+    std::unique_ptr<EngineAudioAdapter> frontend_video_voice_;
+    std::unique_ptr<SfxAudioAdapter> frontend_sfx_;
+    std::string frontend_audio_screen_;
+    void update_frontend_audio();
+    FrontendInput frontend_input_;
+    bool diagnostic_{};
+    godot::String frontend_preview_, frontend_variant_;
+    double frontend_preview_time_{};
     bool original_loop_{}, developer_build_{};
     bool race_mode_{}, race_preview_{};
+    bool competition_test_autopilot_{};
+    bool competition_{}, competition_requested_{}, race_results_pending_{}, race_completed_{};
+    int race_laps_{3}, race_ai_count_{5};
+    void update_race_debug();
+    void show_race_results();
     godot::String game_directory_, track_name_, vehicle_name_{"Animal"};
     std::unique_ptr<GameFiles> files_;
     std::unique_ptr<ResourceStore> resources_;
     std::unique_ptr<RacePresentation> race_;
     std::unique_ptr<VehicleDynamics> vehicle_;
+    // Borrows vehicle_ and race_->collision(); must be destroyed before both.
+    std::unique_ptr<RaceSession> session_;
     void set_mouse_capture(bool enabled);
     bool window_focused_{true}, owns_mouse_capture_{}, ignore_next_mouse_motion_{};
     int previous_mouse_mode_{};

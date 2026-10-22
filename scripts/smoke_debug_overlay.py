@@ -21,6 +21,8 @@ def main():
     if args.track:
         command += ['--', '--race-track=' + resolve_track(args.track),
                     '--game-dir=' + str(game_directory())]
+    else:
+        command += ['--', '--diagnostic']
     result = subprocess.run(command, cwd=ROOT, capture_output=True, text=True, timeout=60)
     print(result.stdout, result.stderr)
     # The fixture deliberately generates one warning/error and a stderr message.

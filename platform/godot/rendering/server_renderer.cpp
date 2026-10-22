@@ -81,9 +81,13 @@ ServerRenderer::~ServerRenderer() {
     if (sky_.is_valid()) {
         server_->environment_set_sky(environment_, {});
         server_->free_rid(sky_);
-        server_->free_rid(sky_material_);
-        server_->free_rid(sky_shader_);
     }
+    // The dummy renderer can return no sky RID while allocating its material
+    // and shader. Those resources still belong to this owner.
+    if (sky_material_.is_valid())
+        server_->free_rid(sky_material_);
+    if (sky_shader_.is_valid())
+        server_->free_rid(sky_shader_);
     if (environment_.is_valid()) {
         server_->scenario_set_environment(scenario_, {});
         server_->free_rid(environment_);
@@ -223,6 +227,10 @@ void ServerRenderer::begin_simulation_tick() {
         pose.previous = pose.current;
     camera_pose_.previous = camera_pose_.current;
 }
+void ServerRenderer::set_paused(bool paused) {
+    for (const auto& [id, system] : particle_systems_)
+        server_->particles_set_speed_scale(system.particles, paused ? 0 : 1);
+}
 void ServerRenderer::reset_interpolation() { begin_simulation_tick(); }
 Vec3 ServerRenderer::interpolated_camera_position(double alpha) const {
     const auto pose =
@@ -241,11 +249,26 @@ void ServerRenderer::present_interpolated(double alpha) {
     server_->camera_set_perspective(camera_, camera_fov_, scene_settings_.near_distance,
                                     scene_settings_.far_distance);
 }
+RaceDebugCamera ServerRenderer::race_debug_camera(double alpha) const {
+    const auto pose =
+        camera_pose_.previous.interpolate_with(camera_pose_.current, std::clamp(alpha, 0.0, 1.0));
+    const auto vector = [&](godot::Vector3 v) {
+        Vec3 value{v.x, v.y, v.z};
+        return original_coordinates_ ? original_to_godot(value) : value;
+    };
+    return {vector(pose.origin),
+            vector(pose.basis.get_column(0)),
+            vector(pose.basis.get_column(1)),
+            vector(-pose.basis.get_column(2)),
+            camera_fov_,
+            scene_settings_.near_distance};
+}
 std::size_t ServerRenderer::live_rids() const {
     return meshes_.size() + instances_.size() + textures_.size() + materials_.size() +
            material_shaders_.size() + 4 + (environment_.is_valid() ? 1 : 0) +
            (light_.is_valid() ? 1 : 0) + (light_instance_.is_valid() ? 1 : 0) +
-           (sky_.is_valid() ? 3 : 0) + particle_systems_.size() * 7 +
+           (sky_.is_valid() ? 1 : 0) + (sky_material_.is_valid() ? 1 : 0) +
+           (sky_shader_.is_valid() ? 1 : 0) + particle_systems_.size() * 7 +
            (hud_canvas_.is_valid() ? 2 : 0);
 }
 TextureHandle ServerRenderer::upload_texture(std::uint32_t width, std::uint32_t height,
@@ -493,7 +516,7 @@ Result ServerRenderer::configure_sky(std::span<const Vec3> positions,
     if (!environment_.is_valid() || texture == material_textures_.end() ||
         positions.size() != uv.size() || indices.empty() || indices.size() % 3)
         return Result::invalid_argument;
-    if (sky_.is_valid())
+    if (sky_.is_valid() || sky_material_.is_valid() || sky_shader_.is_valid())
         return Result::invalid_argument;
     std::ostringstream code;
     code << std::setprecision(std::numeric_limits<float>::max_digits10);

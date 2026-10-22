@@ -21,7 +21,8 @@ are not original C++ ownership evidence.
 | Tire sound | Original material sample, grip gate, rising edge and loop stop | Native looping voice | evidence/tire_audio.md |
 | Impact sound | Wall/landing and car/car threshold contracts; stock wall/landing hooks | Independent native one-shot voices | evidence/collision_audio.md |
 
-Godot uses the Compatibility backend. No per-car MeshInstance3D/vehicle body is
+Godot uses Forward+ with Vulkan on Windows. See evidence/vulkan_migration.md for
+real-GPU acceptance and coverage. No per-car MeshInstance3D/vehicle body is
 introduced. All native handles/voices are released on exit and restart; geometry
 and textures are cached, while moving instances and dirty skid strips update.
 

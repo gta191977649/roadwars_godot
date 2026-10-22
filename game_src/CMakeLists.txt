@@ -1,6 +1,10 @@
 add_library(roadwars_core STATIC core/runtime.cpp unresolved/game_entry.cpp
+  unresolved/menu_frontend.cpp unresolved/frontend_canvas.cpp unresolved/frontend_custom.cpp
+  unresolved/frontend_video.cpp unresolved/frontend_localization.cpp
+  unresolved/frontend_scene.cpp
   unresolved/race_frontend.cpp
-  unresolved/race_music.cpp
+  unresolved/race_music.cpp unresolved/race_start.cpp
+  unresolved/race_route.cpp unresolved/race_ai.cpp unresolved/race_session.cpp unresolved/race_collision.cpp
   unresolved/resource_store.cpp unresolved/mesh_scene.cpp unresolved/bitmap.cpp
   unresolved/track_collision.cpp unresolved/game_initialization.cpp
   unresolved/race_presentation.cpp unresolved/vehicle_dynamics.cpp unresolved/vehicle_input.cpp

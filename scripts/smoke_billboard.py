@@ -10,7 +10,7 @@ def main():
     if console.is_file():
         executable = console
     command = [str(executable), '--path', str(ROOT / 'platform/godot/project'),
-               '--script', 'res://billboard_smoke_test.gd', '--', '--no-debug-overlay']
+               '--script', 'res://billboard_smoke_test.gd', '--', '--diagnostic', '--no-debug-overlay']
     result = subprocess.run(command, cwd=ROOT, capture_output=True, text=True, timeout=60)
     print(result.stdout, result.stderr)
     if result.returncode or 'ROADWARS_BILLBOARD_SMOKE_OK' not in result.stdout:

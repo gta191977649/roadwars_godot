@@ -100,7 +100,7 @@ int main(int argc, char** argv) {
     assert(hud.map_settings().rotation_degrees == 90);
     assert(std::abs(hud.map_settings().scale - 0.0459997f) < 1e-8f);
     const auto texture_count = renderer.textures.size();
-    assert(texture_count == 9);
+    assert(texture_count == 10);
     std::array<FrontendRacer, 1> racers{{{{0, 0, 0}, 0}}};
     FrontendFrame frame;
     frame.racers = racers;
@@ -116,6 +116,17 @@ int main(int argc, char** argv) {
     assert(hud.update(frame) == Result::ok);
     const auto& moved = renderer.frame[renderer.frame.size() - 3];
     assert(moved.positions[0][1] == 395);
+    frame.start_countdown = 9;
+    assert(hud.update(frame) == Result::ok && renderer.frame.empty());
+    frame.start_countdown = 3.5f;
+    assert(hud.update(frame) == Result::ok && renderer.frame.size() == 1);
+    const auto digit = renderer.frame.front();
+    assert(digit.positions[2][0] - digit.positions[0][0] > 20);
+    assert(std::abs(digit.colors[0][3] - 127.f / 255) < 1e-6f);
+    assert(digit.positions[0][0] < 320 && digit.positions[2][0] > 320);
+    frame.start_countdown = .5f;
+    assert(hud.update(frame) == Result::ok && renderer.frame.size() > 1);
+    frame.start_countdown.reset();
     frame.player_index = 1;
     assert(hud.update(frame) == Result::invalid_argument);
     frame.player_index = 0;

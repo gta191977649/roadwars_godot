@@ -26,3 +26,12 @@ def resolve_track(name, root=ROOT):
     if len(matches) != 1:
         raise ValueError('Unknown or ambiguous track: ' + name + '. Available: ' + ', '.join(tracks))
     return matches[0]
+
+
+def resolve_car(name, root=ROOT):
+    directory = game_directory(root) / 'Cars'
+    cars = sorted(p.name for p in directory.iterdir() if p.is_dir() and p.name.casefold() != 'shared')
+    matches = [car for car in cars if car.casefold() == name.strip().casefold()]
+    if len(matches) != 1:
+        raise ValueError('Unknown or ambiguous car: ' + name + '. Available: ' + ', '.join(cars))
+    return matches[0]

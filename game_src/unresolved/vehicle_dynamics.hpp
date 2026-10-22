@@ -5,6 +5,7 @@
 #include "game_src/unresolved/resource_store.hpp"
 #include "game_src/unresolved/tire_audio.hpp"
 #include "game_src/unresolved/track_collision.hpp"
+#include <functional>
 
 namespace roadwars {
 // New portable representation of evidenced fields; original class ownership is unresolved.
@@ -68,11 +69,34 @@ void apply_vehicle_tilt(const VehicleParameters& parameters, VehicleState& state
                         bool fixed_radius, bool braking, bool pitch_only = false);
 void apply_vehicle_yaw_impulse(const VehicleParameters& parameters, VehicleState& state, Vec3 force,
                                Vec3 application, float dt, bool braking, float fixed_lever = -1.0f);
+struct VehicleControls {
+    float engine_throttle{}, brake_amount{}, steering_degrees{};
+};
 class VehicleDynamics {
   public:
     Result initialize(VehicleParameters parameters, const TrackCollision& track,
                       std::string& error);
     void update(float delta_seconds, const InputState& input);
+    void update_controlled(float delta_seconds, const VehicleControls& controls);
+    void begin_race_update(float delta_seconds, const InputState& input) {
+        begin_update(delta_seconds, input, nullptr);
+    }
+    void begin_race_update(float delta_seconds, const VehicleControls& controls) {
+        begin_update(delta_seconds, {}, &controls);
+    }
+    void solve_race_walls(float delta_seconds);
+    void finish_race_update(float delta_seconds);
+    void reset_to(const TrackSpawn& spawn);
+    void set_respawn_handler(std::function<TrackSpawn()> handler) {
+        respawn_handler_ = std::move(handler);
+    }
+    // Borrowed only by the portable race's recovered pair-collision phase.
+    VehicleState& collision_state() { return state_; }
+    void refresh_after_pair_collision() { cache_wheels(); }
+    void append_pair_collision_event(float strength, Vec3 position) {
+        collision_audio_.vehicle_contact(strength, position);
+    }
+    float longitudinal_grip() const { return longitudinal_grip_; }
     const VehicleState& state() const { return state_; }
     const TireAudioInput& tire_audio_input() const { return tire_audio_input_; }
     Transform transform() const;
@@ -88,6 +112,14 @@ class VehicleDynamics {
     }
 
   private:
+    void update_internal(float, const InputState&, const VehicleControls*);
+    void begin_update(float, const InputState&, const VehicleControls*);
+    VehicleState step_previous_;
+    std::array<GroundContact, 4> step_effect_contacts_;
+    float step_effect_speed_{};
+    bool step_pending_{};
+    std::function<TrackSpawn()> respawn_handler_;
+    float longitudinal_grip_{1};
     TireAudioInput tire_audio_input_{};
     VehicleParameters parameters_{};
     VehicleState state_{};

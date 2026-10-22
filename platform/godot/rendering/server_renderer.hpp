@@ -1,5 +1,6 @@
 #pragma once
 #include "game_src/interfaces/host.hpp"
+#include "game_src/interfaces/race_debug.hpp"
 #include <godot_cpp/classes/rendering_server.hpp>
 #include <godot_cpp/variant/rid.hpp>
 #include <godot_cpp/variant/transform3d.hpp>
@@ -51,8 +52,10 @@ class ServerRenderer final : public Renderer {
 
     void begin_simulation_tick();
     void reset_interpolation();
+    void set_paused(bool paused);
     void present_interpolated(double alpha);
     Vec3 interpolated_camera_position(double alpha) const;
+    RaceDebugCamera race_debug_camera(double alpha) const;
 
   private:
     struct PoseHistory {

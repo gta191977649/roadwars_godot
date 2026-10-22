@@ -16,6 +16,18 @@ Godot bootstrap Node -> portable Runtime -> portable Renderer contract
 
 ## Rendering and lifetime
 
+Default launch uses `MenuFrontend` with `GameEntry::Timing::frontend_realtime` and
+the new host-only frontend mode, preserving elapsed time across page transitions.
+The core owns screen routing, input edges, logical 640x480 layout, text, fades,
+icon animation, Cinepak video, garage/store/award scenes and their camera animation.
+`FrontendCanvas` submits opaque texture handles and quads to the existing renderer.
+Godot supplies file/input access, native playback and Windows GSM codec conversion.
+No page logic or animation is implemented in GDScript. Menu and audio owners release
+before resources and renderer, including diagnostic fixture switches. `--diagnostic`
+selects the dependency-free Runtime triangle; driving remains an explicit profile.
+Business actions are unavailable, while state-dependent views use labeled preview
+data. See `evidence/menu_frontend.md` and the custom/3D evidence for fidelity limits.
+
 A single GameHost Node owns ServerRenderer followed by Runtime. Runtime is destroyed first, releasing instances before meshes. The renderer releases remaining instances/meshes, detaches its viewport camera/scenario, then frees material, shader, camera and scenario. It borrows the bootstrap viewport; it does not free the viewport itself. The host must be the sole game-world renderer for that viewport.
 
 World geometry uses RenderingServer mesh and instance RIDs, not per-object MeshInstance3D nodes. Mesh uploads are cached under monotonically allocated opaque handles. Updates submit transforms. All current calls occur on the Godot main thread. Do not access RenderingDevice internals or introduce worker-thread submission without a separate design and synchronization policy.
@@ -47,6 +59,14 @@ Follow original C++ directory/module/class structure when actually recovered fro
 Windows x64 is the initial validated host. The core builds without fetching Godot; the extension needs the pinned dependency. Linux/macOS manifest entries require their own runtime validation. Godot owns input/window processing and implements ResourceReader through FileAccess using the single configured game root. Recovered simulation does not depend on Godot physics. RacePresentation releases instances before meshes, then materials and textures; GameHost destroys vehicle/presentation before resources and renderer. Native Godot audio plays portable original-sample commands; QMDX spatial behavior has separate coverage limits. Read test_driving.md for profile boundaries and validation.
 
 ## New diagnostic extensions
+
+The explicit no-weapons competition entry adds a portable RaceSession inferred
+from original race/vehicle links. It owns route, AI, progress and ranking, borrows
+the player's physics and shared collision track, and releases before either owner.
+Vehicle begin/wall/finish phases preserve multi-car scheduling while trace still
+executes them consecutively. Godot renders independent per-car visual state and
+passes read-only diagnostics to the optional ImGui extension. Actual race results
+switch back to the portable frontend. See evidence/race_session.md for limits.
 
 `game_src/extensions/` contains the optional portable Dear ImGui/imgui-console UI
 and C++ stream logging. It is new infrastructure, has no RE mappings and is built

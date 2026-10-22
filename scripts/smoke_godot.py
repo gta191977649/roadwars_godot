@@ -34,7 +34,7 @@ def main():
     command = [executable, '--path', str(project), '--script', 'res://' + ('fog_smoke_test.gd' if args.fog else 'smoke_test.gd')]
     if args.headless:
         command.append('--headless')
-    command += ['--', '--no-debug-overlay', '--capture=' + str(capture)]
+    command += ['--', '--diagnostic', '--no-debug-overlay', '--capture=' + str(capture)]
     log_path = ROOT / 'build' / ('fog_smoke.log' if args.fog else 'godot_smoke.log')
     log_path.unlink(missing_ok=True)
     command[1:1] = ['--log-file', str(log_path)]
@@ -42,6 +42,10 @@ def main():
     log = log_path.read_text(encoding='utf-8', errors='replace') if log_path.is_file() else ''
     output = result.stdout + '\n' + result.stderr + '\n' + log
     print(output)
+    if not args.headless and not any('Vulkan ' in line and ' - Forward+ - ' in line
+                                     for line in output.splitlines()):
+        print('Expected the default Vulkan Forward+ renderer', file=sys.stderr)
+        return 1
     marker = 'ROADWARS_FOG_SMOKE_OK' if args.fog else 'ROADWARS_SMOKE_OK'
     if result.returncode or 'ERROR:' in output or 'leaked' in output.lower() or marker not in output:
         return 1

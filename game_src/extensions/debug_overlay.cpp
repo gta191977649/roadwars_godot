@@ -7,6 +7,382 @@
 #include <imgui_internal.h>
 
 namespace roadwars::extensions {
+float race_debug_distance_alpha(Vec3 point, Vec3 eye, float distance) {
+    if (!std::isfinite(distance) || distance <= 0)
+        return 0;
+    const double dx = static_cast<double>(point.x) - eye.x;
+    const double dy = static_cast<double>(point.y) - eye.y;
+    const double dz = static_cast<double>(point.z) - eye.z;
+    const double length = std::sqrt(dx * dx + dy * dy + dz * dz);
+    if (!std::isfinite(length))
+        return 0;
+    return static_cast<float>(std::clamp((distance - length) / (distance * .2), 0.0, 1.0));
+}
+bool clip_race_debug_distance(Vec3& from, Vec3& to, Vec3 eye, float distance) {
+    if (!std::isfinite(distance) || distance <= 0)
+        return false;
+    const double dx = static_cast<double>(to.x) - from.x;
+    const double dy = static_cast<double>(to.y) - from.y;
+    const double dz = static_cast<double>(to.z) - from.z;
+    const double x = static_cast<double>(from.x) - eye.x;
+    const double y = static_cast<double>(from.y) - eye.y;
+    const double z = static_cast<double>(from.z) - eye.z;
+    const double a = dx * dx + dy * dy + dz * dz;
+    const double b = 2 * (dx * x + dy * y + dz * z);
+    const double c = x * x + y * y + z * z - static_cast<double>(distance) * distance;
+    if (!std::isfinite(a) || !std::isfinite(b) || !std::isfinite(c))
+        return false;
+    if (a == 0)
+        return c <= 0;
+    const double discriminant = b * b - 4 * a * c;
+    if (discriminant < 0)
+        return false;
+    const double root = std::sqrt(discriminant);
+    const double low = std::max(0.0, (-b - root) / (2 * a));
+    const double high = std::min(1.0, (-b + root) / (2 * a));
+    if (low > high)
+        return false;
+    const auto at = [&](double t) {
+        return Vec3{static_cast<float>(from.x + dx * t), static_cast<float>(from.y + dy * t),
+                    static_cast<float>(from.z + dz * t)};
+    };
+    const auto clipped_to = at(high), clipped_from = at(low);
+    from = clipped_from;
+    to = clipped_to;
+    return true;
+}
+bool project_race_debug_line(const RaceDebugCamera& camera, Vec3 from, Vec3 to, float width,
+                             float height, std::array<float, 2>& screen_from,
+                             std::array<float, 2>& screen_to) {
+    if (!(width > 0 && height > 0 && std::isfinite(width) && std::isfinite(height) &&
+          std::isfinite(camera.vertical_fov_degrees) && camera.vertical_fov_degrees > 0 &&
+          camera.vertical_fov_degrees < 179 && camera.near_distance > 0 &&
+          std::isfinite(camera.near_distance)))
+        return false;
+    const auto local = [&](Vec3 p) {
+        p = {p.x - camera.eye.x, p.y - camera.eye.y, p.z - camera.eye.z};
+        const auto dot = [&](Vec3 v) { return p.x * v.x + p.y * v.y + p.z * v.z; };
+        return Vec3{dot(camera.right), dot(camera.up), dot(camera.forward)};
+    };
+    auto a = local(from), b = local(to);
+    const auto finite = [](Vec3 v) {
+        return std::isfinite(v.x) && std::isfinite(v.y) && std::isfinite(v.z);
+    };
+    if (!finite(a) || !finite(b))
+        return false;
+    const float vertical = std::tan(camera.vertical_fov_degrees * 0.008726646259971648f);
+    const float horizontal = vertical * width / height;
+    const std::array<std::array<float, 4>, 5> planes{{{0, 0, 1, -camera.near_distance},
+                                                      {1, 0, horizontal, 0},
+                                                      {-1, 0, horizontal, 0},
+                                                      {0, 1, vertical, 0},
+                                                      {0, -1, vertical, 0}}};
+    for (const auto& plane : planes) {
+        const auto distance = [&](Vec3 p) {
+            return p.x * plane[0] + p.y * plane[1] + p.z * plane[2] + plane[3];
+        };
+        const float da = distance(a), db = distance(b);
+        if (da < 0 && db < 0)
+            return false;
+        if ((da < 0) != (db < 0)) {
+            const float t = da / (da - db);
+            const Vec3 intersection{a.x + (b.x - a.x) * t, a.y + (b.y - a.y) * t,
+                                    a.z + (b.z - a.z) * t};
+            if (da < 0)
+                a = intersection;
+            else
+                b = intersection;
+        }
+    }
+    const auto screen = [&](Vec3 p) {
+        return std::array<float, 2>{
+            std::clamp((p.x / (p.z * horizontal) + 1) * width * .5f, 0.0f, width),
+            std::clamp((1 - p.y / (p.z * vertical)) * height * .5f, 0.0f, height)};
+    };
+    screen_from = screen(a);
+    screen_to = screen(b);
+    return true;
+}
+
+void DebugOverlay::draw_race_debug(float width, float height) {
+    race_debug_line_count_ = 0;
+    race_checkbox_positions_ = {};
+    race_inspect_positions_ = {};
+    if (!race_debug_)
+        return;
+    const auto& race = *race_debug_;
+    auto& options = race_options_;
+    options.route_distance = std::isfinite(options.route_distance)
+                                 ? std::clamp(options.route_distance, 10.0f, 2000.0f)
+                                 : 200.0f;
+    const auto selected = std::find_if(race.ai.begin(), race.ai.end(), [&](const auto& ai) {
+        return ai.ai_index == options.selected_ai;
+    });
+    if (selected == race.ai.end())
+        options.selected_ai = -1;
+    ImGui::SetNextWindowPos(ImVec2(12 * scale_, 70 * scale_), ImGuiCond_FirstUseEver);
+    ImGui::SetNextWindowSize(
+        ImVec2(std::max(200.0f, std::min(370 * scale_, width - 24 * scale_)), 0),
+        ImGuiCond_FirstUseEver);
+    if (ImGui::Begin("Race Debug", nullptr, ImGuiWindowFlags_NoSavedSettings)) {
+        ImGui::Text("Track: %s", race.track.c_str());
+        ImGui::Text("Phase: %s", race.phase.c_str());
+        ImGui::Text("Laps: %d  Racers: %d", race.total_laps, race.participant_count);
+        ImGui::Text("Tick: %llu  Time: %.3f s",
+                    static_cast<unsigned long long>(race.simulation_ticks), race.race_time);
+        const auto checkbox = [&](int i, const char* label, bool& value) {
+            ImGui::Checkbox(label, &value);
+            const auto low = ImGui::GetItemRectMin(), high = ImGui::GetItemRectMax();
+            race_checkbox_positions_[i] = {(low.x + high.x) * .5f, (low.y + high.y) * .5f};
+        };
+        checkbox(0, "Show AI States", options.show_ai_states);
+        checkbox(1, "Show Route Debug", options.show_route);
+        checkbox(2, "Show Checkpoints", options.show_checkpoints);
+        checkbox(3, "Show Collision Shapes", options.show_collision_shapes);
+        checkbox(4, "Auto Drive", options.auto_drive);
+        if (options.show_route) {
+            ImGui::SetNextItemWidth(120 * scale_);
+            ImGui::SliderFloat("Route Distance (m)", &options.route_distance, 10, 2000, "%.0f");
+        }
+        const auto player_label = "Player: " + race.player_character;
+        const auto selection =
+            options.selected_ai < 0 ? player_label.c_str() : selected->character.c_str();
+        const auto record_inspect = [&](int index) {
+            const auto low = ImGui::GetItemRectMin(), high = ImGui::GetItemRectMax();
+            race_inspect_positions_[index] = {(low.x + high.x) * .5f, (low.y + high.y) * .5f};
+        };
+        const bool open_inspect = ImGui::BeginCombo("Inspect", selection);
+        record_inspect(0);
+        if (open_inspect) {
+            if (ImGui::Selectable(player_label.c_str(), options.selected_ai == -1))
+                options.selected_ai = -1;
+            record_inspect(1);
+            int row = 2;
+            for (const auto& ai : race.ai) {
+                ImGui::PushID(ai.ai_index);
+                if (ImGui::Selectable(ai.character.c_str(), options.selected_ai == ai.ai_index))
+                    options.selected_ai = ai.ai_index;
+                if (row < 7)
+                    record_inspect(row++);
+                ImGui::PopID();
+            }
+            ImGui::EndCombo();
+        }
+        ImGui::TextWrapped("Route: cyan  Branch: magenta  Checkpoint: yellow  Collision: red");
+        ImGui::TextDisabled("` / F8: UI/game focus. Speed values: m/s.");
+    }
+    ImGui::End();
+    if (options.show_ai_states) {
+        const auto controls = ImGui::FindWindowByName("Race Debug");
+        const float x = controls ? controls->Pos.x + controls->Size.x + 12 * scale_ : width * .45f;
+        const float y = controls ? controls->Pos.y : 70 * scale_;
+        ImGui::SetNextWindowPos(ImVec2(x, y), ImGuiCond_FirstUseEver);
+        ImGui::SetNextWindowSize(
+            ImVec2(std::max(200.0f, width - x - 12 * scale_), std::min(300 * scale_, height * .7f)),
+            ImGuiCond_FirstUseEver);
+        if (ImGui::Begin("AI States", nullptr, ImGuiWindowFlags_NoSavedSettings)) {
+            constexpr const char* columns[]{
+                "AI",     "Character", "State",      "Substate", "Lap",      "Rank",  "Node",
+                "Target", "Speed",     "Target m/s", "Steer",    "Throttle", "Brake", "Recovery s"};
+            if (ImGui::BeginTable("AI state table", 14,
+                                  ImGuiTableFlags_Borders | ImGuiTableFlags_RowBg |
+                                      ImGuiTableFlags_ScrollX | ImGuiTableFlags_ScrollY |
+                                      ImGuiTableFlags_SizingFixedFit)) {
+                for (auto column : columns)
+                    ImGui::TableSetupColumn(column);
+                ImGui::TableSetupScrollFreeze(2, 1);
+                ImGui::TableHeadersRow();
+                for (const auto& ai : race.ai) {
+                    ImGui::TableNextRow();
+                    if (options.selected_ai == ai.ai_index)
+                        ImGui::TableSetBgColor(ImGuiTableBgTarget_RowBg0,
+                                               IM_COL32(50, 90, 120, 150));
+                    ImGui::TableNextColumn();
+                    ImGui::Text("%d", ai.ai_index);
+                    ImGui::TableNextColumn();
+                    ImGui::TextUnformatted(ai.character.c_str());
+                    ImGui::TableNextColumn();
+                    ImGui::Text("%s (%d)",
+                                ai.state_name.empty() ? "Unknown" : ai.state_name.c_str(),
+                                ai.state);
+                    ImGui::TableNextColumn();
+                    ImGui::Text("%s (%d)",
+                                ai.substate_name.empty() ? "Unknown" : ai.substate_name.c_str(),
+                                ai.substate);
+                    ImGui::TableNextColumn();
+                    ImGui::Text("%d", ai.completed_laps);
+                    ImGui::TableNextColumn();
+                    ImGui::Text("%d", ai.rank);
+                    ImGui::TableNextColumn();
+                    ImGui::Text("%d", ai.route_node);
+                    ImGui::TableNextColumn();
+                    ImGui::Text("%d", ai.target_node);
+                    ImGui::TableNextColumn();
+                    ImGui::Text("%.2f", ai.speed);
+                    ImGui::TableNextColumn();
+                    ImGui::Text("%.2f", ai.target_speed);
+                    ImGui::TableNextColumn();
+                    ImGui::Text("%.3f", ai.steering);
+                    ImGui::TableNextColumn();
+                    ImGui::Text("%.3f", ai.throttle);
+                    ImGui::TableNextColumn();
+                    ImGui::Text("%.3f", ai.brake);
+                    ImGui::TableNextColumn();
+                    ImGui::Text("%.3f", ai.recovery_time);
+                }
+                ImGui::EndTable();
+            }
+        }
+        ImGui::End();
+    }
+    const auto enabled = [&](RaceDebugKind kind, int ai_index) {
+        if (kind == RaceDebugKind::vehicle_state)
+            return options.show_ai_states;
+        if (ai_index >= 0 && options.selected_ai >= 0 && ai_index != options.selected_ai)
+            return false;
+        switch (kind) {
+        case RaceDebugKind::route:
+        case RaceDebugKind::target:
+            return options.show_route;
+        case RaceDebugKind::checkpoint:
+            return options.show_checkpoints;
+        case RaceDebugKind::collision:
+            return options.show_collision_shapes;
+        case RaceDebugKind::vehicle_state:
+            return options.show_ai_states;
+        }
+        return false;
+    };
+    const auto color = [](RaceDebugKind kind, bool branch, int ai_index) -> ImU32 {
+        switch (kind) {
+        case RaceDebugKind::vehicle_state:
+            return IM_COL32_WHITE;
+        case RaceDebugKind::route:
+            return branch ? IM_COL32(255, 80, 230, 210) : IM_COL32(40, 230, 255, 210);
+        case RaceDebugKind::checkpoint:
+            return IM_COL32(255, 230, 30, 230);
+        case RaceDebugKind::collision:
+            return IM_COL32(255, 70, 50, 230);
+        case RaceDebugKind::target: {
+            constexpr ImU32 colors[]{IM_COL32(100, 255, 100, 255), IM_COL32(255, 170, 60, 255),
+                                     IM_COL32(160, 130, 255, 255), IM_COL32(255, 130, 190, 255),
+                                     IM_COL32(200, 255, 70, 255),  IM_COL32(255, 255, 255, 255)};
+            return colors[static_cast<unsigned>(std::max(ai_index, 0)) % 6];
+        }
+        }
+        return IM_COL32_WHITE;
+    };
+    auto* draw = ImGui::GetBackgroundDrawList();
+    draw->PushClipRect(ImVec2(0, 0), ImVec2(width, height), true);
+    for (const auto& line : race.lines) {
+        if (!enabled(line.kind, line.ai_index))
+            continue;
+        const bool route = line.kind == RaceDebugKind::route || line.kind == RaceDebugKind::target;
+        auto world_from = line.from, world_to = line.to;
+        if (route && !clip_race_debug_distance(world_from, world_to, race.camera.eye,
+                                               options.route_distance))
+            continue;
+        const auto tint = color(line.kind, line.branch, line.ai_index);
+        const bool highlight =
+            line.highlighted || (line.ai_index >= 0 && line.ai_index == options.selected_ai);
+        const auto fade = [&](Vec3 p) {
+            return route ? race_debug_distance_alpha(p, race.camera.eye, options.route_distance)
+                         : 1;
+        };
+        const auto faded = [&](ImU32 value, float alpha) {
+            return (value & ~IM_COL32_A_MASK) |
+                   (static_cast<ImU32>(((value >> IM_COL32_A_SHIFT) & 255) * alpha)
+                    << IM_COL32_A_SHIFT);
+        };
+        const Vec3 displacement{world_to.x - world_from.x, world_to.y - world_from.y,
+                                world_to.z - world_from.z};
+        const float length =
+            std::sqrt(displacement.x * displacement.x + displacement.y * displacement.y +
+                      displacement.z * displacement.z);
+        const int steps = route ? std::max(1, static_cast<int>(std::ceil(length / 10))) : 1;
+        const auto at = [&](float t) {
+            return Vec3{world_from.x + displacement.x * t, world_from.y + displacement.y * t,
+                        world_from.z + displacement.z * t};
+        };
+        for (int part = 0; part < steps; ++part) {
+            const auto p = at(static_cast<float>(part) / steps);
+            const auto q = at(static_cast<float>(part + 1) / steps);
+            std::array<float, 2> a, b;
+            if (!project_race_debug_line(race.camera, p, q, width, height, a, b))
+                continue;
+            const auto start = draw->VtxBuffer.Size;
+            draw->AddLine(ImVec2(a[0], a[1]), ImVec2(b[0], b[1]), tint,
+                          (highlight ? 3.0f : 1.5f) * scale_);
+            const float dx = b[0] - a[0], dy = b[1] - a[1], squared = dx * dx + dy * dy;
+            const float alpha_from = fade(p), alpha_to = fade(q);
+            for (int vertex = start; vertex < draw->VtxBuffer.Size; ++vertex) {
+                auto& v = draw->VtxBuffer[vertex];
+                const float t =
+                    squared == 0
+                        ? 0
+                        : std::clamp(((v.pos.x - a[0]) * dx + (v.pos.y - a[1]) * dy) / squared,
+                                     0.0f, 1.0f);
+                v.col = faded(v.col, alpha_from + (alpha_to - alpha_from) * t);
+            }
+            ++race_debug_line_count_;
+        }
+        std::array<float, 2> a, b;
+        if (route &&
+            project_race_debug_line(race.camera, world_from, world_to, width, height, a, b)) {
+            const float dx = b[0] - a[0], dy = b[1] - a[1], length = std::hypot(dx, dy);
+            if (length > 20 * scale_) {
+                const float x = (a[0] + b[0]) * .5f, y = (a[1] + b[1]) * .5f;
+                const float ux = dx / length * 5 * scale_, uy = dy / length * 5 * scale_;
+                draw->AddTriangleFilled(ImVec2(x + ux, y + uy), ImVec2(x - ux - uy, y - uy + ux),
+                                        ImVec2(x - ux + uy, y - uy - ux),
+                                        faded(tint, fade(at(.5f))));
+            }
+        }
+    }
+    for (const auto& label : race.labels) {
+        std::array<float, 2> p, unused;
+        const bool route =
+            label.kind == RaceDebugKind::route || label.kind == RaceDebugKind::target;
+        const float alpha = route ? race_debug_distance_alpha(label.position, race.camera.eye,
+                                                              options.route_distance)
+                                  : 1;
+        if (label.kind == RaceDebugKind::vehicle_state) {
+            if (options.show_ai_states &&
+                project_race_debug_line(race.camera, label.position, label.position, width, height,
+                                        p, unused)) {
+                const auto size = ImGui::CalcTextSize(label.text.c_str());
+                const ImVec2 origin(p[0] - size.x * .5f, p[1] - size.y * .5f);
+                draw->AddRectFilled(
+                    ImVec2(origin.x - 3 * scale_, origin.y - 2 * scale_),
+                    ImVec2(origin.x + size.x + 3 * scale_, origin.y + size.y + 2 * scale_),
+                    IM_COL32(0, 0, 0, 185), 2 * scale_);
+                draw->AddText(origin, IM_COL32_WHITE, label.text.c_str());
+            }
+            continue;
+        }
+        if (enabled(label.kind, label.ai_index) && alpha > 0 &&
+            project_race_debug_line(race.camera, label.position, label.position, width, height, p,
+                                    unused))
+            draw->AddText(
+                ImVec2(p[0], p[1]),
+                (color(label.kind, false, label.ai_index) & ~IM_COL32_A_MASK) |
+                    (static_cast<ImU32>(
+                         ((color(label.kind, false, label.ai_index) >> IM_COL32_A_SHIFT) & 255) *
+                         alpha)
+                     << IM_COL32_A_SHIFT),
+                label.text.c_str());
+    }
+    draw->PopClipRect();
+}
+
+std::array<float, 2> DebugOverlay::race_checkbox_position(int index) const {
+    if (index < 0 || index >= static_cast<int>(race_checkbox_positions_.size()))
+        return {};
+    return race_checkbox_positions_[index];
+}
+std::array<float, 2> DebugOverlay::race_inspect_position(int index) const {
+    return index >= 0 && index < 7 ? race_inspect_positions_[index] : std::array<float, 2>{};
+}
 class OverlayConsole final : public ImGuiConsole {
   public:
     OverlayConsole() : ImGuiConsole("Console") {}
@@ -55,7 +431,7 @@ DebugOverlay::DebugOverlay(std::shared_ptr<DebugMessages> messages, std::vector<
         [this](const csys::String& value) { messages_->append(value.m_String); },
         csys::Arg<csys::String>("message"));
     messages_->append(
-        "RoadWars debug console ready. ESC toggles mouse capture. Type help for commands.");
+        "RoadWars debug console ready. ` / F8 toggles mouse capture. Type help for commands.");
 }
 DebugOverlay::~DebugOverlay() {
     current();
@@ -67,7 +443,9 @@ ImDrawData* DebugOverlay::frame(float width, float height, float delta, float dp
                                 std::uint64_t triangles, bool interactive) {
     current();
     auto& io = ImGui::GetIO();
-    dpi = std::clamp(dpi, 0.75f, 4.0f);
+    // A high-DPI desktop can host a small pixel viewport. Keep the tools usable
+    // there while preserving the reported scale in a correspondingly large view.
+    dpi = std::clamp(std::min({dpi, width / 960.0f, height / 540.0f}), 0.75f, 4.0f);
     if (std::abs(dpi - scale_) > 0.01f) {
         if (scale_ > 0) {
             const float ratio = dpi / scale_;
@@ -130,6 +508,7 @@ ImDrawData* DebugOverlay::frame(float width, float height, float delta, float dp
         collapse_requested_ = false;
     }
     console_->Draw();
+    draw_race_debug(width, height);
     if (auto profile = ImGui::FindWindowByName("Render profile"))
         ImGui::BringWindowToDisplayFront(profile);
     ImGui::Render();

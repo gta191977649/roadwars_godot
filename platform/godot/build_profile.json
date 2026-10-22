@@ -6,6 +6,7 @@
     "RenderingServer",
     "Input",
     "FileAccess",
+    "JSON",
     "OS",
     "AudioStreamPlayer",
     "AudioStreamWAV",

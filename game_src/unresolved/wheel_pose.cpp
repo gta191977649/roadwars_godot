@@ -33,7 +33,8 @@ Result advance_wheel_spin(std::array<float, 4>& pitch_degrees, float cached_spee
     if (!std::isfinite(cached_speed) || cached_speed < 0 ||
         !std::isfinite(velocity_angle_degrees) || velocity_angle_degrees < 0 ||
         velocity_angle_degrees > 180 || !std::isfinite(circumference) || circumference <= 0 ||
-        !std::isfinite(brake) || brake < 0 || brake > 1 || !std::isfinite(delta_seconds) ||
+        // 0041aa67 can emit .99-target/speed in [-.01,0) near the target speed.
+        !std::isfinite(brake) || brake < -.01f || brake > 1 || !std::isfinite(delta_seconds) ||
         delta_seconds < 0)
         return Result::invalid_argument;
     if (!body_spin_enabled || cached_speed == 0 ||

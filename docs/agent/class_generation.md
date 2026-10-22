@@ -37,7 +37,10 @@ Ghidra independently confirms `00519480` as CRT startup calling game entry `0045
 
 The observed loop converts elapsed milliseconds to seconds using float 1000 at `005f50b4` and clamps values above float 0.1 at `005f50b0` to 0.1. These constants were checked against the hash-matched PE bytes. The adaptation receives Godot elapsed seconds and applies that clamp. Original float absolute-clock precision, FPS text, modal screen loops, inactivity predicates, shortcut bodies, network transition state and race update algorithms are not fully ported. Optional-stage predicates are explicit host state; they are not recovered layouts.
 
-Default launch remains an explicitly diagnostic triangle using the same scheduler and rendering lifecycle. Diagnostic hooks are not original game implementations. To enter strict original-stage tracing:
+Default launch now runs the portable frontend described in evidence/menu_frontend.md.
+The triangle is explicitly selected with `--diagnostic`; its hooks are not original
+game implementations. The new frontend host mode is not an original mode value or
+proof of a complete race dispatcher. To enter strict original-stage tracing:
 
 ```text
 python scripts/build.py run --original-loop

@@ -32,6 +32,12 @@ class AnimationRenderer final : public Renderer {
     std::map<std::uint64_t, bool> billboard_materials, billboard_meshes, billboards;
     std::map<std::uint64_t, unsigned> updates;
     std::map<std::uint64_t, bool> static_instances;
+    std::map<std::uint64_t, bool> visibility;
+    unsigned visibility_updates{};
+    void set_instance_visible(InstanceHandle h, bool visible) override {
+        visibility[h.value] = visible;
+        ++visibility_updates;
+    }
     MeshHandle upload_mesh(std::span<const Vec3>, std::span<const std::uint32_t>) override {
         return {next++};
     }
@@ -59,6 +65,7 @@ class AnimationRenderer final : public Renderer {
         billboards.erase(h.value);
         updates.erase(h.value);
         static_instances.erase(h.value);
+        visibility.erase(h.value);
     }
     void set_instance_static(InstanceHandle h, bool value) override {
         static_instances[h.value] = value;
@@ -127,6 +134,40 @@ int main(int argc, char** argv) {
             return 1;
         race.stop();
         if (!renderer.poses.empty())
+            return 1;
+    }
+    for (const auto car :
+         {"Animal", "Avenging Angel", "Bud The Crud", "Daisy", "Electra", "Heartbreaker", "Kitiara",
+          "Niki Roadkill", "Radcliff", "Romulus", "Sarge", "Wainright"}) {
+        if (race.load(resources, "Dark Forest", car, error) != Result::ok) {
+            std::cerr << car << ": " << error;
+            return 1;
+        }
+        if (renderer.visibility.empty())
+            return 1;
+        const auto check = [&](bool expected) {
+            for (const auto& [id, visible] : renderer.visibility)
+                if (visible != expected)
+                    throw std::runtime_error("Brake overlay visibility incorrect");
+        };
+        check(false);
+        VehicleState state;
+        state.reverse_engaged = true;
+        race.update_lights(state);
+        check(false);
+        state.brake_amount = .01f;
+        race.update_lights(state);
+        check(true);
+        const auto updates = renderer.visibility_updates;
+        race.update_lights(state);
+        if (updates != renderer.visibility_updates)
+            return 1;
+        state = {};
+        race.update_lights(state);
+        check(false);
+        std::cout << car << ": brake overlay off/reverse/on/release passed\n";
+        race.stop();
+        if (!renderer.visibility.empty())
             return 1;
     }
 }

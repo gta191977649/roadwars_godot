@@ -23,6 +23,12 @@ void SfxAudioAdapter::play_one_shot(const WavePcm& sample, const EngineAudioComm
 void SfxAudioAdapter::reap_finished() {
     std::erase_if(one_shots_, [](const auto& voice) { return !voice->playing(); });
 }
+void SfxAudioAdapter::set_paused(bool paused) {
+    if (tire_)
+        tire_->set_paused(paused);
+    for (auto& voice : one_shots_)
+        voice->set_paused(paused);
+}
 void SfxAudioAdapter::reset() {
     EngineAudioCommand stop;
     stop.action = EngineVoiceAction::stop;

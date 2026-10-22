@@ -33,12 +33,14 @@ EngineAudioAdapter::EngineAudioAdapter(godot::Node& owner, const WavePcm& sample
     player_->set_name(godot::String::utf8(std::string(voice_name).c_str()));
     player_->set_stream(stream_);
     player_->set_max_polyphony(1);
+    player_->set_process_mode(godot::Node::PROCESS_MODE_PAUSABLE);
     owner_.add_child(player_);
 }
 EngineAudioAdapter::~EngineAudioAdapter() {
     if (!player_)
         return;
     player_->stop();
+    player_->set_stream(godot::Ref<godot::AudioStream>());
     owner_.remove_child(player_);
     memdelete(player_);
 }
@@ -64,5 +66,6 @@ bool EngineAudioAdapter::playing() const { return player_ && player_->is_playing
 double EngineAudioAdapter::playback_position() const {
     return player_ ? player_->get_playback_position() : 0;
 }
+void EngineAudioAdapter::set_paused(bool paused) { player_->set_stream_paused(paused); }
 void EngineAudioAdapter::seek(double seconds) { player_->seek(seconds); }
 } // namespace roadwars

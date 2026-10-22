@@ -18,6 +18,7 @@ class EngineAudioAdapter {
     bool playing() const;
     double playback_position() const;
     void seek(double seconds);
+    void set_paused(bool paused);
     std::uint32_t frequency_hz() const { return frequency_hz_; }
     float linear_gain() const { return linear_gain_; }
     std::uint64_t sample_frames() const { return sample_frames_; }

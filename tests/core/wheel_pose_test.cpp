@@ -23,6 +23,11 @@ int main() {
     require(advance_wheel_spin(spins, 10, 0, 2, 0, grounded, .1f, false) == Result::ok);
     require(spins[0] == -180);
     require(advance_wheel_spin(spins, 10, 0, 0, 0, grounded, .1f) == Result::invalid_argument);
+    std::array<float, 4> ai_spins{};
+    require(advance_wheel_spin(ai_spins, 10, 0, 2, -.005f, grounded, .1f) == Result::ok);
+    require(std::abs(ai_spins[0] - -180.9f) < .001f);
+    require(advance_wheel_spin(ai_spins, 10, 0, 2, -.02f, grounded, .1f) ==
+            Result::invalid_argument);
     const auto left = original_wheel_transform(0, {1, 2, 3}, 0, 0, 1.4f);
     const auto right = original_wheel_transform(1, {1, 2, 3}, 0, 0, 1.4f);
     require(left.origin.x == 1 && left.origin.y == 2 && left.origin.z == 3);

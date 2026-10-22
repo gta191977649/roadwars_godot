@@ -161,18 +161,21 @@ Result RaceFrontend::load(ResourceStore& resources, std::string_view track, Vec3
     track_map_ = map != 0;
     lap_update_ = lap != 0;
     map_ = {start, scale, static_cast<int>(sx), static_cast<int>(sy), static_cast<int>(rotation)};
-    const std::array<std::pair<std::string, Sprite*>, 7> assets{
+    const std::array<std::pair<std::string, Sprite*>, 8> assets{
         {{"RaceInterface/xxSpeedOMeter.bmp", &meter_},
          {"RaceInterface/16SpeedOMeterNeedle.bmp", &needle_},
          {"Tracks/" + std::string(track) + "/Map/16Map.bmp", &map_texture_},
          {"RaceInterface/16MapDotBorder.bmp", &border_},
          {"RaceInterface/16MapEliminated.bmp", &eliminated_},
          {"RaceInterface/16MapFinished.bmp", &finished_},
-         {"Fonts/16Font1.bmp", &font_texture_}}};
-    Bitmap font_bitmap;
+         {"Fonts/16Font1.bmp", &font_texture_},
+         {"Fonts/16321go.bmp", &countdown_texture_}}};
+    Bitmap font_bitmap, countdown_bitmap;
     for (const auto& [path, sprite] : assets) {
         const auto result = load_sprite(resources, path, *sprite,
-                                        sprite == &font_texture_ ? &font_bitmap : nullptr);
+                                        sprite == &font_texture_        ? &font_bitmap
+                                        : sprite == &countdown_texture_ ? &countdown_bitmap
+                                                                        : nullptr);
         if (result != Result::ok)
             return fail(result, path);
     }
@@ -182,6 +185,10 @@ Result RaceFrontend::load(ResourceStore& resources, std::string_view track, Vec3
     if (font_.decode(font_bitmap, {reinterpret_cast<const unsigned char*>(alphabet.data()),
                                    alphabet.size()}) != Result::ok)
         return fail(Result::invalid_argument, "invalid original font atlas");
+    // 00487fbe, alphabet321G at0061a13c: G selects the complete GO artwork.
+    constexpr std::array<unsigned char, 4> countdown_alphabet{'3', '2', '1', 'G'};
+    if (countdown_font_.decode(countdown_bitmap, countdown_alphabet) != Result::ok)
+        return fail(Result::invalid_argument, "invalid original countdown atlas");
     for (const auto& character : characters) {
         Sprite dot, portrait;
         for (const auto& [name, sprite] : std::array<std::pair<const char*, Sprite*>, 2>{
@@ -220,21 +227,23 @@ void RaceFrontend::sprite(const Sprite& sprite, HudRect rect, float alpha, float
     commands_.push_back(quad);
 }
 // RE: 93b4e4c301a5694b55e16977c2e52f4971bd9089659e3d58617c8af2368436c8:function:004e0a26
-void RaceFrontend::text(int x, int y, std::string_view value) {
+void RaceFrontend::text(int x, int y, std::string_view value, bool countdown) {
+    const auto& font = countdown ? countdown_font_ : font_;
+    const auto& texture = countdown ? countdown_texture_ : font_texture_;
     for (unsigned char character : value) {
         if (character == ' ') {
-            x += font_.space_width() + 2;
+            x += font.space_width() + 2;
             continue;
         }
-        const auto& glyph = font_.glyph(character);
+        const auto& glyph = font.glyph(character);
         if (!glyph.width)
             continue;
-        sprite(font_texture_, {x, y, glyph.width, glyph.height});
+        sprite(texture, {x, y, glyph.width, glyph.height});
         auto& quad = commands_.back();
-        const float u = static_cast<float>(glyph.x) / font_texture_.width;
-        const float v = 1 - static_cast<float>(glyph.y) / font_texture_.height;
-        const float right = static_cast<float>(glyph.x + glyph.width) / font_texture_.width;
-        const float bottom = 1 - static_cast<float>(glyph.y + glyph.height) / font_texture_.height;
+        const float u = static_cast<float>(glyph.x) / texture.width;
+        const float v = 1 - static_cast<float>(glyph.y) / texture.height;
+        const float right = static_cast<float>(glyph.x + glyph.width) / texture.width;
+        const float bottom = 1 - static_cast<float>(glyph.y + glyph.height) / texture.height;
         quad.uv = {{{u, v}, {right, v}, {right, bottom}, {u, bottom}}};
         for (int i = 0; i < 4; ++i)
             quad.colors[i][3] = i < 2 ? 178.0f / 255 : 102.0f / 255;
@@ -245,10 +254,14 @@ void RaceFrontend::text(int x, int y, std::string_view value) {
 // RE: 93b4e4c301a5694b55e16977c2e52f4971bd9089659e3d58617c8af2368436c8:function:0048be66
 // RE: 93b4e4c301a5694b55e16977c2e52f4971bd9089659e3d58617c8af2368436c8:function:0048b648
 // RE: 93b4e4c301a5694b55e16977c2e52f4971bd9089659e3d58617c8af2368436c8:function:0048b7b4
+// RE-STUB: 93b4e4c301a5694b55e16977c2e52f4971bd9089659e3d58617c8af2368436c8:function:0048b120
 Result RaceFrontend::update(const FrontendFrame& frame) {
     commands_.clear();
     if (!loaded_)
         return Result::unavailable;
+    if (frame.start_countdown &&
+        (!std::isfinite(*frame.start_countdown) || *frame.start_countdown < 0))
+        return Result::invalid_argument;
     if (frame.racers.empty() || frame.racers.size() > 6 ||
         frame.player_index >= frame.racers.size() || !std::isfinite(frame.speed) ||
         !std::isfinite(frame.rpm) || std::abs(frame.speed) > 1000000 ||
@@ -263,6 +276,33 @@ Result RaceFrontend::update(const FrontendFrame& frame) {
             return Result::invalid_argument;
     if (!visible_)
         return renderer_.draw_hud({});
+    if (frame.start_countdown && *frame.start_countdown > 0) {
+        const float remaining = *frame.start_countdown;
+        const int digit = static_cast<int>(remaining);
+        if (digit < 4) {
+            const std::string value = digit == 0 ? "G" : std::to_string(digit);
+            const float fraction = remaining - digit;
+            const float scale = 2 * (1 - fraction);
+            const auto first = commands_.size();
+            text(0, 0, value, true);
+            float width = 0;
+            for (unsigned char character : value)
+                width += countdown_font_.glyph(character).width + 2;
+            width -= 2;
+            for (auto index = first; index < commands_.size(); ++index) {
+                auto& quad = commands_[index];
+                for (int vertex = 0; vertex < 4; ++vertex) {
+                    quad.positions[vertex][0] =
+                        320 + (quad.positions[vertex][0] - width * .5f) * scale;
+                    quad.positions[vertex][1] =
+                        240 + (quad.positions[vertex][1] - countdown_font_.height() * .5f) * scale;
+                    quad.colors[vertex] = {1, 1, 1, std::floor(fraction * 255) / 255};
+                }
+            }
+        }
+        if (remaining >= 3)
+            return renderer_.draw_hud(commands_);
+    }
     if (speedometer_) {
         sprite(meter_, {512, 352, meter_.width, meter_.height});
         text(583, 425, std::to_string(static_cast<int>(frame.speed * 2.236997365951538f)));
@@ -283,10 +323,16 @@ Result RaceFrontend::update(const FrontendFrame& frame) {
     if (lap_update_ && frame.race_info) {
         const auto& race = *frame.race_info;
         text(5, 5,
-             "LAP " + std::to_string(race.completed_laps + 1) + "/" +
+             "LAP " + std::to_string(std::min(race.completed_laps + 1, race.total_laps)) + "/" +
                  std::to_string(race.total_laps));
         text(5, font_.height() + 10,
              std::to_string(race.rank) + "/" + std::to_string(race.racer_count));
+    }
+    if (!frame.status_text.empty()) {
+        int width = -2;
+        for (unsigned char character : frame.status_text)
+            width += (character == ' ' ? font_.space_width() : font_.glyph(character).width) + 2;
+        text((640 - width) / 2, 100, frame.status_text);
     }
     if (track_map_) {
         sprite(map_texture_, {0, 352, 128, 128}, 0.7f);
@@ -302,12 +348,15 @@ Result RaceFrontend::update(const FrontendFrame& frame) {
             if (i == frame.player_index)
                 sprite(border_, rect);
         }
-        // The trace profile supplies identity order; actual race ranking must be supplied
-        // by the race dispatcher when that subsystem is recovered.
-        for (std::size_t i = 0; i < frame.racers.size(); ++i) {
+        for (std::size_t slot = 0; slot < frame.racers.size(); ++slot) {
+            if (!frame.ranking.empty() && frame.ranking.size() != frame.racers.size())
+                return Result::invalid_argument;
+            const auto i = frame.ranking.empty() ? slot : frame.ranking[slot];
+            if (i >= frame.racers.size())
+                return Result::invalid_argument;
             const auto& racer = frame.racers[i];
             const auto tint = i == frame.player_index ? 1.0f : 100.0f / 255;
-            const HudRect rect{4, 360 + static_cast<int>(i) * 20, 17, 17};
+            const HudRect rect{4, 360 + static_cast<int>(slot) * 20, 17, 17};
             sprite(portraits_[racer.character_index], rect, 1, tint);
             if (racer.eliminated)
                 sprite(eliminated_, rect, 1, tint);

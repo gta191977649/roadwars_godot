@@ -49,8 +49,8 @@ func run_test() -> void:
             push_error("Debug console missed message: " + message)
             quit(1)
             return
-    key_event(host, KEY_ESCAPE, true)
-    key_event(host, KEY_ESCAPE, false)
+    key_event(host, KEY_F8, true)
+    key_event(host, KEY_F8, false)
     await process_frame
     if not host.get_ui_mouse_visible() or Input.mouse_mode != Input.MOUSE_MODE_VISIBLE:
         quit(1)

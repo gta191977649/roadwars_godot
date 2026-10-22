@@ -13,6 +13,7 @@ class SfxAudioAdapter {
                        std::string_view name);
     void reap_finished();
     void reset();
+    void set_paused(bool paused);
     bool tire_playing() const;
     double tire_playback_position() const;
     std::size_t playing_one_shots() const;
