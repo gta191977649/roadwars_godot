@@ -107,7 +107,7 @@ int main(int argc, char** argv) {
     require(load_vehicle_metrics(resources, "Animal", p, error) == Result::ok);
     require(load_vehicle_geometry(resources, "Animal", p, error) == Result::ok);
     const auto reference = run(p, track, std::vector<double>(1200, 1.0 / 60));
-    for (int fps : {10, 15, 30, 60, 75, 120, 144, 240}) {
+    for (int fps : {10, 15, 30, 59, 60, 75, 119, 120, 144, 165, 240}) {
         require(run(p, track, std::vector<double>(fps * 20, 1.0 / fps)) == reference);
         std::cout << fps << " render FPS: 1200 physics ticks, bit-identical complete trace\n";
     }
