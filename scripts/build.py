@@ -243,7 +243,7 @@ def main():
     parser.add_argument('--car', help='Player car name (default: Animal)')
     parser.add_argument('--laps', type=positive_laps, help='Number of laps, 1..10 (default: 3 for --race)')
     parser.add_argument('--ai', type=ai_count, help='AI opponents, 0..5 (default: 5 for --race)')
-    parser.add_argument('--seed', type=int, help='Diagnostic CRT seed, 0..4294967295 (default: 1)')
+    parser.add_argument('--seed', type=int, help='Diagnostic CRT seed, 0..4294967295 (default: fresh seed per launch)')
     args = parser.parse_intermixed_args()
     if args.action is None:
         args.action = args.preset or 'godot'
@@ -300,8 +300,9 @@ def main():
             command += ['--', '--race', '--race-track=' + track, '--race-vehicle=' + vehicle,
                         '--race-laps=' + str(args.laps if args.laps is not None else 3),
                         '--race-ai=' + str(args.ai if args.ai is not None else 5),
-                        '--race-seed=' + str(args.seed if args.seed is not None else 1),
                         '--game-dir=' + str(directory)]
+            if args.seed is not None:
+                command.append('--race-seed=' + str(args.seed))
         elif args.action == 'trace':
             command += ['--', '--race-track=' + track, '--race-vehicle=' + vehicle, '--game-dir=' + str(directory)]
         elif args.original_loop:

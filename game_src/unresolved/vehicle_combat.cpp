@@ -1110,7 +1110,7 @@ void VehicleCombat::update_visuals(const VehicleCombatFrame& frame) {
                 attached ? angles.y : p.pitch_degrees,
                 item.rocket.flare_roll + (attached ? angles.z : 0));
             visuals_.push_back({slot, 0, VehicleCombatVisualKind::missile_flare, flare_pose,
-                                item.missile_flare_enabled && (attached || p.active)});
+                                item.missile_flare_enabled && !attached && p.active});
         }
         for (std::size_t m = 0; m < item.guided.missiles().size(); ++m) {
             const auto& p = item.guided.missiles()[m];
@@ -1127,7 +1127,7 @@ void VehicleCombat::update_visuals(const VehicleCombatFrame& frame) {
                 point(body_pose, asset.flare_position), attached ? attached_heading : p.heading,
                 attached ? angles.y : item.launch_pitch, p.flare_roll + (attached ? angles.z : 0));
             visuals_.push_back({slot, m, VehicleCombatVisualKind::missile_flare, flare_pose,
-                                item.missile_flare_enabled && (attached || p.visible)});
+                                item.missile_flare_enabled && !attached && p.visible});
         }
         if (item.kind == Kind::rear)
             for (std::size_t m = 0; m < item.instances.size(); ++m) {
@@ -1204,6 +1204,25 @@ Result VehicleCombat::jam(float seconds) {
         return Result::invalid_argument;
     // Non-guided side weapons' virtual+3c is an evidenced no-op (e.g.0049f7eb).
     return items_[1].kind == Kind::guided ? items_[1].guided.jam(seconds) : Result::ok;
+}
+// Read-only presentation inventory for loading-time native instance preparation.
+std::size_t VehicleCombat::projectile_capacity(WeaponSlot slot) const {
+    const auto i = static_cast<std::size_t>(slot);
+    if (i >= items_.size())
+        return 0;
+    const auto& item = items_[i];
+    switch (item.kind) {
+    case Kind::salvo:
+        return item.projectiles.size();
+    case Kind::guided:
+        return item.guided.missiles().size();
+    case Kind::rocket:
+        return 1;
+    case Kind::rear:
+        return item.instances.size();
+    default:
+        return 0;
+    }
 }
 std::span<const GuidedMissileState> VehicleCombat::guided_missiles() const {
     return items_[1].kind == Kind::guided ? items_[1].guided.missiles()

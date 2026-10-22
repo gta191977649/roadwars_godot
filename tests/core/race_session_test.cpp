@@ -394,7 +394,15 @@ Trace run(ResourceStore& resources, const Scenario& scenario, const RaceOptions&
     }
     // Verify route topology against decoded resource order, including the wrap
     // and the first segment entering each optional branch.
+    const auto debug_state_before = state_words(session);
     const auto snapshot = session.debug_snapshot();
+    const auto compact_snapshot = session.debug_snapshot(false);
+    require(compact_snapshot.equipment.size() == snapshot.equipment.size() &&
+                compact_snapshot.ai.size() == snapshot.ai.size() &&
+                compact_snapshot.simulation_ticks == snapshot.simulation_ticks &&
+                compact_snapshot.lines.size() < snapshot.lines.size() &&
+                state_words(session) == debug_state_before,
+            "Optional route diagnostics changed gameplay or omitted participant data");
     require(snapshot.equipment.size() == session.racers().size(),
             "Missing actual loadout diagnostics");
     for (std::size_t i = 0; i < session.racers().size(); ++i) {

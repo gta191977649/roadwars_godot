@@ -1,10 +1,12 @@
 #include "game_src/unresolved/race_frontend.hpp"
 #include <cassert>
+#include <algorithm>
 #include <cmath>
 #include <filesystem>
 #include <fstream>
 #include <iostream>
 #include <set>
+#include <limits>
 
 using namespace roadwars;
 class HudRenderer final : public Renderer {
@@ -82,6 +84,34 @@ int main(int argc, char** argv) {
     assert(font.glyph('B').x == 3 && font.glyph('0').y == 3);
     atlas.rgba.pop_back();
     assert(font.decode(atlas, alphabet) == Result::invalid_argument);
+    AmmunitionNotices notices;
+    assert(notices.push("MACHINE GUN", 99));
+    assert(notices.entries()[0].text == "MACHINE GUN 99" && notices.entries()[0].remaining == 2);
+    assert(notices.advance(.5f) == Result::ok);
+    assert(notices.push("machine gun", 98));
+    assert(notices.entries()[0].text == "MACHINE GUN 98" && notices.entries()[0].remaining == 2);
+    assert(notices.push("GATLING GUN", 9));
+    assert(notices.push("LAND MINES", 2));
+    assert(notices.push("NITROUS BOOST", 0));
+    assert(!notices.push("OTHER", 1));
+    assert(notices.advance(-1) == Result::invalid_argument);
+    assert(notices.advance(std::numeric_limits<float>::infinity()) == Result::invalid_argument);
+    assert(notices.entries()[0].remaining == 2);
+    assert(notices.advance(3) == Result::ok);
+    for (const auto& notice : notices.entries()) assert(notice.remaining == 0);
+    assert(!notices.push("", 1) && !notices.push("MACHINE GUN", -1));
+    notices.clear();
+    assert(notices.push("MACHINE GUN", 1));
+    assert(notices.advance(.5f) == Result::ok);
+    assert(notices.push("NITROUS BOOST", 1));
+    assert(notices.advance(1.5f) == Result::ok);
+    assert(notices.push("NITROUS BOOST", 0));
+    // The original loop takes an earlier empty lane before a later matching one.
+    assert(notices.entries()[0].text == "NITROUS BOOST 0" &&
+           notices.entries()[1].text == "NITROUS BOOST 1");
+    notices.clear();
+    for (const auto& notice : notices.entries())
+        assert(notice.remaining == 0 && notice.text.empty());
     if (argc < 2)
         return 0;
 
@@ -100,7 +130,7 @@ int main(int argc, char** argv) {
     assert(hud.map_settings().rotation_degrees == 90);
     assert(std::abs(hud.map_settings().scale - 0.0459997f) < 1e-8f);
     const auto texture_count = renderer.textures.size();
-    assert(texture_count == 10);
+    assert(texture_count == 24); // Ten external HUD textures plus fourteen preloaded cockpit assets.
     std::array<FrontendRacer, 1> racers{{{{0, 0, 0}, 0}}};
     FrontendFrame frame;
     frame.racers = racers;
@@ -202,6 +232,39 @@ int main(int argc, char** argv) {
     assert(hud.update(frame) == Result::ok && renderer.frame.size() == 5);
     racers[0].finished = false;
     frame.equipment.reset();
+    const std::array<AmmunitionNotice, 4> messages{{{"MACHINE GUN 99", 2},
+                                                  {"GATLING GUN 9", 2},
+                                                  {"LAND MINES 2", 2},
+                                                  {"NITROUS BOOST 0", 2}}};
+    frame.ammunition_notices = messages;
+    frame.developer_build = false;
+    assert(hud.update(frame) == Result::ok);
+    const auto without_dev = renderer.frame;
+    const auto& last = renderer.frame.back();
+    const float message_height = last.positions[2][1] - last.positions[0][1];
+    assert(last.positions[0][1] == 440 - 3 * (message_height + 5));
+    assert(last.colors[0][3] == 178.f / 255 && last.colors[2][3] == 102.f / 255);
+    frame.developer_build = true;
+    assert(hud.update(frame) == Result::ok && renderer.frame.size() > without_dev.size());
+    std::size_t dev_glyphs = 0;
+    for (const auto& q : renderer.frame) {
+        const bool present = std::any_of(without_dev.begin(), without_dev.end(), [&](const auto& p) {
+            return q.positions == p.positions && q.uv == p.uv && q.texture.value == p.texture.value;
+        });
+        if (!present) {
+            ++dev_glyphs;
+            assert(q.positions[0][1] >= 440 + message_height + 5);
+        }
+    }
+    assert(dev_glyphs > 0);
+    for (const auto& message : messages) assert(message.remaining == 2);
+    const std::array<AmmunitionNotice, 1> fading{{{"MACHINE GUN 0", .25f}}};
+    frame.ammunition_notices = fading;
+    assert(hud.update(frame) == Result::ok);
+    for (const auto& color : renderer.frame.back().colors)
+        assert(color[3] == 127.f / 255);
+    frame.ammunition_notices = {};
+    frame.developer_build = false;
     hud.set_visible(false);
     assert(hud.update(frame) == Result::ok && renderer.frame.empty());
     hud.stop();

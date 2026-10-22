@@ -2,11 +2,13 @@
 #include "game_src/core/simulation_clock.hpp"
 #include "game_src/shader/shader_variant.hpp"
 #include "game_src/unresolved/track_render_settings.hpp"
+#include "platform/godot/extension/frame_trace.hpp"
 #include "platform/godot/rendering/coordinate_conversion.hpp"
 #include "shader_sources.hpp"
 #include <algorithm>
 #include <cmath>
 #include <cstring>
+#include <godot_cpp/classes/display_server.hpp>
 #include <godot_cpp/classes/image.hpp>
 #include <godot_cpp/variant/aabb.hpp>
 #include <godot_cpp/variant/array.hpp>
@@ -50,9 +52,22 @@ ServerRenderer::ServerRenderer(godot::RID viewport, bool original_coordinates)
     server_->viewport_attach_camera(viewport_, camera_);
 }
 void ServerRenderer::set_instance_visible(InstanceHandle handle, bool visible) {
+    if (visible)
+        invisible_instances_.erase(handle.value);
+    else
+        invisible_instances_.insert(handle.value);
     const auto found = instances_.find(handle.value);
     if (found != instances_.end())
-        server_->instance_set_visible(found->second, visible);
+        server_->instance_set_visible(found->second, visible && !camera_hidden_.contains(handle.value));
+}
+void ServerRenderer::set_instance_camera_hidden(InstanceHandle handle, bool hidden) {
+    if (hidden)
+        camera_hidden_.insert(handle.value);
+    else
+        camera_hidden_.erase(handle.value);
+    const auto found = instances_.find(handle.value);
+    if (found != instances_.end())
+        server_->instance_set_visible(found->second, !hidden && !invisible_instances_.contains(handle.value));
 }
 ServerRenderer::~ServerRenderer() {
     if (hud_canvas_.is_valid()) {
@@ -65,6 +80,10 @@ ServerRenderer::~ServerRenderer() {
     server_->viewport_set_scenario(viewport_, {});
     while (!particle_systems_.empty())
         destroy_particles({particle_systems_.begin()->first});
+    for (auto [key, rid] : particle_process_shaders_)
+        server_->free_rid(rid);
+    for (auto [key, rid] : particle_draw_shaders_)
+        server_->free_rid(rid);
     for (auto [key, rid] : instances_)
         server_->free_rid(rid);
     for (auto [key, rid] : meshes_)
@@ -111,6 +130,7 @@ Result ServerRenderer::draw_hud(std::span<const HudQuad> quads) {
             hud_item_, godot::RenderingServer::CANVAS_ITEM_TEXTURE_FILTER_NEAREST);
     }
     server_->canvas_item_clear(hud_item_);
+    aspect_hud_pixels_.clear();
     for (const auto& quad : quads) {
         const auto texture = textures_.find(quad.texture.value);
         if (texture == textures_.end())
@@ -120,18 +140,32 @@ Result ServerRenderer::draw_hud(std::span<const HudQuad> quads) {
         godot::PackedInt32Array indices;
         for (int i : {0, 1, 2, 2, 3, 0})
             indices.push_back(i);
+        std::array<godot::Vector2, 4> pixels;
         for (int i = 0; i < 4; ++i) {
-            points.push_back({quad.positions[i][0], quad.positions[i][1]});
+            float x = quad.positions[i][0], y = quad.positions[i][1];
+            if (quad.preserve_aspect) {
+                const float scale = std::min(hud_width_ / 640, hud_height_ / 480);
+                x = (x * scale + (hud_width_ - 640 * scale) / 2) * 640 / hud_width_;
+                y = (y * scale + hud_height_ - 480 * scale) * 480 / hud_height_;
+            }
+            pixels[i] = {x * hud_width_ / 640, y * hud_height_ / 480};
+            points.push_back({x, y});
             uv.push_back({quad.uv[i][0], quad.uv[i][1]});
             const auto& c = quad.colors[i];
             colors.push_back({c[0], c[1], c[2], c[3]});
         }
+        if (quad.preserve_aspect)
+            aspect_hud_pixels_.push_back(pixels);
         server_->canvas_item_add_triangle_array(hud_item_, indices, points, colors, uv, {}, {},
                                                 texture->second);
     }
     return Result::ok;
 }
 void ServerRenderer::resize_hud(float width, float height) {
+    if (width > 0 && height > 0) {
+        hud_width_ = width;
+        hud_height_ = height;
+    }
     if (!hud_canvas_.is_valid() || width <= 0 || height <= 0)
         return;
     godot::Transform2D transform;
@@ -160,6 +194,7 @@ MeshHandle ServerRenderer::upload_mesh(std::span<const Vec3> vertices,
     arrays.resize(godot::RenderingServer::ARRAY_MAX);
     arrays[godot::RenderingServer::ARRAY_VERTEX] = positions;
     arrays[godot::RenderingServer::ARRAY_INDEX] = triangles;
+    trace_resource(FrameResource::mesh);
     const auto rid = server_->mesh_create();
     server_->mesh_add_surface_from_arrays(rid, godot::RenderingServer::PRIMITIVE_TRIANGLES, arrays);
     server_->mesh_surface_set_material(rid, 0, material_);
@@ -171,6 +206,7 @@ InstanceHandle ServerRenderer::create_instance(MeshHandle mesh) {
     auto found = meshes_.find(mesh.value);
     if (found == meshes_.end())
         return {};
+    trace_resource(FrameResource::instance);
     auto rid = server_->instance_create2(found->second, scenario_);
     const auto id = next_handle_++;
     instances_.emplace(id, rid);
@@ -184,7 +220,7 @@ Result ServerRenderer::update_instance(InstanceHandle instance, const Transform&
         convert(original_coordinates_ ? original_object_to_godot(transform) : transform);
     if (!static_instances_.contains(instance.value)) {
         const auto cached =
-            instance_poses_.try_emplace(instance.value, PoseHistory{pose, pose, pose}).first;
+            instance_poses_.try_emplace(instance.value, PoseHistory{pose, pose, {}}).first;
         cached->second.current = pose;
     }
     // Live simulation only records snapshots. Submit one coherent interpolated
@@ -242,6 +278,8 @@ void ServerRenderer::reset_instance_interpolation(InstanceHandle instance) {
         found->second.previous = found->second.current;
 }
 void ServerRenderer::destroy_instance(InstanceHandle instance) {
+    camera_hidden_.erase(instance.value);
+    invisible_instances_.erase(instance.value);
     static_instances_.erase(instance.value);
     instance_poses_.erase(instance.value);
     auto found = instances_.find(instance.value);
@@ -265,9 +303,9 @@ void ServerRenderer::update_camera(const Transform& transform, float fov) {
         camera_pose_.presented = camera_pose_.current;
         presented_camera_fov_ = fov;
         server_->camera_set_transform(camera_, camera_pose_.presented);
-        server_->camera_set_perspective(camera_, fov,
-                                        original_coordinates_ ? scene_settings_.near_distance : 0.05f,
-                                        original_coordinates_ ? scene_settings_.far_distance : 2000.0f);
+        server_->camera_set_perspective(
+            camera_, fov, original_coordinates_ ? (first_person_ ? .1f : scene_settings_.near_distance) : 0.05f,
+            original_coordinates_ ? scene_settings_.far_distance : 2000.0f);
     }
 }
 // Native test fixture: exercise the actual submission path at a known high speed,
@@ -314,7 +352,8 @@ bool ServerRenderer::test_interpolation_history() {
                     clock.ticks() == 0 ? 0 : (clock.ticks() - 1 + clock.interpolation_alpha()) * 2);
                 valid &= std::abs(fixture.instance_poses_.at(body.value).presented.origin.z -
                                   position) < .0001f;
-                valid &= std::abs(fixture.camera_pose_.presented.origin.z - (position - 6)) < .0001f;
+                valid &=
+                    std::abs(fixture.camera_pose_.presented.origin.z - (position - 6)) < .0001f;
                 valid &= fixture.instance_poses_.at(wheel.value).presented.basis.determinant() < 0;
             }
             // Stop updating after an in-between presentation: the final pose must settle.
@@ -326,13 +365,60 @@ bool ServerRenderer::test_interpolation_history() {
             // Reset/teleport must snap at every render fraction.
             pose.origin.z = -100;
             fixture.update_instance(body, pose);
-            fixture.reset_interpolation();
+            fixture.reset_instance_interpolation(body);
             fixture.present_interpolated(.25);
             valid &= fixture.instance_poses_.at(body.value).presented.origin.z == -100;
+            valid &= fixture.instance_poses_.at(wheel.value).presented.origin.z == 240;
+            // Camera cuts and projection interpolation must not reset world histories.
+            fixture.begin_simulation_tick();
+            pose.origin.z = -98;
+            fixture.update_instance(body, pose);
+            camera.origin.z = 1000;
+            fixture.update_camera(camera, 70);
+            fixture.present_interpolated(.25);
+            valid &= std::abs(fixture.presented_camera_fov_ - 55) < .0001f;
+            fixture.reset_camera_interpolation();
+            fixture.present_interpolated(.25);
+            valid &= fixture.camera_pose_.presented.origin.z == 1000;
+            valid &= std::abs(fixture.instance_poses_.at(body.value).presented.origin.z + 99.5f) <
+                     .0001f;
         }
         fixture.destroy_instance(wheel);
         fixture.destroy_instance(body);
         fixture.destroy_mesh(mesh);
+        const std::array<std::byte, 4> white{std::byte{255}, std::byte{255}, std::byte{255},
+                                             std::byte{255}};
+        const auto texture = fixture.upload_texture(1, 1, white);
+        const auto material = fixture.create_material(texture, MaterialSettings{});
+        fixture.prewarm_particles(15, material, false, false);
+        const auto first = fixture.create_particles(15, material);
+        const auto second = fixture.create_particles(15, material);
+        const auto& a = fixture.particle_systems_.at(first.value);
+        const auto& b = fixture.particle_systems_.at(second.value);
+        const bool native = godot::DisplayServer::get_singleton()->get_name() != "headless";
+        if (native) {
+            valid &= a.process_shader == b.process_shader && a.draw_shader == b.draw_shader;
+            valid &= a.process_material != b.process_material && a.draw_material != b.draw_material;
+        }
+        std::array<ParticleDrawState, 15> red{}, blue{};
+        red[0] = {{1, 0, 0}, 1, 0xffff0000, 0, true};
+        blue[0] = {{2, 0, 0}, 1, 0xff0000ff, 0, true};
+        valid &= fixture.update_particles(first, red) == Result::ok;
+        valid &= fixture.update_particles(second, blue) == Result::ok;
+        const godot::PackedVector4Array first_positions =
+            server->material_get_param(a.process_material, "slot_position");
+        const godot::PackedVector4Array second_positions =
+            server->material_get_param(b.process_material, "slot_position");
+        // The headless dummy renderer does not retain material parameter arrays.
+        // Exercise uniform isolation on the native renderer, without indexing
+        // unavailable readbacks in the dependency-free timing smoke.
+        if (native)
+            valid &= first_positions.size() == 15 && second_positions.size() == 15 &&
+                     first_positions[0].x == 1 && second_positions[0].x == 2;
+        fixture.destroy_particles(first);
+        valid &= fixture.update_particles(second, blue) == Result::ok;
+        fixture.destroy_particles(second);
+
     } catch (...) {
         valid = false;
     }
@@ -348,6 +434,15 @@ godot::Dictionary ServerRenderer::presentation_snapshot() const {
         return result;
     };
     godot::Dictionary result, instances;
+    godot::Array quads;
+    for (const auto& points : aspect_hud_pixels_) {
+        godot::Array quad;
+        for (const auto& p : points) quad.push_back(p);
+        quads.push_back(quad);
+    }
+    result["aspect_hud_pixels"] = quads;
+    result["camera_hidden_instances"] = static_cast<int>(camera_hidden_.size());
+    result["camera_near"] = first_person_ ? .1f : scene_settings_.near_distance;
     for (const auto& [id, pose] : instance_poses_)
         instances[static_cast<int64_t>(id)] = history(pose);
     result["instances"] = instances;
@@ -398,7 +493,7 @@ void ServerRenderer::present_interpolated(double alpha) {
     camera_pose_.presented = camera;
     server_->camera_set_transform(camera_, camera);
     presented_camera_fov_ = previous_camera_fov_ + (camera_fov_ - previous_camera_fov_) * weight;
-    server_->camera_set_perspective(camera_, presented_camera_fov_, scene_settings_.near_distance,
+    server_->camera_set_perspective(camera_, presented_camera_fov_, first_person_ ? .1f : scene_settings_.near_distance,
                                     scene_settings_.far_distance);
 }
 RaceDebugCamera ServerRenderer::race_debug_camera(double alpha) const {
@@ -412,15 +507,17 @@ RaceDebugCamera ServerRenderer::race_debug_camera(double alpha) const {
             vector(pose.basis.get_column(0)),
             vector(pose.basis.get_column(1)),
             vector(-pose.basis.get_column(2)),
-            previous_camera_fov_ + (camera_fov_ - previous_camera_fov_) * static_cast<float>(std::clamp(alpha, 0.0, 1.0)),
-            scene_settings_.near_distance};
+            previous_camera_fov_ + (camera_fov_ - previous_camera_fov_) *
+                                       static_cast<float>(std::clamp(alpha, 0.0, 1.0)),
+            first_person_ ? .1f : scene_settings_.near_distance};
 }
 std::size_t ServerRenderer::live_rids() const {
     return meshes_.size() + instances_.size() + textures_.size() + materials_.size() +
            material_shaders_.size() + 4 + (environment_.is_valid() ? 1 : 0) +
            (light_.is_valid() ? 1 : 0) + (light_instance_.is_valid() ? 1 : 0) +
            (sky_.is_valid() ? 1 : 0) + (sky_material_.is_valid() ? 1 : 0) +
-           (sky_shader_.is_valid() ? 1 : 0) + particle_systems_.size() * 7 +
+           (sky_shader_.is_valid() ? 1 : 0) + particle_systems_.size() * 5 +
+           particle_process_shaders_.size() + particle_draw_shaders_.size() +
            (hud_canvas_.is_valid() ? 2 : 0);
 }
 TextureHandle ServerRenderer::upload_texture(std::uint32_t width, std::uint32_t height,
@@ -432,6 +529,7 @@ TextureHandle ServerRenderer::upload_texture(std::uint32_t width, std::uint32_t 
     std::memcpy(pixels.ptrw(), rgba.data(), rgba.size());
     const auto image =
         godot::Image::create_from_data(width, height, false, godot::Image::FORMAT_RGBA8, pixels);
+    trace_resource(FrameResource::texture);
     const auto rid = server_->texture_2d_create(image);
     const auto id = next_handle_++;
     textures_.emplace(id, rid);
@@ -451,6 +549,7 @@ MaterialHandle ServerRenderer::create_material(TextureHandle texture,
     const auto found = textures_.find(texture.value);
     if (found == textures_.end())
         return {};
+    trace_resource(FrameResource::material);
     const auto rid = server_->material_create();
     const auto shader = server_->shader_create();
     std::string code;
@@ -641,6 +740,7 @@ MeshHandle ServerRenderer::upload_surface(std::span<const Vec3> positions,
     if (!vertex_colors.is_empty())
         arrays[godot::RenderingServer::ARRAY_COLOR] = vertex_colors;
     arrays[godot::RenderingServer::ARRAY_INDEX] = triangles;
+    trace_resource(FrameResource::mesh);
     const auto rid = server_->mesh_create();
     server_->mesh_add_surface_from_arrays(rid, godot::RenderingServer::PRIMITIVE_TRIANGLES, arrays);
     server_->mesh_surface_set_material(rid, 0, found->second);
@@ -660,6 +760,17 @@ MeshHandle ServerRenderer::upload_surface(std::span<const Vec3> positions,
     meshes_.emplace(id, rid);
     return {id};
 }
+void ServerRenderer::clear_sky() {
+    if (environment_.is_valid()) {
+        server_->environment_set_sky(environment_, {});
+        server_->environment_set_background(environment_, godot::RenderingServer::ENV_BG_COLOR);
+    }
+    for (auto* rid : {&sky_, &sky_material_, &sky_shader_}) {
+        if (rid->is_valid())
+            server_->free_rid(*rid);
+        *rid = {};
+    }
+}
 Result ServerRenderer::configure_sky(std::span<const Vec3> positions,
                                      std::span<const std::array<float, 2>> uv,
                                      std::span<const std::uint32_t> indices,
@@ -668,8 +779,7 @@ Result ServerRenderer::configure_sky(std::span<const Vec3> positions,
     if (!environment_.is_valid() || texture == material_textures_.end() ||
         positions.size() != uv.size() || indices.empty() || indices.size() % 3)
         return Result::invalid_argument;
-    if (sky_.is_valid() || sky_material_.is_valid() || sky_shader_.is_valid())
-        return Result::invalid_argument;
+    clear_sky();
     std::ostringstream code;
     code << std::setprecision(std::numeric_limits<float>::max_digits10);
     code << "shader_type sky; uniform sampler2D "
@@ -727,6 +837,21 @@ Result ServerRenderer::configure_sky(std::span<const Vec3> positions,
     server_->environment_set_background(environment_, godot::RenderingServer::ENV_BG_SKY);
     return Result::ok;
 }
+void ServerRenderer::prewarm_particles(std::uint32_t capacity, MaterialHandle material, bool tire,
+                                       bool lower_atlas) {
+    if (!capacity)
+        return;
+    const auto key = std::tuple{capacity, material.value, tire, lower_atlas};
+    if (particle_warmups_.contains(key))
+        return;
+    const auto handle = create_particles(capacity, material, tire, lower_atlas);
+    if (!handle.value)
+        throw std::runtime_error("Particle preparation failed");
+    auto& system = particle_systems_.at(handle.value);
+    server_->instance_set_visible(system.instance, false);
+    server_->particles_set_emitting(system.particles, false);
+    particle_warmups_.emplace(key, handle);
+}
 ParticleSystemHandle ServerRenderer::create_particles(std::uint32_t capacity,
                                                       MaterialHandle material, bool tire,
                                                       bool lower_atlas) {
@@ -734,13 +859,21 @@ ParticleSystemHandle ServerRenderer::create_particles(std::uint32_t capacity,
     if (!capacity || capacity > 1024 || texture == material_textures_.end())
         return {};
     ParticleResources system;
+    trace_resource(FrameResource::particles,
+                   "particles:" + std::to_string(capacity) + (tire ? ":mix" : ":add"));
     system.capacity = capacity;
     system.particles = server_->particles_create();
     system.instance = server_->instance_create2(system.particles, scenario_);
     system.mesh = server_->mesh_create();
-    system.process_shader = server_->shader_create();
+    auto [process_entry, new_process] = particle_process_shaders_.try_emplace(capacity);
+    if (new_process)
+        process_entry->second = server_->shader_create();
+    system.process_shader = process_entry->second;
     system.process_material = server_->material_create();
-    system.draw_shader = server_->shader_create();
+    auto [draw_entry, new_draw] = particle_draw_shaders_.try_emplace(std::pair{capacity, tire});
+    if (new_draw)
+        draw_entry->second = server_->shader_create();
+    system.draw_shader = draw_entry->second;
     system.draw_material = server_->material_create();
     const auto count = std::to_string(capacity);
     const std::string process =
@@ -749,7 +882,8 @@ ParticleSystemHandle ServerRenderer::create_particles(std::uint32_t capacity,
         "]; void start(){VELOCITY=vec3(0.0);} void process(){int "
         "i=int(INDEX);TRANSFORM=mat4(1.0);TRANSFORM[3]=vec4(slot_position[i].xyz,1.0);COLOR=slot_"
         "color[i];CUSTOM=slot_data[i];ACTIVE=true;}";
-    server_->shader_set_code(system.process_shader, godot::String(process.c_str()));
+    if (new_process)
+        server_->shader_set_code(system.process_shader, godot::String(process.c_str()));
     server_->material_set_shader(system.process_material, system.process_shader);
     auto draw = shaders::shader_variant(shaders::original_particle,
                                         std::string("#define RW_CUSTOM_GEOMETRY\n") +
@@ -757,7 +891,8 @@ ParticleSystemHandle ServerRenderer::create_particles(std::uint32_t capacity,
     const auto vertex_entry = draw.find("void vertex()");
     draw.insert(vertex_entry, "uniform vec4 slot_triangle_ab[" + count +
                                   "]; uniform vec4 slot_triangle_c[" + count + "];\n");
-    server_->shader_set_code(system.draw_shader, godot::String(draw.c_str()));
+    if (new_draw)
+        server_->shader_set_code(system.draw_shader, godot::String(draw.c_str()));
     server_->material_set_shader(system.draw_material, system.draw_shader);
     server_->material_set_param(system.draw_material, "original_texture", texture->second);
     if (tire || lower_atlas)
@@ -848,8 +983,7 @@ void ServerRenderer::destroy_particles(ParticleSystemHandle handle) {
     if (found == particle_systems_.end())
         return;
     const auto& p = found->second;
-    for (auto rid : {p.instance, p.particles, p.mesh, p.process_material, p.process_shader,
-                     p.draw_material, p.draw_shader})
+    for (auto rid : {p.instance, p.particles, p.mesh, p.process_material, p.draw_material})
         server_->free_rid(rid);
     particle_systems_.erase(found);
 }

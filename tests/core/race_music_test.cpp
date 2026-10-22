@@ -107,8 +107,17 @@ int main(int argc, char** argv) {
     mono = fixture(1);
     mono.pop_back();
     assert(decode_ms_adpcm_wave(mono, pcm) == Result::invalid_argument);
+    auto partial = fixture(1);
+    partial[32] = std::byte{16}; // A short final block of a 16-byte-alignment stream.
+    partial[38] = std::byte{20};
+    partial[54] = std::byte{5}; // Shipped theme metadata has one unavailable tail sample.
+    assert(decode_ms_adpcm_wave(partial, pcm) == Result::ok && pcm.frame_count() == 4);
+    partial[54] = std::byte{6};
+    assert(decode_ms_adpcm_wave(partial, pcm) == Result::invalid_argument);
     RaceMusic music;
     EngineAudioCommand command;
+    assert(music.gain(0).action == EngineVoiceAction::update);
+    assert(music.gain(1).action == EngineVoiceAction::update);
     assert(music.start(command) == Result::unavailable);
     if (argc < 2)
         return 0;
@@ -133,6 +142,25 @@ int main(int argc, char** argv) {
         file.write(reinterpret_cast<const char*>(music.sample().data.data()),
                    music.sample().data.size());
         assert(file.good());
+    }
+    RaceMusic menu;
+    assert(menu.load_menu(store, error) == Result::ok);
+    assert(menu.sample().frame_count() > 0);
+    assert(menu.start(command) == Result::ok && command.loop);
+    assert(command.qmdx_volume == 26213);
+    assert(menu.start(command) == Result::ok && command.action == EngineVoiceAction::none);
+    assert(menu.stop().action == EngineVoiceAction::stop);
+    Configuration characters;
+    assert(characters.load(store, "Screens/SelectCharacter/Data.ini") == Result::ok);
+    float count{};
+    assert(characters.number("INFO", "NUMSELECTIONS", count) == Result::ok);
+    for (int index = 0; index < static_cast<int>(count); ++index) {
+        const auto name = characters.value("SELECTION" + std::to_string(index), "VALUE");
+        RaceMusic theme;
+        assert(theme.load_character(store, name, error) == Result::ok &&
+               theme.sample().frame_count() > 0);
+        assert(theme.start(command) == Result::ok && command.loop);
+        assert(theme.gain(0).linear_gain == 0 && theme.gain(1).qmdx_volume == 26213);
     }
     std::cout
         << "ROADWARS_MUSIC_CORE_OK: original fallback decoded, 1857152 frames, loop/volume/stop\n";

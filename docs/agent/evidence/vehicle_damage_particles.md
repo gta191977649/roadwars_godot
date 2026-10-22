@@ -39,3 +39,21 @@ count, initial/moving color and velocity, material transition, native list remov
 stop/start and explicit unavailable atlas state. Warning-enabled standalone C++20
 build and test passed. This does not establish original runtime parity for the
 indeterminate presentation state or caller camera transform.
+
+## User-requested visual correction (2026-10-22)
+
+Live presentation now initializes the animation timer of each emitted slot to zero.
+This deliberately replaces the native slot-zero-only write described above: hiding
+39 of 40 slots made wreck fire almost invisible, with a visible emission only once
+per pool wrap. The change is a modern bug fix, not evidence of original parity.
+Lifetime, emission cadence, motion, shared RNG consumption and list traversal remain
+unchanged. Regression checks every live slot's atlas frame through 1200 fixed ticks.
+Missile flare visibility also requires a launched missile, preventing the previous
+launch's retained flare flag from lighting the next attached missile during reload.
+Progress classifications remain unchanged.
+
+Validation: portable core and Godot extension builds passed; core CTest 66/66,
+installed-asset VehicleCombat acceptance (including repeated missile requests),
+and native Vulkan particle smoke passed. The latter covers spark/tire rendering
+and restart/resource cleanup; it does not constitute a wreck-fire visual capture.
+Progress update/check, architecture boundaries and diff whitespace checks passed.

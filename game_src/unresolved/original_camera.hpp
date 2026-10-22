@@ -10,7 +10,16 @@ struct CameraFrame {
 struct OriginalCameraSettings {
     Vec3 body_local_position{};
     float hood_height_offset{};
+    Vec3 in_car_local_position{}, hood_local_position{}, hood_point_local_position{};
+    Vec3 body_local_angles{};
 };
+// Four-view cycling is a modern presentation extension; values are stable diagnostic IDs.
+enum class CameraView { near_chase, far_chase, hood, cockpit };
+CameraView next_camera_view(CameraView view);
+Result camera_view_frame(CameraView view, const VehicleState& vehicle,
+                         const VehicleParameters& parameters, const OriginalCameraSettings& settings,
+                         const TrackCollision* track, const CameraFrame& near_frame,
+                         CameraFrame& output);
 struct OriginalCameraView {
     bool look_back{}, follow_vehicle_heading{}, nitrous_active{}, badlands{};
 };

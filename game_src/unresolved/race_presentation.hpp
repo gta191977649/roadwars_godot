@@ -29,6 +29,7 @@ class RacePresentation {
                 std::string& error, const TireSelection& tires = {});
     void update_vehicle(Vec3 position, float heading_degrees);
     void update_vehicle(const Transform& pose);
+    void set_camera_vehicle_hidden(int target, std::size_t player_index);
     void snap_racer(std::size_t index, std::size_t player_index);
     void update_wheels(const VehicleDynamics&, float delta, float brake, bool reset);
     void update_lights(const VehicleState&);
@@ -38,6 +39,7 @@ class RacePresentation {
                              std::size_t& id, std::string& error);
     Result update_combat_visual(std::size_t id, const Transform&, bool visible);
     Result update_combat(ResourceStore&, const RaceSession&, std::string& error);
+    Result prepare_combat(ResourceStore&, const RaceSession&, std::string& error);
     const std::string& combat_render_status() const { return combat_render_status_; }
     void apply_camera(const CameraFrame& frame);
     Result configure_frontend(ResourceStore&, std::string_view track, std::string_view character,

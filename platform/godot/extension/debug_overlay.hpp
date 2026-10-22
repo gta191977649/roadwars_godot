@@ -28,6 +28,7 @@ class DebugOverlayAdapter {
   public:
     explicit DebugOverlayAdapter(godot::Viewport* viewport);
     ~DebugOverlayAdapter();
+    void begin_frame(std::uint64_t now_usec);
     void frame(double delta, bool interactive);
     bool input(const godot::Ref<godot::InputEvent>& event, bool interactive);
     void focus(bool focused);
@@ -38,6 +39,7 @@ class DebugOverlayAdapter {
     int live_rids() const;
 
   private:
+    std::uint64_t timing_frame_{~std::uint64_t{}}, timing_usec_{}, display_poll_usec_{};
     void render(ImDrawData* data);
     godot::Viewport* viewport_;
     std::shared_ptr<extensions::DebugMessages> messages_;

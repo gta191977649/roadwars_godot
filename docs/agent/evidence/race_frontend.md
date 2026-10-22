@@ -86,3 +86,12 @@ fabricating progression. No source-only scaffolds are counted as implementations
   code. Shader variants are now expanded before submission; billboard helpers
   receive the inverse view matrix as an explicit vertex-stage argument. These are
   host shader compatibility repairs, not new RE progress.
+
+
+## Cockpit follow-up (2026-10-22)
+
+The cockpit/portrait limitation above describes the earlier HUD subset. The live
+four-view extension now includes original cockpit tiles, steering and RPM/MPH
+needles, cockpit map and English weapon/ammunition readouts. See cockpit.md and
+camera_views.md for address-bound coverage and modern widescreen policy. Global
+original mode dispatch, intro/replay and arbitrary localization remain partial.

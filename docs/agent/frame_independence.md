@@ -77,3 +77,57 @@ checks RID teardown, and separately tests a real350ms Godot main-thread stall an
 Engine.time_scale0. Standalone clock tests cover zero-tick input edges, held reset,
 ten-second retained catch-up debt, invalid time and callback failure. These are
 modernization regressions, not original-executable behavioral equivalence.
+
+## Presentation continuity regression (2026-10-22)
+
+The renderer now stages live dynamic instance/camera updates without submitting
+raw simulation transforms. Only presentation submits the shared interpolated
+interval, including camera FOV. Preview, frontend and diagnostic modes retain
+immediate submission. Settled instances still submit their final pose: skipping
+identical previous/current snapshots could leave the last displayed intermediate
+pose behind when an owner stopped updating. These are adapter corrections, not
+new claims about the original executable or its solver.
+
+`get_presentation_state` exposes previous/current snapshots and the exact most
+recently submitted transforms for native tests. The added pre-presentation
+assertion failed on the old path with `Simulation submitted a raw instance
+transform before presentation`. This proves mixed submission paths existed; it
+alone does not prove the user's perceived high-speed jitter had a single cause.
+
+Native regression also covers 59/119/165 FPS, variable render intervals and stalls,
+120-units/second uniform motion with a matching camera, reflected wheel bases,
+settling, selective teleport snaps, camera-only cuts and interpolated FOV. Repeated
+presentation must leave simulation snapshots and vehicle/effect state unchanged.
+The timing smoke lets queued audio Nodes finish deletion before exiting.
+
+Vehicle reset/AI recovery increments a presentation-only pose generation. The host
+snaps that racer's body, wheels and combat attachments after updating them; other
+racers keep their interpolation intervals. A cut of the inspected camera resets
+only camera history. This metadata never enters force/contact calculations.
+The existing explicit race restart snaps all histories. Godot pause retains the
+same clock fraction and frozen presentation.
+
+Competition smoke checks the shared presentation contract during the race and
+while paused, switches the real Inspect dropdown at speed between AI and player,
+checks that camera cuts preserve world histories, and exercises mixed
+120/144/59/240 FPS schedules for both targets. Renderer transform assertions prove
+submission continuity, not physical accuracy of the partially recovered contact
+solver or subjective smoothness on every display.
+
+The first Vulkan moving-pause pixel comparison intermittently failed despite
+exactly frozen ticks and submitted transforms. A targeted reproduction retained
+before/after images: 4 to 7 of 320,000 pixels differed, by at most two 8-bit
+color codes. The pixel helper therefore permits at most 16 changed RGB8/RGBA8 pixels,
+with per-channel difference at most 2; geometry/snapshot/tick assertions remain
+exact. Larger image changes still fail and retain diagnostic captures. This is
+a GPU output tolerance, not permission for camera/vehicle movement during pause.
+
+Validation completed on the configured Windows/Godot 4.7.2 Vulkan Forward+ host:
+portable core and extension builds; 66/66 core CTest cases; the two native adapter
+CTest cases; eleven-rate 1200-tick portable bitwise regression; native timing
+smoke with irregular intervals and 350/900ms stalls; ten-restart RID lifecycle;
+headless competition; and the Vulkan competition path. A targeted Vulkan pause
+probe additionally passed five moving-race pauses with eight pixel/state
+comparisons each. Progress and boundary checks passed. Captures, logs and the
+one-off pause probe remain ignored build artifacts. These checks do not establish
+subjective smoothness on every monitor or original-executable equivalence.

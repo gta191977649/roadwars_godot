@@ -348,8 +348,10 @@ void FrontendScene::upload(const MeshObject& object, const std::string& base, Ve
         local.origin = position;
         draws_.push_back({instance, local, vehicle, turntable, sky});
         renderer_.set_instance_static(instance, vehicle < 0 && turntable < 0 && sky < 0);
-        if (vehicle >= 0 && object.name == "295ULTailL")
+        if (vehicle >= 0 && object.name == "295ULTailL") {
+            draws_.back().visible = false;
             renderer_.set_instance_visible(instance, false);
+        }
     }
     for (const auto& child : object.children)
         upload(child, base, position, vehicle, turntable, sky);
@@ -483,6 +485,7 @@ Result FrontendScene::load(std::string_view id, std::string_view character, int 
             std::sin(light_heading * kLightRadians) * std::cos(light_pitch * kLightRadians),
             -std::sin(light_pitch * kLightRadians),
             std::cos(light_heading * kLightRadians) * std::cos(light_pitch * kLightRadians)};
+        scene_settings_ = settings;
         renderer_.configure_scene(settings);
         sky_angles_.assign(2, 0);
         upload(room, victory_ || store_ ? base : "Characters/" + std::string(character) + "/Garage",
@@ -685,6 +688,15 @@ void FrontendScene::step(float dt) {
         vehicle_angles_[0] += rotation_speed_ * dt;
     if (store_)
         product_angles_ = add(product_angles_, scale(product_speeds_, dt));
+}
+void FrontendScene::set_visible(bool visible) {
+    for (const auto& draw : draws_)
+        renderer_.set_instance_visible(draw.instance, visible && draw.visible);
+    if (visible && loaded_) {
+        renderer_.configure_scene(scene_settings_);
+        update_draws();
+        update_camera();
+    }
 }
 Result FrontendScene::advance(double elapsed_seconds) {
     if (!loaded_)

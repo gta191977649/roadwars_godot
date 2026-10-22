@@ -77,9 +77,16 @@ Result decode_ms_adpcm_wave(std::span<const std::byte> bytes, WavePcm& output) {
         const auto available =
             blocks * samples_per_block +
             (remainder ? (remainder - 7 * result.channels) * 2 / result.channels + 2 : 0);
+        // Several shipped mono themes overstate the partial tail by one sample.
+        // Decode only the samples represented by bytes; never synthesize a missing nibble.
+        if (frames > available) {
+            if (result.channels == 1 && remainder >= 7 && frames == available + 1)
+                frames = static_cast<std::uint32_t>(available);
+            else
+                return Result::invalid_argument;
+        }
         // Bound decoded allocation to 64 MiB; sufficient for the original fallback song.
-        if (frames > available ||
-            static_cast<std::uint64_t>(frames) * result.channels * 2 > 64 * 1024 * 1024)
+        if (static_cast<std::uint64_t>(frames) * result.channels * 2 > 64 * 1024 * 1024)
             return Result::invalid_argument;
         result.bits_per_sample = 16;
         result.data.reserve(static_cast<std::size_t>(frames) * result.channels * 2);
@@ -150,25 +157,50 @@ Result decode_ms_adpcm_wave(std::span<const std::byte> bytes, WavePcm& output) {
 }
 // RE: 93b4e4c301a5694b55e16977c2e52f4971bd9089659e3d58617c8af2368436c8:function:00462cbc
 Result RaceMusic::load(ResourceStore& resources, std::string& error) {
+    return load_track(resources, "Sfx/RaceMusic.wav", "INGAMEMUSIC", error);
+}
+// RE-STUB: 93b4e4c301a5694b55e16977c2e52f4971bd9089659e3d58617c8af2368436c8:function:00462bed
+Result RaceMusic::load_menu(ResourceStore& resources, std::string& error) {
+    return load_track(resources, "Sfx/SoundBackgroundMusic.wav", "MUSIC", error);
+}
+// RE-STUB: 93b4e4c301a5694b55e16977c2e52f4971bd9089659e3d58617c8af2368436c8:function:0046305d
+Result RaceMusic::load_character(ResourceStore& resources, std::string_view character,
+                                 std::string& error) {
+    if (character.empty() || character.find_first_of("/\\:\r\n") != std::string_view::npos ||
+        character.find("..") != std::string_view::npos)
+        return Result::invalid_argument;
+    return load_track(resources, "Characters/" + std::string(character) + "/ThemeMusic.wav",
+                      "MUSIC", error);
+}
+EngineAudioCommand RaceMusic::gain(float scale) const {
+    EngineAudioCommand command;
+    command.action = EngineVoiceAction::update;
+    command.set_volume = true;
+    command.qmdx_volume = static_cast<std::int32_t>(std::clamp(scale, 0.f, 1.f) * volume_ * 32767);
+    command.linear_gain = static_cast<float>(command.qmdx_volume) / 32767;
+    return command;
+}
+Result RaceMusic::load_track(ResourceStore& resources, std::string_view path,
+                             std::string_view volume_key, std::string& error) {
     playing_ = false;
     sample_ = {};
     Configuration config;
     if (config.load(resources, "Ini/RoadWars.ini") != Result::ok ||
-        config.number("ROADWARS", "INGAMEMUSIC", volume_) != Result::ok ||
-        !std::isfinite(volume_) || volume_ < 0 || volume_ > 1) {
-        error = "Missing or invalid original INGAMEMUSIC volume";
+        config.number("ROADWARS", volume_key, volume_) != Result::ok || !std::isfinite(volume_) ||
+        volume_ < 0 || volume_ > 1) {
+        error = "Missing or invalid original music volume: " + std::string(volume_key);
         return Result::invalid_argument;
     }
     // No host CD transport is available, so take the original failed-CD fallback.
     std::vector<std::byte> bytes;
-    auto status = resources.read("Sfx/RaceMusic.wav", bytes);
+    auto status = resources.read(path, bytes);
     if (status == Result::ok) {
         status = decode_wave_pcm(bytes, sample_);
         if (status == Result::unavailable)
             status = decode_ms_adpcm_wave(bytes, sample_);
     }
     if (status != Result::ok)
-        error = "Original Sfx/RaceMusic.wav unavailable or invalid";
+        error = "Original music unavailable or invalid: " + std::string(path);
     return status;
 }
 // RE: 93b4e4c301a5694b55e16977c2e52f4971bd9089659e3d58617c8af2368436c8:function:00480b40

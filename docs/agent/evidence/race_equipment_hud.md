@@ -54,3 +54,12 @@ main HUD, uses the actual English key WEAPONS LOCKED, and remains visible when
 ordinary HUD elements are hidden. Its countdown/time predicate is separate from
 the equipment icon brightness predicate. Native space advances omit the extra
 two-pixel nonspace spacing; the portable text helper and centering now agree.
+
+## Successful-use notifications
+
+The separate transient bottom-center name/count queue is recovered in
+[ammunition_notices.md](ammunition_notices.md), with retained executable hash,
+producer/draw addresses and raw decompilation. It observes post-consumption
+counts independently of the selected equipment icon. DEV BUILD retains a small
+bottom-center row below the original notification lanes; clearance is asserted
+with the installed font and inspected in native captures.

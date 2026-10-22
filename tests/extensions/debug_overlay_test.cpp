@@ -11,6 +11,23 @@ void require(bool value) {
         throw std::runtime_error("Debug overlay contract failed");
 }
 int main() {
+    FrameTiming timing;
+    timing.record(0);
+    timing.record(-1);
+    timing.record(NAN);
+    require(timing.count() == 0);
+    for (int i = 0; i < 599; ++i)
+        timing.record(1000.0f / 120);
+    timing.record(50);
+    auto summary = timing.summary(1000.0f / 120);
+    require(summary.count == 600 && summary.late == 1 && summary.maximum == 50);
+    require(std::abs(summary.p95 - 1000.0f / 120) < .001f);
+    require(summary.p99 == summary.p95);
+    for (int i = 0; i < 600; ++i)
+        timing.record(10);
+    summary = timing.summary(0);
+    require(timing.count() == 600 && timing.offset() == 0 && summary.mean == 10 &&
+            summary.maximum == 10 && summary.late == 0);
     using roadwars::Vec3;
     require(race_debug_distance_alpha({0, 0, 0}, {}, 200) == 1);
     require(race_debug_distance_alpha({160, 0, 0}, {}, 200) == 1);

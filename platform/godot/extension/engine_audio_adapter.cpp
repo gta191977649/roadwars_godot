@@ -1,3 +1,4 @@
+#include "platform/godot/extension/frame_trace.hpp"
 #include "platform/godot/extension/engine_audio_adapter.hpp"
 #include <cstring>
 #include <godot_cpp/core/memory.hpp>
@@ -12,6 +13,8 @@ EngineAudioAdapter::EngineAudioAdapter(godot::Node& owner, const WavePcm& sample
         (sample.bits_per_sample != 8 && sample.bits_per_sample != 16) ||
         (sample.channels != 1 && sample.channels != 2))
         throw std::runtime_error("Original PCM voice is incomplete");
+    FrameStageTimer timer(FrameStage::audio);
+    trace_resource(FrameResource::audio_voice, voice_name);
     stream_.instantiate();
     stream_->set_format(sample.bits_per_sample == 16 ? godot::AudioStreamWAV::FORMAT_16_BITS
                                                      : godot::AudioStreamWAV::FORMAT_8_BITS);

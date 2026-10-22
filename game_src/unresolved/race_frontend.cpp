@@ -1,4 +1,5 @@
 #include "game_src/unresolved/race_frontend.hpp"
+#include "game_src/unresolved/cockpit_frontend.hpp"
 #include <algorithm>
 #include <cmath>
 #include <numbers>
@@ -85,8 +86,11 @@ std::array<int, 2> FrontendMapSettings::project(Vec3 position, int x, int y) con
     return {static_cast<int>(static_cast<float>(x + start_x) + px + 0.5f),
             static_cast<int>(static_cast<float>(y + start_y) + py + 0.5f)};
 }
+RaceFrontend::RaceFrontend(Renderer& renderer)
+    : renderer_(renderer), cockpit_(std::make_unique<CockpitFrontend>(renderer)) {}
 RaceFrontend::~RaceFrontend() { stop(); }
 void RaceFrontend::stop() {
+    cockpit_->stop();
     equipment_loaded_ = false;
     if (loaded_ || !textures_.empty())
         renderer_.draw_hud({});
@@ -202,6 +206,10 @@ Result RaceFrontend::load(ResourceStore& resources, std::string_view track, Vec3
         dots_.push_back(dot);
         portraits_.push_back(portrait);
     }
+    if (cockpit_->load(resources, track, characters, error) != Result::ok) {
+        stop();
+        return Result::unavailable;
+    }
     visible_ = loaded_ = true;
     return Result::ok;
 }
@@ -278,6 +286,18 @@ Result RaceFrontend::update(const FrontendFrame& frame) {
             std::abs((racer.position.z - map_.start.z) * map_.scale) > 100000000)
             return Result::invalid_argument;
     const auto& player = frame.racers[frame.player_index];
+    if (frame.cockpit && visible_) {
+        const auto result = cockpit_->draw(frame.cockpit_character, frame.steering_fraction,
+                                           frame.rpm, frame.speed, frame.gear_index, frame.reverse,
+                                           frame.viewport_aspect, commands_,
+                                           !frame.equipment || frame.equipment->selected_item == 0);
+        if (result != Result::ok)
+            return result;
+        const auto equipment = frame.equipment.value_or(FrontendEquipmentFrame{});
+        if (cockpit_->draw_readouts(frame.cockpit_character, frame.cockpit_weapon_names,
+                                    equipment.ammunition, equipment.present, commands_) != Result::ok)
+            return Result::unavailable;
+    }
     if (frame.weapon_lock_warning && !player.eliminated) {
         // 004823af..00482446: original English localization key006196e4.
         // The native anchor is300 (0x12c), rather than the other HUD labels'320.
@@ -321,7 +341,7 @@ Result RaceFrontend::update(const FrontendFrame& frame) {
         if (remaining >= 3)
             return renderer_.draw_hud(commands_);
     }
-    if (!terminal && speedometer_) {
+    if (!terminal && speedometer_ && !frame.cockpit) {
         sprite(meter_, {512, 352, meter_.width, meter_.height});
         text(583, 425, std::to_string(static_cast<int>(frame.speed * 2.236997365951538f)));
         sprite(needle_, {546, 398, needle_.width, needle_.height}, 1, 1,
@@ -336,9 +356,18 @@ Result RaceFrontend::update(const FrontendFrame& frame) {
         int width = -2;
         for (unsigned char character : label)
             width += (character == ' ' ? font_.space_width() : font_.glyph(character).width + 2);
-        text((640 - width) / 2, 480 - font_.height() - 5, label);
+        // Preserve the requested bottom-center watermark, reserving a separate
+        // small row below the original y440 notification and its full glyph height.
+        constexpr float scale = .4f;
+        const auto first = commands_.size();
+        text(0, 0, label);
+        const float left = 320 - width * scale / 2;
+        const float top = 480 - font_.height() * scale - 3;
+        for (auto i = first; i < commands_.size(); ++i)
+            for (auto& point : commands_[i].positions)
+                point = {left + point[0] * scale, top + point[1] * scale};
     }
-    if (!terminal && lap_update_ && frame.race_info) {
+    if (!terminal && lap_update_ && frame.race_info && !frame.cockpit) {
         const auto& race = *frame.race_info;
         text(5, 5,
              "LAP " + std::to_string(std::min(race.completed_laps + 1, race.total_laps)) + "/" +
@@ -352,26 +381,30 @@ Result RaceFrontend::update(const FrontendFrame& frame) {
             width += (character == ' ' ? font_.space_width() : font_.glyph(character).width + 2);
         text((640 - width) / 2, 100, frame.status_text);
     }
-    if (!terminal && frame.equipment) {
+    if (!terminal && frame.equipment && !frame.cockpit) {
         const auto result = draw_equipment(*frame.equipment);
         if (result != Result::ok)
             return result;
     }
     if ((terminal || track_map_) &&
         (terminal || !frame.equipment || frame.equipment->selected_item == 0)) {
-        sprite(map_texture_, {0, 352, 128, 128}, 0.7f);
+        if (!frame.cockpit)
+            sprite(map_texture_, {0, 352, 128, 128}, 0.7f);
+        const auto map_origin = frame.cockpit ? cockpit_->map_offset(frame.cockpit_character)
+                                              : std::array<int, 2>{0, 352};
         for (std::size_t i = 0; i < frame.racers.size(); ++i) {
             const auto& racer = frame.racers[i];
             if (racer.hidden_on_map && i != frame.player_index)
                 continue;
             const auto& dot = dots_[racer.character_index];
-            const auto position = map_.project(racer.position);
+            const auto position = map_.project(racer.position, map_origin[0], map_origin[1]);
             HudRect rect{position[0] - dot.width / 2, position[1] - dot.height / 2, dot.width,
                          dot.height};
             sprite(dot, rect, 1, i == frame.player_index ? 1 : 100.0f / 255);
             if (i == frame.player_index)
                 sprite(border_, rect);
         }
+        if (!frame.cockpit)
         for (std::size_t slot = 0; slot < frame.racers.size(); ++slot) {
             if (!frame.ranking.empty() && frame.ranking.size() != frame.racers.size())
                 return Result::invalid_argument;
@@ -400,6 +433,14 @@ Result RaceFrontend::update(const FrontendFrame& frame) {
                 commands_[i].colors[vertex] = {229.f / 255, vertex < 2 ? 0.f : 229.f / 255, 0,
                                                229.f / 255};
     }
+    if (!terminal) {
+        const auto result = draw_ammunition_notices(frame.ammunition_notices);
+        if (result != Result::ok)
+            return result;
+    }
+    if (frame.cockpit)
+        for (auto& command : commands_)
+            command.preserve_aspect = true;
     return renderer_.draw_hud(commands_);
 }
 } // namespace roadwars

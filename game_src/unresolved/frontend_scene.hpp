@@ -21,6 +21,7 @@ class FrontendScene {
     Result select_store_product(std::string_view item, std::string_view quality,
                                 std::string& error);
     void stop();
+    void set_visible(bool visible);
     bool loaded() const { return loaded_; }
     Vec3 camera_position() const { return eye_; }
     std::size_t camera_index() const { return camera_index_; }
@@ -32,6 +33,7 @@ class FrontendScene {
         Transform local;
         int vehicle{-1}, turntable{-1}, sky{-1};
         bool product{};
+        bool visible{true};
     };
     struct CameraPose {
         Vec3 eye, target;
@@ -48,6 +50,7 @@ class FrontendScene {
     void step(float dt);
     ResourceStore& resources_;
     Renderer& renderer_;
+    SceneSettings scene_settings_;
     bool loaded_{}, victory_{}, store_{}, victory_finished_{};
     double elapsed_{}, debt_{};
     Vec3 eye_{}, velocity_{}, target_{}, stand_{};

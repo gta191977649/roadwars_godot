@@ -1,9 +1,11 @@
+#include "platform/godot/extension/frame_trace.hpp"
 #include "platform/godot/extension/game_files.hpp"
 #include <cstring>
 #include <godot_cpp/classes/file_access.hpp>
 
 namespace roadwars {
 Result GameFiles::read(std::string_view path, std::vector<std::byte>& output) {
+    trace_resource(FrameResource::file_read, path);
     output.clear();
     if (path.empty() || path.find("..") != std::string_view::npos ||
         path.find(':') != std::string_view::npos || path.front() == '/' || path.front() == '\\')

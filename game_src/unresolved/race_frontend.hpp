@@ -2,6 +2,7 @@
 #include "game_src/unresolved/bitmap.hpp"
 #include "game_src/unresolved/resource_store.hpp"
 #include <optional>
+#include <memory>
 
 namespace roadwars {
 struct HudRect {
@@ -36,7 +37,26 @@ struct FrontendEquipmentFrame {
     float internal_hp{}, maximum_internal_hp{};
     std::array<float, 4> armor_hp{}, maximum_armor_hp{};
 };
+struct AmmunitionNotice {
+    std::string text;
+    float remaining{};
+};
+// Four original fixed text lanes, with simulation-owned lifetimes.
+class AmmunitionNotices {
+  public:
+    bool push(std::string_view name, int remaining);
+    Result advance(float delta);
+    void clear() { entries_ = {}; }
+    std::span<const AmmunitionNotice> entries() const { return entries_; }
+  private:
+    std::array<AmmunitionNotice, 4> entries_;
+};
 struct FrontendFrame {
+    std::span<const AmmunitionNotice> ammunition_notices;
+    bool cockpit{};
+    std::array<std::string, 3> cockpit_weapon_names;
+    std::size_t cockpit_character{};
+    float steering_fraction{}, viewport_aspect{4.f / 3};
     bool developer_build{};
     std::span<const FrontendRacer> racers;
     std::span<const std::size_t> ranking;
@@ -59,9 +79,10 @@ struct FrontendMapSettings {
     int start_x{}, start_y{}, rotation_degrees{};
     std::array<int, 2> project(Vec3 position, int x = 0, int y = 352) const;
 };
+class CockpitFrontend;
 class RaceFrontend {
   public:
-    explicit RaceFrontend(Renderer& renderer) : renderer_(renderer) {}
+    explicit RaceFrontend(Renderer& renderer);
     ~RaceFrontend();
     RaceFrontend(const RaceFrontend&) = delete;
     RaceFrontend& operator=(const RaceFrontend&) = delete;
@@ -85,7 +106,9 @@ class RaceFrontend {
                 float degrees = 0, std::array<float, 2> pivot = {});
     void text(int x, int y, std::string_view, bool countdown = false);
     Result draw_equipment(const FrontendEquipmentFrame&);
+    Result draw_ammunition_notices(std::span<const AmmunitionNotice>);
     Renderer& renderer_;
+    std::unique_ptr<CockpitFrontend> cockpit_;
     bool loaded_{}, visible_{true}, speedometer_{}, track_map_{}, lap_update_{};
     FrontendMapSettings map_;
     HudBitmapFont font_, countdown_font_;

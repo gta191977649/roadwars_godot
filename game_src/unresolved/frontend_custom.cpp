@@ -61,12 +61,20 @@ Result action_icon(FrontendCanvas& canvas, std::string_view root, std::string_vi
                    int y, bool selected, double elapsed) {
     const int radius = selected ? 72 : 36;
     const HudRect rectangle{x - radius, y - radius, radius * 2, radius * 2};
-    auto result = canvas.sprite(
-        std::string(root) + "/" + std::string(label) + "/16SelectionIcon.bmp", rectangle);
+    FrontendSprite icon;
+    auto result = canvas.asset(
+        std::string(root) + "/" + std::string(label) + "/16SelectionIcon.bmp", icon);
     if (result != Result::ok)
         return result;
-    canvas.text(FrontendFont::body, static_cast<float>(x), static_cast<float>(y + radius * .15f),
-                label, true, selected ? .7f : .35f);
+    canvas.sprite(icon, rectangle);
+    // 004927c0/004a91f0 bake centered Arial15 at (70,18), scale .7, into the
+    // source surface before the selection animation scales that whole surface.
+    const float icon_scale = static_cast<float>(radius * 2) / icon.width;
+    const float label_scale = .7f * icon_scale;
+    canvas.text(FrontendFont::arial, rectangle.x + 70 * icon_scale,
+                rectangle.y + 18 * icon_scale -
+                    canvas.font_height(FrontendFont::arial) * label_scale / 2,
+                label, true, label_scale);
     return canvas.sprite("Standings/16AlphaIcon.bmp", rectangle, selected ? pulse(elapsed) : .7f);
 }
 Result draw_options(FrontendCanvas& canvas, const FrontendCustomState& state) {
@@ -862,7 +870,11 @@ Result FrontendCustom::draw(FrontendCanvas& canvas, const FrontendCustomState& s
                         0xff80ffff);
         result = Result::ok;
     } else if (state.screen == "loading") {
-        result = background(canvas);
+        result =
+            !state.preview_data && state.fields.contains("CHARACTER")
+                ? canvas.sprite("Characters/" + state.fields.at("CHARACTER") + "/16Portrait.bmp",
+                                {0, 0, 640, 480})
+                : background(canvas);
         canvas.text(FrontendFont::small, 41, 352, "LOADING");
         canvas.text(FrontendFont::small, 320,
                     static_cast<float>(449 - canvas.font_height(FrontendFont::small)),

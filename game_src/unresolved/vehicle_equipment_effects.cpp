@@ -92,16 +92,19 @@ Result load_vehicle_equipment_effects(
         error = "Character original TRACTION multiplier unavailable";
         return Result::unavailable;
     }
-    if (config.load(resources, "Cars/Shared/Armor/" + std::string(armor_type) + "/" +
-                                   std::string(armor_quality) + "/Data.ini") != Result::ok) {
-        error = "Selected armor HP configuration unavailable";
-        return Result::unavailable;
-    }
-    float armor_scale{};
-    if (config.number("HP", "HPSCALE", armor_scale) != Result::ok ||
-        rescale_vehicle_armor(next, armor_scale) != Result::ok) {
-        error = "Selected armor HP scale is invalid";
-        return Result::invalid_argument;
+    // 0040d4cb installs NONE/NONE armor for a fresh garage vehicle.
+    if (!armor_type.empty() && canonical(armor_type) != "NONE") {
+        if (config.load(resources, "Cars/Shared/Armor/" + std::string(armor_type) + "/" +
+                                       std::string(armor_quality) + "/Data.ini") != Result::ok) {
+            error = "Selected armor HP configuration unavailable";
+            return Result::unavailable;
+        }
+        float armor_scale{};
+        if (config.number("HP", "HPSCALE", armor_scale) != Result::ok ||
+            rescale_vehicle_armor(next, armor_scale) != Result::ok) {
+            error = "Selected armor HP scale is invalid";
+            return Result::invalid_argument;
+        }
     }
     for (const auto& [category, quality] : drivetrain) {
         std::int32_t bonus{};

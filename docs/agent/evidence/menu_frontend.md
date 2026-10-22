@@ -133,3 +133,43 @@ original legacy label compositing, all custom-screen dynamic fields, and complet
 3D garage/victory behavior must retain the precise limitations recorded in their
 respective evidence. A mapped source marker alone never promotes a containing
 original function to implemented or verified.
+
+## Single Race versus Quick Race routing audit (2026-10-22)
+
+Reference SHA256 is unchanged and was rechecked against the installed artifact.
+Read-only live Ghidra results are retained in single_quick_menu_flow_ghidra.json.
+These are static control-flow observations, not an original runtime recording.
+
+- 004ab60d sets race+0x24 to 1 for SINGLE RACE, 0 for QUICK RACE, then calls
+  004aac8f for both. SEASON RACE calls the separate 004b67bb handler.
+- 004aac8f calls 004b10d2 (Screens/SelectCharacter), then the generic
+  Screens/SelectTrack screen. Both modes select character and track first.
+- Assembly 004aae64..004aaedc tests race+0x24. Single Race calls 004927c0,
+  which loads Screens/StartRaceSummary/Data.ini. Quick Race bypasses that call,
+  supplies its start action and consumes a rand()%2 draw instead.
+- After accepting the start action, 004ab23f onward calls 004aa5f3 (LOADING),
+  then 004a4f79 creates the six vehicles, calls 004a55a9 and 00484189 with
+  Game Options/Single Race/RaceInit. Loading is after selection/summary.
+- 004a55a9 always randomizes opponent equipment/paint. Player randomization is
+  conditional on its caller flag or game+0xeec; 004a4f79 passes race+0x24==0.
+  Consequently Quick Race requests player randomization; Single Race can retain
+  the player vehicle configured through Summary/Garage. Uniform randomization
+  of every player configuration is not an unconditional original Single rule.
+
+Current reconstruction audit: MenuFrontend::activate merges Single/Quick into
+select_character -> select_track -> start_race_summary. This is consistent with
+Single's screen order, but incorrectly omits Quick's bypass. GameHost's frontend
+loop advances/draws the menu and does not consume a race launch request; Summary
+START remains an unavailable business action. It is not running the season race
+handler. CLI --race independently starts the existing live diagnostic RaceSession
+and randomizes all participants; it is not a completed menu Single Race business
+flow. This audit changes no menu routing or garage state and does not claim those
+missing transitions are implemented.
+
+## Live Single/Quick implementation follow-up
+
+The audit's missing menu launch is now connected; see menu_race_launch.md for
+actual flow, stock versus randomized player configuration, Loading, menu BGM,
+executed acceptance and remaining Garage economy/legacy ABI limits. The earlier
+blanket statement that all race launch business actions are unavailable no longer
+applies to Single/Quick Start Race.

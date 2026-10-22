@@ -25,6 +25,10 @@
 
 namespace roadwars {
 void GameHost::_bind_methods() {
+    godot::ClassDB::bind_method(godot::D_METHOD("get_frame_profile_trace"),
+                                &GameHost::get_frame_profile_trace);
+    godot::ClassDB::bind_method(godot::D_METHOD("get_frame_timing_state"),
+                                &GameHost::get_frame_timing_state);
     godot::ClassDB::bind_method(godot::D_METHOD("test_interpolation_history"),
                                 &GameHost::test_interpolation_history);
     godot::ClassDB::bind_method(godot::D_METHOD("get_presentation_state"),
@@ -120,6 +124,11 @@ void GameHost::_bind_methods() {
                                 &GameHost::orbit_test_input);
     godot::ClassDB::bind_method(godot::D_METHOD("get_camera_position"),
                                 &GameHost::get_camera_position);
+    godot::ClassDB::bind_method(
+        godot::D_METHOD("competition_weapon_test_step", "delta", "slot", "nitrous"),
+        &GameHost::competition_weapon_test_step);
+    godot::ClassDB::bind_method(godot::D_METHOD("cycle_camera_view"), &GameHost::cycle_camera_view);
+    godot::ClassDB::bind_method(godot::D_METHOD("set_camera_view_for_test", "view"), &GameHost::set_camera_view_for_test);
     godot::ClassDB::bind_method(godot::D_METHOD("get_camera_orbit_yaw"),
                                 &GameHost::get_camera_orbit_yaw);
     godot::ClassDB::bind_method(godot::D_METHOD("start_fog_fixture"), &GameHost::start_fog_fixture);
@@ -161,6 +170,9 @@ void GameHost::start_fog_fixture() {
         set_mouse_capture(false);
         frontend_video_voice_.reset();
         frontend_sfx_.reset();
+        frontend_music_voice_.reset();
+        frontend_music_.stop();
+        frontend_music_path_.clear();
         frontend_audio_screen_.clear();
         menu_.reset();
         engine_audio_adapter_.reset();
@@ -195,6 +207,9 @@ void GameHost::start_billboard_fixture() {
         set_mouse_capture(false);
         frontend_video_voice_.reset();
         frontend_sfx_.reset();
+        frontend_music_voice_.reset();
+        frontend_music_.stop();
+        frontend_music_path_.clear();
         frontend_audio_screen_.clear();
         menu_.reset();
         entry_.reset();
@@ -234,8 +249,15 @@ void GameHost::set_billboard_fixture_camera(double heading, double pitch) {
 
 void GameHost::_ready() {
     set_process_mode(godot::Node::PROCESS_MODE_ALWAYS);
+    // Modern launch seed; explicit --race-seed retains reproducible diagnostics.
+    diagnostic_race_seed_ = static_cast<std::uint32_t>(
+        static_cast<std::uint64_t>(godot::Time::get_singleton()->get_unix_time_from_system() *
+                                   1000000.0) ^
+        godot::Time::get_singleton()->get_ticks_usec());
     bool enable_debug_overlay = true;
     for (const auto argument : godot::OS::get_singleton()->get_cmdline_user_args()) {
+        if (argument == "--frame-trace")
+            frame_trace_.enable();
         if (argument == "--no-debug-overlay")
             enable_debug_overlay = false;
         if (argument == "--race") {
@@ -306,6 +328,8 @@ void GameHost::restart_smoke_scene() {
             if (track_name_.is_empty())
                 track_name_ = "Dark Forest";
         }
+        race_loading_task_.reset();
+        race_assets_prepared_ = false;
         race_completed_ = false;
         simulation_failed_ = false;
         race_results_pending_ = false;
@@ -314,6 +338,9 @@ void GameHost::restart_smoke_scene() {
         entry_.reset();
         frontend_video_voice_.reset();
         frontend_sfx_.reset();
+        frontend_music_voice_.reset();
+        frontend_music_.stop();
+        frontend_music_path_.clear();
         frontend_audio_screen_.clear();
         menu_.reset();
         engine_audio_adapter_.reset();
@@ -360,6 +387,9 @@ void GameHost::restart_smoke_scene() {
         entry_.reset();
         frontend_video_voice_.reset();
         frontend_sfx_.reset();
+        frontend_music_voice_.reset();
+        frontend_music_.stop();
+        frontend_music_path_.clear();
         frontend_audio_screen_.clear();
         menu_.reset();
         engine_audio_adapter_.reset();
@@ -387,6 +417,9 @@ void GameHost::restart_smoke_scene() {
         entry_.reset();
         frontend_video_voice_.reset();
         frontend_sfx_.reset();
+        frontend_music_voice_.reset();
+        frontend_music_.stop();
+        frontend_music_path_.clear();
         frontend_audio_screen_.clear();
         menu_.reset();
         engine_audio_adapter_.reset();
@@ -489,7 +522,8 @@ void GameHost::_input(const godot::Ref<godot::InputEvent>& event) {
         }
     }
     if (menu_ || pause_menu_) {
-        if (debug_overlay_ && ui_mouse_visible_ &&
+        const auto* frontend = pause_menu_ ? pause_menu_.get() : menu_.get();
+        if (frontend->assertion_message().empty() && debug_overlay_ && ui_mouse_visible_ &&
             !(pause_menu_ && key.is_valid() && key->get_keycode() == godot::KEY_ESCAPE)) {
             debug_overlay_->input(event, true);
             return;
@@ -555,6 +589,15 @@ void GameHost::_input(const godot::Ref<godot::InputEvent>& event) {
         get_viewport()->set_input_as_handled();
         return;
     }
+    if (key.is_valid() && key->is_pressed() && !key->is_echo()) {
+        const auto code = key->get_physical_keycode() == godot::KEY_NONE ? key->get_keycode()
+                                                                       : key->get_physical_keycode();
+        if (code == godot::KEY_C || code == godot::KEY_F1) {
+            cycle_camera_view();
+            get_viewport()->set_input_as_handled();
+            return;
+        }
+    }
     const godot::Ref<godot::InputEventMouseMotion> motion = event;
     if (race_mode_ && !race_preview_ && window_focused_ && owns_mouse_capture_ &&
         motion.is_valid()) {
@@ -589,15 +632,38 @@ double GameHost::get_view_distance_at(godot::Vector3 p) {
 }
 
 void GameHost::_process(double delta) {
+    FrameTraceScope trace(frame_trace_);
+    if (frame_trace_.enabled()) {
+        const auto probe_start = godot::Time::get_singleton()->get_ticks_usec();
+        auto* server = godot::RenderingServer::get_singleton();
+        const auto viewport = get_viewport()->get_viewport_rid();
+        server->viewport_set_measure_render_time(viewport, true);
+        trace.record.frame = godot::Engine::get_singleton()->get_process_frames();
+        trace.record.ticks = entry_ ? entry_->simulation_ticks() : 0;
+        trace.record.render_cpu_ms = server->viewport_get_measured_render_time_cpu(viewport);
+        trace.record.render_gpu_ms = server->viewport_get_measured_render_time_gpu(viewport);
+        for (std::size_t i = 0; i < trace.record.pipelines.size(); ++i)
+            trace.record.pipelines[i] =
+                server->get_rendering_info(static_cast<godot::RenderingServer::RenderingInfo>(
+                    godot::RenderingServer::RENDERING_INFO_PIPELINE_COMPILATIONS_CANVAS + i));
+        trace.record.probe_usec = godot::Time::get_singleton()->get_ticks_usec() - probe_start;
+    }
     try {
         const auto now = godot::Time::get_singleton()->get_ticks_usec();
         const auto elapsed = last_simulation_usec_
                                  ? static_cast<double>(now - last_simulation_usec_) / 1000000.0
                                  : 0.0;
         last_simulation_usec_ = now;
-        update_race_debug();
         if (debug_overlay_)
+            debug_overlay_->begin_frame(now);
+        {
+            FrameStageTimer timer(FrameStage::debug_snapshot);
+            update_race_debug();
+        }
+        if (debug_overlay_) {
+            FrameStageTimer timer(FrameStage::overlay);
             debug_overlay_->frame(delta, ui_mouse_visible_ && window_focused_);
+        }
         // Rebuilding a race must occur after ImGui has finished traversing its snapshot.
         if (apply_race_debug_track_request()) {
             update_race_debug();
@@ -605,6 +671,8 @@ void GameHost::_process(double delta) {
             return;
         }
         if (!entry_ || simulation_failed_)
+            return;
+        if (apply_frontend_race_request(elapsed))
             return;
         if (update_pause_menu(delta)) {
             present_test_frame();
@@ -644,12 +712,17 @@ void GameHost::_process(double delta) {
         const double simulation_delta = menu_                          ? elapsed
                                         : race_mode_ && !race_preview_ ? elapsed * scale
                                                                        : delta;
-        if (entry_->advance(simulation_delta, input) != Result::ok) {
-            throw std::runtime_error("Runtime update failed");
+        {
+            FrameStageTimer timer(FrameStage::simulation);
+            if (entry_->advance(simulation_delta, input) != Result::ok)
+                throw std::runtime_error("Runtime update failed");
         }
         if (race_results_pending_)
             show_race_results();
-        present_test_frame();
+        {
+            FrameStageTimer timer(FrameStage::presentation);
+            present_test_frame();
+        }
         if (menu_) {
             frontend_input_ = {};
             if (menu_->quit_requested())
@@ -661,6 +734,9 @@ void GameHost::_process(double delta) {
         simulation_failed_ = true;
         frontend_video_voice_.reset();
         frontend_sfx_.reset();
+        frontend_music_voice_.reset();
+        frontend_music_.stop();
+        frontend_music_path_.clear();
         ui_mouse_visible_ = true;
         set_mouse_capture(false);
         godot::UtilityFunctions::push_error(error.what());
@@ -670,6 +746,9 @@ void GameHost::_process(double delta) {
         simulation_failed_ = true;
         frontend_video_voice_.reset();
         frontend_sfx_.reset();
+        frontend_music_voice_.reset();
+        frontend_music_.stop();
+        frontend_music_path_.clear();
         ui_mouse_visible_ = true;
         set_mouse_capture(false);
         godot::UtilityFunctions::push_error("Host update exception");
@@ -688,6 +767,65 @@ bool GameHost::get_console_collapsed() const {
 bool GameHost::console_contains(godot::String text) const {
     return debug_overlay_ && debug_overlay_->messages()->contains(text.utf8().get_data());
 }
+godot::Array GameHost::get_frame_profile_trace() const {
+    godot::Array result;
+    const auto& records = frame_trace_.records();
+    for (std::size_t n = 0; n < records.size(); ++n) {
+        const auto& record = records[(frame_trace_.offset() + n) % records.size()];
+        godot::Dictionary row;
+        row["frame"] = static_cast<int64_t>(record.frame);
+        row["start_us"] = static_cast<int64_t>(record.start_usec);
+        row["interval_us"] = static_cast<int64_t>(record.interval_usec);
+        row["host_us"] = static_cast<int64_t>(record.total_usec);
+        row["ticks"] = static_cast<int64_t>(record.ticks);
+        row["probe_us"] = static_cast<int64_t>(record.probe_usec);
+        row["render_cpu_ms"] = record.render_cpu_ms;
+        row["render_gpu_ms"] = record.render_gpu_ms;
+        row["events"] = godot::String::utf8(record.events.c_str());
+        const std::array<const char*, 10> stages{
+            "debug_us",       "overlay_us",      "display_poll_us", "dpi_poll_us",
+            "simulation_us",  "presentation_us", "race_logic_us",   "combat_visuals_us",
+            "skid_upload_us", "audio_us"};
+        const std::array<const char*, 8> resources{"meshes",     "instances", "textures",
+                                                   "materials",  "particles", "audio_voices",
+                                                   "file_reads", "ui_items"};
+        const std::array<const char*, 5> pipelines{"pipeline_canvas", "pipeline_mesh",
+                                                   "pipeline_surface", "pipeline_draw",
+                                                   "pipeline_specialization"};
+        for (std::size_t i = 0; i < stages.size(); ++i)
+            row[stages[i]] = static_cast<int64_t>(record.stages[i]);
+        for (std::size_t i = 0; i < resources.size(); ++i)
+            row[resources[i]] = static_cast<int64_t>(record.resources[i]);
+        for (std::size_t i = 0; i < pipelines.size(); ++i)
+            row[pipelines[i]] = record.pipelines[i];
+        result.push_back(row);
+    }
+    return result;
+}
+godot::Dictionary GameHost::get_frame_timing_state() const {
+    godot::Dictionary result;
+    if (!debug_overlay_)
+        return result;
+    const auto& ui = debug_overlay_->ui();
+    const auto& history = ui.frame_timing();
+    const float target = ui.refresh_hz() > 0 ? 1000.0f / ui.refresh_hz() : 0;
+    const auto summary = history.summary(target);
+    result["refresh_hz"] = ui.refresh_hz();
+    result["vsync"] = godot::String::utf8(ui.vsync().c_str());
+    result["target_ms"] = target;
+    result["mean_ms"] = summary.mean;
+    result["p95_ms"] = summary.p95;
+    result["p99_ms"] = summary.p99;
+    result["max_ms"] = summary.maximum;
+    result["late_frames"] = static_cast<int64_t>(summary.late);
+    result["sample_count"] = history.count();
+    godot::Array samples;
+    for (int i = 0; i < history.count(); ++i)
+        samples.push_back(
+            history.data()[(history.offset() + i) % extensions::FrameTiming::kCapacity]);
+    result["samples_ms"] = samples;
+    return result;
+}
 double GameHost::get_debug_dpi_scale() const {
     return debug_overlay_ ? debug_overlay_->ui().scale() : 0;
 }
@@ -703,10 +841,14 @@ void GameHost::debug_stdio_test() {
     std::cerr << "ROADWARS_STDERR_CAPTURE_TEST" << std::endl;
 }
 void GameHost::_exit_tree() {
+    race_loading_task_.reset();
     set_mouse_capture(false);
     entry_.reset();
     frontend_video_voice_.reset();
     frontend_sfx_.reset();
+    frontend_music_voice_.reset();
+    frontend_music_.stop();
+    frontend_music_path_.clear();
     frontend_audio_screen_.clear();
     menu_.reset();
     engine_audio_adapter_.reset();
@@ -727,6 +869,179 @@ void GameHost::_exit_tree() {
     renderer_.reset();
     debug_overlay_.reset();
 }
+LoadingTask GameHost::prepare_race() {
+    previous_cockpit_states_.clear();
+    current_cockpit_states_.clear();
+    camera_cut_pending_ = true;
+    co_yield LoadingProgress{0, "STARTING"};
+    if (game_directory_.is_empty())
+        throw std::runtime_error("The launcher must supply game_dir from config.local.json");
+    if (!resources_) {
+        files_ = std::make_unique<GameFiles>(game_directory_);
+        resources_ = std::make_unique<ResourceStore>(*files_);
+        if (resources_->open() != Result::ok)
+            throw std::runtime_error("Original game archive could not be opened");
+    }
+    std::string error;
+    const BootOptions options{track_name_.utf8().get_data(), vehicle_name_.utf8().get_data()};
+    if (initialize_test_game(*resources_, options, initialized_, error) != Result::ok)
+        throw std::runtime_error(error);
+    renderer_->set_interpolation_enabled(!race_preview_);
+    race_ = std::make_unique<RacePresentation>(*renderer_);
+    TireSelection initial_tires;
+    if (competition_) {
+        load_race_debug_tracks();
+        RaceLoadoutTable table;
+        if (table.load(*resources_, options.track, error) != Result::ok)
+            throw std::runtime_error(error);
+        initial_tires = table.tires();
+        if (load_original_weapon_keys(*resources_, weapon_keys_, error) != Result::ok ||
+            validate_weapon_keys(weapon_keys_, error) != Result::ok)
+            throw std::runtime_error(error);
+    }
+    if (race_->load(*resources_, options.track, options.vehicle, error, initial_tires) !=
+        Result::ok)
+        throw std::runtime_error(error);
+    co_yield LoadingProgress{.1f, "LOADING TRACK"};
+    // Explicit free-driving character selection; car/character selection remains
+    // separate in the original game and will come from the recovered race setup.
+    race_->set_developer_build(developer_build_);
+    if (race_->configure_frontend(*resources_, options.track, "Animal", error) != Result::ok)
+        throw std::runtime_error("Original frontend unavailable: " + error);
+    const auto hud_size = get_viewport()->get_visible_rect().size;
+    renderer_->resize_hud(hud_size.x, hud_size.y);
+    if (chase_camera_.load(*resources_, options.vehicle, error) != Result::ok)
+        throw std::runtime_error(error);
+    VehicleState preview_state;
+    preview_state.position = race_->collision().spawn().position;
+    preview_state.heading_degrees = race_->collision().spawn().heading_degrees;
+    CameraFrame preview_camera;
+    if (chase_camera_.update(preview_state, {}, nullptr, 0, preview_camera) != Result::ok)
+        throw std::runtime_error("Original preview camera unavailable");
+    race_->apply_camera(preview_camera);
+    co_yield LoadingProgress{.2f, "LOADING PLAYER"};
+    if (!race_preview_) {
+        float effects_scalar{};
+        if (initialized_.global_config.number("ROADWARS", "SPECIAL_EFFECTS_SCALAR",
+                                              effects_scalar) != Result::ok)
+            throw std::runtime_error("Original SPECIAL_EFFECTS_SCALAR is unavailable");
+        if (!competition_) {
+            for (auto& emitter : tire_smoke_)
+                if (emitter.configure(effects_scalar, particle_random_) != Result::ok)
+                    throw std::runtime_error("Original tire particles unavailable");
+            if (race_->configure_tire_particles(
+                    *resources_, static_cast<std::uint32_t>(tire_smoke_[0].particles().size() *
+                                                            4)) != Result::ok)
+                throw std::runtime_error("Native tire particles unavailable");
+            const auto effects = vehicle_spark_settings(effects_scalar);
+            if (sparks_.configure(effects) != Result::ok ||
+                race_->configure_particles(*resources_, effects.capacity) != Result::ok)
+                throw std::runtime_error("Native Godot particle initialization failed");
+        }
+        VehicleParameters parameters;
+        if (load_vehicle_metrics(*resources_, options.vehicle, parameters, error) != Result::ok)
+            throw std::runtime_error(error);
+        parameters.tires = initial_tires;
+        if (load_vehicle_geometry(*resources_, options.vehicle, parameters, error) != Result::ok)
+            throw std::runtime_error(error);
+        float manual_transmission{};
+        if (initialized_.global_config.number("ROADWARS", "MANUALTRANSMISSION",
+                                              manual_transmission) != Result::ok)
+            throw std::runtime_error("Original MANUALTRANSMISSION is unavailable");
+        parameters.automatic_transmission = manual_transmission == 0;
+        vehicle_ = std::make_unique<VehicleDynamics>();
+        float skid_scalar{};
+        if (initialized_.global_config.number("ROADWARS", "SKIDMARK_SCALAR", skid_scalar) !=
+            Result::ok)
+            throw std::runtime_error("Original SKIDMARK_SCALAR unavailable");
+        for (auto& emitter : skid_marks_)
+            if (emitter.configure(skid_scalar, parameters.tire_half_width) != Result::ok)
+                throw std::runtime_error("Original skid-mark initialization failed");
+        if (race_->configure_skid_marks(*resources_) != Result::ok)
+            throw std::runtime_error("Native skid-mark rendering unavailable");
+        if (vehicle_->initialize(std::move(parameters), race_->collision(), error) != Result::ok)
+            throw std::runtime_error(error);
+        if (load_engine_audio(*resources_, options.vehicle, engine_audio_resources_, error) !=
+            Result::ok)
+            throw std::runtime_error(error);
+        if (engine_audio_.initialize(engine_audio_resources_.sample.sample_rate,
+                                     engine_audio_resources_.sfx_volume) != Result::ok)
+            throw std::runtime_error("Original engine voice initialization failed");
+        engine_audio_adapter_ =
+            std::make_unique<EngineAudioAdapter>(*this, engine_audio_resources_.sample);
+        if (race_music_.load(*resources_, error) != Result::ok)
+            throw std::runtime_error(error);
+        race_music_adapter_ = std::make_unique<EngineAudioAdapter>(*this, race_music_.sample(),
+                                                                   true, "OriginalRaceMusic");
+        EngineAudioCommand music;
+        if (!competition_) {
+            if (race_music_.start(music) != Result::ok)
+                throw std::runtime_error("Original race music start failed");
+            race_music_adapter_->submit(music);
+        }
+        if (load_collision_audio(*resources_, collision_audio_resources_, error) != Result::ok ||
+            load_tire_audio(*resources_, options.track, tire_audio_resources_, error) != Result::ok)
+            throw std::runtime_error(error);
+        if (tire_audio_.initialize(tire_audio_resources_.sfx_volume) != Result::ok)
+            throw std::runtime_error("Original tire voice initialization failed");
+        sfx_audio_adapter_ = std::make_unique<SfxAudioAdapter>(*this);
+    }
+    co_yield LoadingProgress{.3f, "LOADING AUDIO"};
+    if (competition_) {
+        session_ = std::make_unique<RaceSession>();
+        RaceOptions setup{options.track, options.vehicle, race_laps_, race_ai_count_};
+        if (diagnostic_race_seed_ < 0 || diagnostic_race_seed_ > 0xffffffffLL)
+            throw std::runtime_error("Diagnostic race seed must fit an unsigned 32-bit value");
+        setup.seed = static_cast<std::uint32_t>(diagnostic_race_seed_);
+        setup.player_loadout = menu_player_loadout_;
+        if (session_->load(*resources_, race_->collision(), setup, *vehicle_, error) != Result::ok)
+            throw std::runtime_error(error);
+        co_yield LoadingProgress{.45f, "LOADING VEHICLES"};
+        combat_audio_adapter_ =
+            std::make_unique<CombatAudioAdapter>(*this, session_->audio_resources());
+        std::vector<std::string> characters;
+        for (const auto& racer : session_->racers())
+            characters.push_back(racer.character);
+        if (race_->replace_player_visual(*resources_, options.vehicle,
+                                         session_->racers()[session_->player_index()].loadout,
+                                         error) != Result::ok)
+            throw std::runtime_error(error);
+        if (race_->configure_racers(*resources_, options.track, characters, error) != Result::ok)
+            throw std::runtime_error(error);
+        if (race_->configure_equipment_hud(
+                *resources_, options.vehicle,
+                session_->racers()[session_->player_index()].loadout.weapons, error) != Result::ok)
+            throw std::runtime_error(error);
+        co_yield LoadingProgress{.5f, "LOADED PLAYER"};
+        for (std::size_t i = 0; i < session_->player_index(); ++i) {
+            if (race_->add_opponent(*resources_, characters[i], error,
+                                    session_->racers()[i].loadout.tires,
+                                    session_->racers()[i].loadout.paint_job) != Result::ok)
+                throw std::runtime_error(error);
+            race_->update_opponent(i, *session_->racers()[i].vehicle, 0, true);
+            co_yield LoadingProgress{.5f + .35f * static_cast<float>(i + 1) /
+                                               static_cast<float>(session_->player_index()),
+                                     "LOADED VEHICLE " + std::to_string(i + 2)};
+        }
+        race_->update_wheels(*vehicle_, 0, 0, true);
+        race_->update_vehicle(vehicle_->transform());
+        if (race_->prepare_combat(*resources_, *session_, error) != Result::ok)
+            throw std::runtime_error(error);
+        co_yield LoadingProgress{.95f, "LOADING EFFECTS"};
+        if (race_->update_combat(*resources_, *session_, error) != Result::ok)
+            throw std::runtime_error(error);
+        race_->apply_camera(session_->start_sequence().camera());
+        renderer_->reset_interpolation();
+        std::vector<FrontendRacer> racers;
+        auto frame = session_->frontend_frame(racers);
+        frame.developer_build = developer_build_;
+        race_->update_frontend(frame);
+    }
+    godot::UtilityFunctions::print("ROADWARS_RACE_LOADED: ", track_name_, " / ", vehicle_name_,
+                                   race_preview_ ? " (static resource preview)"
+                                                 : " (original logic trace)");
+    co_yield LoadingProgress{1, "FINISHED"};
+}
 Result GameHost::invoke(LoopStage stage, float delta, const InputState& input, LoopState& state) {
     if (!diagnostic_ && !original_loop_ && !race_mode_) {
         if (stage == LoopStage::initialize_0045c8ab) {
@@ -741,6 +1056,7 @@ Result GameHost::invoke(LoopStage stage, float delta, const InputState& input, L
             std::string error;
             if (menu_->start(error) != Result::ok)
                 throw std::runtime_error(error);
+            menu_->set_race_seed(static_cast<std::uint32_t>(diagnostic_race_seed_));
             if (!frontend_preview_.is_empty() &&
                 !preview_frontend_screen(frontend_preview_, frontend_preview_time_,
                                          frontend_variant_))
@@ -760,169 +1076,13 @@ Result GameHost::invoke(LoopStage stage, float delta, const InputState& input, L
     }
     if (race_mode_) {
         if (stage == LoopStage::initialize_0045c8ab) {
-            if (game_directory_.is_empty())
-                throw std::runtime_error(
-                    "The launcher must supply game_dir from config.local.json");
-            files_ = std::make_unique<GameFiles>(game_directory_);
-            resources_ = std::make_unique<ResourceStore>(*files_);
-            if (resources_->open() != Result::ok)
-                throw std::runtime_error("Original game archive could not be opened");
-            std::string error;
-            const BootOptions options{track_name_.utf8().get_data(),
-                                      vehicle_name_.utf8().get_data()};
-            if (initialize_test_game(*resources_, options, initialized_, error) != Result::ok)
-                throw std::runtime_error(error);
-            renderer_->set_interpolation_enabled(!race_preview_);
-            race_ = std::make_unique<RacePresentation>(*renderer_);
-            TireSelection initial_tires;
-            if (competition_) {
-                load_race_debug_tracks();
-                RaceLoadoutTable table;
-                if (table.load(*resources_, options.track, error) != Result::ok)
-                    throw std::runtime_error(error);
-                initial_tires = table.tires();
-                if (load_original_weapon_keys(*resources_, weapon_keys_, error) != Result::ok ||
-                    validate_weapon_keys(weapon_keys_, error) != Result::ok)
-                    throw std::runtime_error(error);
-            }
-            if (race_->load(*resources_, options.track, options.vehicle, error, initial_tires) !=
-                Result::ok)
-                throw std::runtime_error(error);
-            // Explicit free-driving character selection; car/character selection remains
-            // separate in the original game and will come from the recovered race setup.
-            race_->set_developer_build(developer_build_);
-            if (race_->configure_frontend(*resources_, options.track, "Animal", error) !=
-                Result::ok)
-                throw std::runtime_error("Original frontend unavailable: " + error);
-            const auto hud_size = get_viewport()->get_visible_rect().size;
-            renderer_->resize_hud(hud_size.x, hud_size.y);
-            if (chase_camera_.load(*resources_, options.vehicle, error) != Result::ok)
-                throw std::runtime_error(error);
-            VehicleState preview_state;
-            preview_state.position = race_->collision().spawn().position;
-            preview_state.heading_degrees = race_->collision().spawn().heading_degrees;
-            CameraFrame preview_camera;
-            if (chase_camera_.update(preview_state, {}, nullptr, 0, preview_camera) != Result::ok)
-                throw std::runtime_error("Original preview camera unavailable");
-            race_->apply_camera(preview_camera);
-            if (!race_preview_) {
-                float effects_scalar{};
-                if (initialized_.global_config.number("ROADWARS", "SPECIAL_EFFECTS_SCALAR",
-                                                      effects_scalar) != Result::ok)
-                    throw std::runtime_error("Original SPECIAL_EFFECTS_SCALAR is unavailable");
-                if (!competition_) {
-                    for (auto& emitter : tire_smoke_)
-                        if (emitter.configure(effects_scalar, particle_random_) != Result::ok)
-                            throw std::runtime_error("Original tire particles unavailable");
-                    if (race_->configure_tire_particles(
-                            *resources_, static_cast<std::uint32_t>(
-                                             tire_smoke_[0].particles().size() * 4)) != Result::ok)
-                        throw std::runtime_error("Native tire particles unavailable");
-                    const auto effects = vehicle_spark_settings(effects_scalar);
-                    if (sparks_.configure(effects) != Result::ok ||
-                        race_->configure_particles(*resources_, effects.capacity) != Result::ok)
-                        throw std::runtime_error("Native Godot particle initialization failed");
+            if (race_assets_prepared_) {
+                race_assets_prepared_ = false;
+            } else {
+                auto loading = prepare_race();
+                while (loading.advance()) {
                 }
-                VehicleParameters parameters;
-                if (load_vehicle_metrics(*resources_, options.vehicle, parameters, error) !=
-                    Result::ok)
-                    throw std::runtime_error(error);
-                parameters.tires = initial_tires;
-                if (load_vehicle_geometry(*resources_, options.vehicle, parameters, error) !=
-                    Result::ok)
-                    throw std::runtime_error(error);
-                float manual_transmission{};
-                if (initialized_.global_config.number("ROADWARS", "MANUALTRANSMISSION",
-                                                      manual_transmission) != Result::ok)
-                    throw std::runtime_error("Original MANUALTRANSMISSION is unavailable");
-                parameters.automatic_transmission = manual_transmission == 0;
-                vehicle_ = std::make_unique<VehicleDynamics>();
-                float skid_scalar{};
-                if (initialized_.global_config.number("ROADWARS", "SKIDMARK_SCALAR", skid_scalar) !=
-                    Result::ok)
-                    throw std::runtime_error("Original SKIDMARK_SCALAR unavailable");
-                for (auto& emitter : skid_marks_)
-                    if (emitter.configure(skid_scalar, parameters.tire_half_width) != Result::ok)
-                        throw std::runtime_error("Original skid-mark initialization failed");
-                if (race_->configure_skid_marks(*resources_) != Result::ok)
-                    throw std::runtime_error("Native skid-mark rendering unavailable");
-                if (vehicle_->initialize(std::move(parameters), race_->collision(), error) !=
-                    Result::ok)
-                    throw std::runtime_error(error);
-                if (load_engine_audio(*resources_, options.vehicle, engine_audio_resources_,
-                                      error) != Result::ok)
-                    throw std::runtime_error(error);
-                if (engine_audio_.initialize(engine_audio_resources_.sample.sample_rate,
-                                             engine_audio_resources_.sfx_volume) != Result::ok)
-                    throw std::runtime_error("Original engine voice initialization failed");
-                engine_audio_adapter_ =
-                    std::make_unique<EngineAudioAdapter>(*this, engine_audio_resources_.sample);
-                if (race_music_.load(*resources_, error) != Result::ok)
-                    throw std::runtime_error(error);
-                race_music_adapter_ = std::make_unique<EngineAudioAdapter>(
-                    *this, race_music_.sample(), true, "OriginalRaceMusic");
-                EngineAudioCommand music;
-                if (!competition_) {
-                    if (race_music_.start(music) != Result::ok)
-                        throw std::runtime_error("Original race music start failed");
-                    race_music_adapter_->submit(music);
-                }
-                if (load_collision_audio(*resources_, collision_audio_resources_, error) !=
-                        Result::ok ||
-                    load_tire_audio(*resources_, options.track, tire_audio_resources_, error) !=
-                        Result::ok)
-                    throw std::runtime_error(error);
-                if (tire_audio_.initialize(tire_audio_resources_.sfx_volume) != Result::ok)
-                    throw std::runtime_error("Original tire voice initialization failed");
-                sfx_audio_adapter_ = std::make_unique<SfxAudioAdapter>(*this);
             }
-            if (competition_) {
-                session_ = std::make_unique<RaceSession>();
-                RaceOptions setup{options.track, options.vehicle, race_laps_, race_ai_count_};
-                if (diagnostic_race_seed_ < 0 || diagnostic_race_seed_ > 0xffffffffLL)
-                    throw std::runtime_error(
-                        "Diagnostic race seed must fit an unsigned 32-bit value");
-                setup.seed = static_cast<std::uint32_t>(diagnostic_race_seed_);
-                if (session_->load(*resources_, race_->collision(), setup, *vehicle_, error) !=
-                    Result::ok)
-                    throw std::runtime_error(error);
-                combat_audio_adapter_ =
-                    std::make_unique<CombatAudioAdapter>(*this, session_->audio_resources());
-                std::vector<std::string> characters;
-                for (const auto& racer : session_->racers())
-                    characters.push_back(racer.character);
-                if (race_->replace_player_visual(
-                        *resources_, options.vehicle,
-                        session_->racers()[session_->player_index()].loadout, error) != Result::ok)
-                    throw std::runtime_error(error);
-                if (race_->configure_racers(*resources_, options.track, characters, error) !=
-                    Result::ok)
-                    throw std::runtime_error(error);
-                if (race_->configure_equipment_hud(
-                        *resources_, options.vehicle,
-                        session_->racers()[session_->player_index()].loadout.weapons,
-                        error) != Result::ok)
-                    throw std::runtime_error(error);
-                for (std::size_t i = 0; i < session_->player_index(); ++i) {
-                    if (race_->add_opponent(*resources_, characters[i], error,
-                                            session_->racers()[i].loadout.tires,
-                                            session_->racers()[i].loadout.paint_job) != Result::ok)
-                        throw std::runtime_error(error);
-                    race_->update_opponent(i, *session_->racers()[i].vehicle, 0, true);
-                }
-                race_->update_vehicle(vehicle_->transform());
-                if (race_->update_combat(*resources_, *session_, error) != Result::ok)
-                    throw std::runtime_error(error);
-                race_->apply_camera(session_->start_sequence().camera());
-                renderer_->reset_interpolation();
-                std::vector<FrontendRacer> racers;
-                auto frame = session_->frontend_frame(racers);
-                frame.developer_build = developer_build_;
-                race_->update_frontend(frame);
-            }
-            godot::UtilityFunctions::print(
-                "ROADWARS_RACE_LOADED: ", track_name_, " / ", vehicle_name_,
-                race_preview_ ? " (static resource preview)" : " (original logic trace)");
         } else if (stage == LoopStage::single_race_004a4f57 && vehicle_) {
             if (session_ && session_->paused()) {
                 std::vector<FrontendRacer> racers;
@@ -935,6 +1095,13 @@ Result GameHost::invoke(LoopStage stage, float delta, const InputState& input, L
             if (session_)
                 for (const auto& racer : session_->racers())
                     generations.push_back(racer.vehicle->pose_generation());
+            capture_cockpit_states(true);
+            while (pending_camera_cycles_ > 0) {
+                camera_view_ = next_camera_view(camera_view_);
+                --pending_camera_cycles_;
+                camera_cut_pending_ = true;
+            }
+            if (camera_cut_pending_) { orbit_camera_.reset(); pending_mouse_ = {}; }
             renderer_->begin_simulation_tick();
             race_->update_track_animation(delta);
             if (session_) {
@@ -948,10 +1115,16 @@ Result GameHost::invoke(LoopStage stage, float delta, const InputState& input, L
                     for (std::size_t i = 0; i < 2 + session_->racers().size(); ++i)
                         session_->set_audio_voice_alive(i, combat_audio_adapter_->loop_alive(i));
                 }
-                if (session_->advance(delta, input, error) != Result::ok)
-                    throw std::runtime_error(error);
-                if (race_->update_combat(*resources_, *session_, error) != Result::ok)
-                    throw std::runtime_error(error);
+                {
+                    FrameStageTimer timer(FrameStage::race_logic);
+                    if (session_->advance(delta, input, error) != Result::ok)
+                        throw std::runtime_error(error);
+                }
+                {
+                    FrameStageTimer timer(FrameStage::combat_visuals);
+                    if (race_->update_combat(*resources_, *session_, error) != Result::ok)
+                        throw std::runtime_error(error);
+                }
                 for (std::size_t i = 0; i < session_->player_index(); ++i)
                     race_->update_opponent(i, *session_->racers()[i].vehicle, delta,
                                            input.reset_requested);
@@ -965,8 +1138,11 @@ Result GameHost::invoke(LoopStage stage, float delta, const InputState& input, L
                 if (skid_marks_[i].advance(delta, vehicle_->tire_particle_sources()[i]) !=
                     Result::ok)
                     throw std::runtime_error("Original skid-mark update failed");
-            if (race_->update_skid_marks(skid_marks_) != Result::ok)
-                throw std::runtime_error("Native skid-mark submission failed");
+            {
+                FrameStageTimer timer(FrameStage::skid_upload);
+                if (race_->update_skid_marks(skid_marks_) != Result::ok)
+                    throw std::runtime_error("Native skid-mark submission failed");
+            }
             if (!session_) {
                 if (input.reset_requested) {
                     sparks_.reset();
@@ -1015,21 +1191,53 @@ Result GameHost::invoke(LoopStage stage, float delta, const InputState& input, L
                 if (session_->countdown() >= 1) {
                     orbit_camera_.reset();
                     camera = original_camera;
-                } else if (orbit_camera_.update(original_camera, delta, pending_mouse_, camera) !=
-                           Result::ok)
+                } else if (camera_view_ == CameraView::near_chase &&
+                           orbit_camera_.update(original_camera, delta, pending_mouse_, camera) !=
+                               Result::ok)
                     throw std::runtime_error("Race camera orbit update failed");
             } else if (chase_camera_.update(vehicle_->state(), vehicle_->parameters(),
                                             &race_->collision(), delta,
                                             original_camera) != Result::ok ||
-                       orbit_camera_.update(original_camera, delta, pending_mouse_, camera) !=
-                           Result::ok)
+                       (camera_view_ == CameraView::near_chase &&
+                        orbit_camera_.update(original_camera, delta, pending_mouse_, camera) !=
+                           Result::ok))
                 throw std::runtime_error("Original chase camera update failed");
+            if (camera_view_ != CameraView::near_chase) {
+                const auto target = camera_target_index();
+                const auto& car = session_ ? *session_->racers()[target].vehicle : *vehicle_;
+                auto settings = session_ ? session_->racers()[target].chase_camera.settings()
+                                         : chase_camera_.settings();
+                settings.body_local_angles = {0, car.body_orientation().body_pitch,
+                                               car.body_orientation().body_roll};
+                if (camera_view_frame(camera_view_, car.state(), car.parameters(), settings,
+                                      &race_->collision(), original_camera, camera) != Result::ok)
+                    throw std::runtime_error("Vehicle camera view failed");
+                if (camera_view_ == CameraView::far_chase) {
+                    const auto far_frame = camera;
+                    if (orbit_camera_.update(far_frame, delta, pending_mouse_, camera) != Result::ok)
+                        throw std::runtime_error("Far chase orbit failed");
+                }
+            }
             pending_mouse_ = {};
             race_->apply_camera(camera);
+            const bool first_person = camera_view_ == CameraView::hood || camera_view_ == CameraView::cockpit;
+            renderer_->set_first_person(first_person);
+            race_->set_camera_vehicle_hidden(first_person ? static_cast<int>(camera_target_index()) : -1,
+                                             session_ ? session_->player_index() : 0);
+            capture_cockpit_states(false);
+            if (camera_cut_pending_) {
+                orbit_camera_.reset();
+                renderer_->reset_camera_interpolation();
+                previous_cockpit_states_ = current_cockpit_states_;
+                camera_cut_pending_ = false;
+            }
             if (session_) {
-                const int inspected = debug_overlay_ ? debug_overlay_->ui().race_options().selected_ai : -1;
-                const auto target = inspected >= 0 && static_cast<std::size_t>(inspected) < session_->player_index()
-                                        ? static_cast<std::size_t>(inspected) : session_->player_index();
+                const int inspected =
+                    debug_overlay_ ? debug_overlay_->ui().race_options().selected_ai : -1;
+                const auto target =
+                    inspected >= 0 && static_cast<std::size_t>(inspected) < session_->player_index()
+                        ? static_cast<std::size_t>(inspected)
+                        : session_->player_index();
                 for (std::size_t i = 0; i < generations.size(); ++i)
                     if (generations[i] != session_->racers()[i].vehicle->pose_generation()) {
                         race_->snap_racer(i, session_->player_index());
@@ -1040,8 +1248,14 @@ Result GameHost::invoke(LoopStage stage, float delta, const InputState& input, L
                 race_->snap_racer(0, 0);
                 renderer_->reset_camera_interpolation();
             }
-            if (input.reset_requested || (entry_ && entry_->simulation_ticks() == 0))
+            if (input.reset_requested || (entry_ && entry_->simulation_ticks() == 0)) {
                 renderer_->reset_interpolation();
+                previous_cockpit_states_ = current_cockpit_states_;
+            }
+            if (session_)
+                for (std::size_t i = 0; i < generations.size(); ++i)
+                    if (generations[i] != session_->racers()[i].vehicle->pose_generation())
+                        previous_cockpit_states_[i] = current_cockpit_states_[i];
             if (sfx_audio_adapter_) {
                 if (input.reset_requested) {
                     sfx_audio_adapter_->reset();
@@ -1165,6 +1379,8 @@ bool GameHost::frontend_test_step(double elapsed, godot::String command) {
     try {
         if (!menu_)
             return false;
+        if (apply_frontend_race_request(elapsed))
+            return !simulation_failed_;
         FrontendInput input;
         input.left = command == "left";
         input.right = command == "right";
@@ -1189,6 +1405,31 @@ bool GameHost::frontend_test_step(double elapsed, godot::String command) {
 void GameHost::update_frontend_audio() {
     if (!menu_)
         return;
+    const auto music_path = menu_->music_path();
+    if (music_path != frontend_music_path_ || (!music_path.empty() && !frontend_music_voice_)) {
+        frontend_music_voice_.reset();
+        frontend_music_.stop();
+        frontend_music_path_.clear();
+        frontend_music_path_ = music_path;
+        if (!music_path.empty()) {
+            std::string error;
+            const auto result =
+                music_path == "Sfx/SoundBackgroundMusic.wav"
+                    ? frontend_music_.load_menu(*resources_, error)
+                    : frontend_music_.load_character(*resources_, menu_->selected_character(), error);
+            if (result != Result::ok)
+                throw std::runtime_error(error);
+            frontend_music_voice_ = std::make_unique<EngineAudioAdapter>(
+                *this, frontend_music_.sample(), true, "OriginalFrontendMusic");
+            EngineAudioCommand command;
+            if (frontend_music_.start(command) != Result::ok)
+                throw std::runtime_error("Original frontend music start failed");
+            command.linear_gain *= menu_->music_gain_scale();
+            frontend_music_voice_->submit(command);
+        }
+    }
+    if (frontend_music_voice_)
+        frontend_music_voice_->submit(frontend_music_.gain(menu_->music_gain_scale()));
     const std::string screen(menu_->screen());
     if (frontend_audio_screen_ != screen) {
         frontend_video_voice_.reset();
@@ -1243,6 +1484,114 @@ bool GameHost::test_interpolation_history() const {
 godot::Dictionary GameHost::get_presentation_state() const {
     return renderer_ ? renderer_->presentation_snapshot() : godot::Dictionary{};
 }
+std::size_t GameHost::camera_target_index() const {
+    const int inspected = debug_overlay_ ? debug_overlay_->ui().race_options().selected_ai : -1;
+    return session_ && inspected >= 0 && static_cast<std::size_t>(inspected) < session_->player_index()
+               ? static_cast<std::size_t>(inspected) : session_ ? session_->player_index() : 0;
+}
+void GameHost::cut_camera_to_target() {
+    if (!race_ || !vehicle_ || !renderer_)
+        return;
+    const auto target = camera_target_index();
+    const auto& car = session_ ? *session_->racers()[target].vehicle : *vehicle_;
+    auto settings = session_ ? session_->racers()[target].chase_camera.settings()
+                             : chase_camera_.settings();
+    settings.body_local_angles = {0, car.body_orientation().body_pitch, car.body_orientation().body_roll};
+    const auto& baseline = session_ ? session_->camera_for(static_cast<int>(target))
+                                    : race_->camera_frame();
+    CameraFrame frame;
+    if (camera_view_frame(camera_view_, car.state(), car.parameters(), settings,
+                          &race_->collision(), baseline, frame) != Result::ok)
+        throw std::runtime_error("Camera target cut failed");
+    race_->apply_camera(frame);
+    renderer_->reset_camera_interpolation();
+    const bool first_person = camera_view_ == CameraView::hood || camera_view_ == CameraView::cockpit;
+    renderer_->set_first_person(first_person);
+    race_->set_camera_vehicle_hidden(first_person ? static_cast<int>(target) : -1,
+                                     session_ ? session_->player_index() : 0);
+    if (current_cockpit_states_.empty())
+        capture_cockpit_states(false);
+    if (target < current_cockpit_states_.size() && target < previous_cockpit_states_.size())
+        previous_cockpit_states_[target] = current_cockpit_states_[target];
+    camera_cut_pending_ = false;
+}
+void GameHost::cycle_camera_view() {
+    if (race_ && vehicle_ && !menu_ && !pause_menu_ && (!session_ || !session_->paused()))
+        ++pending_camera_cycles_;
+}
+void GameHost::set_camera_view_for_test(int view) {
+    if (view < 0 || view > 3 || !race_ || !vehicle_)
+        return;
+    camera_view_ = static_cast<CameraView>(view);
+    pending_camera_cycles_ = 0;
+    camera_cut_pending_ = true;
+    orbit_camera_.reset();
+    pending_mouse_ = {};
+}
+void GameHost::capture_cockpit_states(bool previous) {
+    auto& output = previous ? previous_cockpit_states_ : current_cockpit_states_;
+    output.clear();
+    if (session_) {
+        for (const auto& racer : session_->racers())
+            output.push_back(racer.vehicle->state());
+    } else if (vehicle_)
+        output.push_back(vehicle_->state());
+    if (!previous && previous_cockpit_states_.size() != output.size())
+        previous_cockpit_states_ = output;
+}
+void GameHost::present_race_frontend(double alpha) {
+    if (!race_ || !vehicle_ || !entry_ || race_preview_ || pause_menu_)
+        return;
+    if (current_cockpit_states_.empty())
+        capture_cockpit_states(false);
+    const auto target = camera_target_index();
+    if (target >= current_cockpit_states_.size())
+        return;
+    const auto& before = previous_cockpit_states_[target];
+    const auto& after = current_cockpit_states_[target];
+    const auto blend = [&](float a, float b) { return a + (b - a) * static_cast<float>(alpha); };
+    std::vector<FrontendRacer> racers;
+    FrontendFrame frame;
+    if (session_)
+        frame = session_->frontend_frame(racers);
+    else {
+        racers.push_back({vehicle_->state().position, 0});
+        frame.racers = racers;
+        frame.speed = after.cached_speed;
+        frame.rpm = after.rpm;
+        frame.gear_index = static_cast<int>(after.gear_index);
+        frame.reverse = after.reverse_engaged;
+    }
+    frame.developer_build = developer_build_;
+    frame.cockpit = camera_view_ == CameraView::cockpit;
+    frame.cockpit_character = target;
+    const auto viewport_size = get_viewport()->get_visible_rect().size;
+    frame.viewport_aspect = viewport_size.x > 0 && viewport_size.y > 0
+                                ? viewport_size.x / viewport_size.y : 4.f / 3;
+    if (frame.cockpit) {
+        const auto& car = session_ ? *session_->racers()[target].vehicle : *vehicle_;
+        frame.speed = blend(before.cached_speed, after.cached_speed);
+        frame.rpm = blend(before.rpm, after.rpm);
+        frame.steering_fraction = blend(before.steering_degrees, after.steering_degrees) /
+                                  car.parameters().max_wheel_angle_degrees;
+        frame.gear_index = static_cast<int>(after.gear_index);
+        frame.reverse = after.reverse_engaged;
+        if (session_) {
+            frame.cockpit_weapon_names = session_->racers()[target].loadout.weapons;
+            auto equipment = frame.equipment.value_or(FrontendEquipmentFrame{});
+            for (std::size_t slot = 0; slot < 3; ++slot) {
+                const auto weapon = car.combat()->slot(static_cast<WeaponSlot>(slot));
+                equipment.ammunition[slot] = weapon.ammunition;
+                equipment.present[slot] = weapon.descriptor != nullptr;
+            }
+            frame.equipment = equipment;
+        }
+    }
+    presented_cockpit_rpm_ = frame.rpm;
+    presented_cockpit_steering_ = frame.steering_fraction;
+    if (race_->update_frontend(frame) != Result::ok)
+        throw std::runtime_error("Cockpit frontend presentation failed");
+}
 void GameHost::present_test_frame() {
     try {
         if ((race_ || menu_) && renderer_) {
@@ -1253,6 +1602,7 @@ void GameHost::present_test_frame() {
             const auto alpha = entry_->interpolation_alpha();
             race_->configure_view_at(renderer_->interpolated_camera_position(alpha));
             renderer_->present_interpolated(alpha);
+            present_race_frontend(alpha);
         }
     } catch (const std::exception& error) {
         godot::UtilityFunctions::push_error(error.what());
@@ -1534,7 +1884,82 @@ bool GameHost::update_pause_menu(double delta) {
     }
     return true;
 }
+bool GameHost::apply_frontend_race_request(double elapsed) {
+    if (!menu_ || !menu_->race_requested()) {
+        frontend_loading_presented_ = false;
+        return false;
+    }
+    const auto frame = godot::Engine::get_singleton()->get_process_frames();
+    if (!frontend_loading_presented_) {
+        frontend_loading_presented_ = true;
+        frontend_loading_frame_ = frame;
+        return false;
+    }
+    if (frame <= frontend_loading_frame_ + 1)
+        return false;
+    std::string error;
+    if (menu_->advance(elapsed, {}, error) != Result::ok)
+        throw std::runtime_error(error);
+    // Both race routes must finish the Loading intro before synchronous asset work.
+    // Otherwise the first expensive stage can leave the new theme at zero gain.
+    update_frontend_audio();
+    if (!menu_->loading_intro_complete())
+        return true;
+    if (!race_loading_task_ && !race_assets_prepared_) {
+        const auto request = menu_->race_request();
+        track_name_ = godot::String::utf8(request.track.c_str());
+        vehicle_name_ = godot::String::utf8(request.character.c_str());
+        race_laps_ = request.laps;
+        race_ai_count_ = 5;
+        diagnostic_race_seed_ = request.seed;
+        menu_player_loadout_ = request.player_loadout;
+        competition_requested_ = competition_ = race_mode_ = true;
+        race_preview_ = race_completed_ = race_results_pending_ = false;
+        inspected_camera_ = -2;
+        pressed_keyboard_keys_.clear();
+        frontend_input_ = {};
+        race_loading_task_ = prepare_race();
+    }
+    if (race_loading_task_) {
+        if (race_loading_task_.advance()) {
+            const auto& progress = race_loading_task_.progress();
+            if (menu_->set_loading_progress(progress.fraction, progress.message, error) !=
+                Result::ok)
+                throw std::runtime_error(error);
+        } else {
+            race_loading_task_.reset();
+            race_assets_prepared_ = true;
+        }
+    }
+    update_frontend_audio();
+    if (!race_assets_prepared_ || !menu_->loading_fade_complete())
+        return true;
+    frontend_video_voice_.reset();
+    frontend_sfx_.reset();
+    frontend_music_voice_.reset();
+    frontend_music_.stop();
+    frontend_music_path_.clear();
+    frontend_audio_screen_.clear();
+    menu_.reset();
+    entry_ = std::make_unique<GameEntry>(*this, GameEntry::Timing::fixed_simulation);
+    if (entry_->start() != Result::ok)
+        throw std::runtime_error("Prepared race entry failed");
+    renderer_->reset_interpolation();
+    std::vector<FrontendRacer> racers;
+    race_->update_frontend(session_->frontend_frame(racers));
+    last_simulation_usec_ = godot::Time::get_singleton()->get_ticks_usec();
+    frontend_loading_presented_ = false;
+    set_mouse_capture(window_focused_ && !ui_mouse_visible_);
+    present_test_frame();
+    return true;
+}
 void GameHost::return_to_main_menu() {
+    if (renderer_)
+        renderer_->set_first_person(false);
+    camera_view_ = CameraView::near_chase;
+    pending_camera_cycles_ = 0;
+    previous_cockpit_states_.clear();
+    current_cockpit_states_.clear();
     renderer_->set_interpolation_enabled(false);
     set_mouse_capture(false);
     godot::Input::get_singleton()->set_mouse_mode(godot::Input::MOUSE_MODE_VISIBLE);
@@ -1546,12 +1971,16 @@ void GameHost::return_to_main_menu() {
     race_music_.stop();
     sfx_audio_adapter_.reset();
     vehicle_.reset();
+    renderer_->clear_sky();
     race_.reset();
     menu_ = std::make_unique<MenuFrontend>(*resources_, *renderer_);
     std::string error;
     if (menu_->start(error, "main_menu") != Result::ok)
         throw std::runtime_error(error);
-    competition_ = race_mode_ = race_results_pending_ = false;
+    competition_ = race_mode_ = race_results_pending_ = race_completed_ = false;
+    menu_player_loadout_.reset();
+    menu_->set_race_seed(static_cast<std::uint32_t>(diagnostic_race_seed_));
+    update_frontend_audio();
     entry_->state().mode = GameMode::frontend;
     entry_->set_timing(GameEntry::Timing::frontend_realtime);
     if (debug_overlay_)
@@ -1647,11 +2076,13 @@ void GameHost::update_race_debug() {
     const int inspected = debug_overlay_->ui().race_options().selected_ai;
     if (inspected != inspected_camera_) {
         inspected_camera_ = inspected;
+        camera_cut_pending_ = true;
         orbit_camera_.reset();
-        race_->apply_camera(session_->camera_for(inspected));
-        renderer_->reset_camera_interpolation();
+        // Selection is a visual cut even on frames without a simulation tick.
+        cut_camera_to_target();
     }
-    auto snapshot = session_->debug_snapshot();
+    const auto& options = debug_overlay_->ui().race_options();
+    auto snapshot = session_->debug_snapshot(options.show_route || options.show_checkpoints);
     snapshot.available_tracks = available_race_tracks_;
     for (std::size_t index = 0; index < available_race_tracks_.size(); ++index)
         if (ResourceStore::canonical(available_race_tracks_[index]) ==
@@ -1667,6 +2098,7 @@ void GameHost::update_race_debug() {
 void GameHost::show_race_results() {
     if (!session_ || !race_results_pending_)
         return;
+    renderer_->set_first_person(false);
     std::vector<FrontendPreviewRacer> results;
     for (const auto index : session_->ranking()) {
         const auto& racer = session_->racers()[index];
@@ -1694,16 +2126,17 @@ void GameHost::show_race_results() {
     race_music_.stop();
     sfx_audio_adapter_.reset();
     vehicle_.reset();
+    renderer_->clear_sky();
     race_.reset();
     if (debug_overlay_)
         debug_overlay_->ui().clear_race_debug();
+    renderer_->set_interpolation_enabled(false);
     menu_ = std::make_unique<MenuFrontend>(*resources_, *renderer_);
     std::string error;
     if (menu_->show_race_results(results, track, error) != Result::ok)
         throw std::runtime_error(error);
     race_results_pending_ = false;
     race_completed_ = true;
-    renderer_->set_interpolation_enabled(false);
     competition_ = race_mode_ = false;
     entry_->state().mode = GameMode::frontend;
     entry_->set_timing(GameEntry::Timing::frontend_realtime);
@@ -1711,7 +2144,30 @@ void GameHost::show_race_results() {
     set_mouse_capture(false);
     godot::Input::get_singleton()->set_mouse_mode(godot::Input::MOUSE_MODE_VISIBLE);
     frontend_sfx_ = std::make_unique<SfxAudioAdapter>(*this);
+    menu_->set_race_seed(static_cast<std::uint32_t>(diagnostic_race_seed_));
+    menu_player_loadout_.reset();
+    update_frontend_audio();
     last_simulation_usec_ = godot::Time::get_singleton()->get_ticks_usec();
+}
+bool GameHost::competition_weapon_test_step(double delta, int slot, bool nitrous) {
+    try {
+        if (!session_ || !entry_ || pause_menu_ || session_->paused() ||
+            !std::isfinite(delta) || delta < 0 || slot < -1 || slot > 2)
+            return false;
+        InputState input;
+        if (slot >= 0)
+            input.weapon_requested[static_cast<std::size_t>(slot)] = true;
+        input.nitrous_requested = nitrous;
+        competition_test_autopilot_ = false;
+        if (entry_->advance(delta, input) != Result::ok)
+            return false;
+        present_test_frame();
+        update_race_debug();
+        return true;
+    } catch (const std::exception& error) {
+        godot::UtilityFunctions::push_error(error.what());
+        return false;
+    }
 }
 bool GameHost::competition_test_step(double delta, bool autopilot) {
     try {
@@ -1752,6 +2208,21 @@ godot::Dictionary GameHost::get_competition_state() const {
     state["track"] = track_name_;
     state["vehicle"] = vehicle_name_;
     state["diagnostic_seed"] = diagnostic_race_seed_;
+    state["menu_music_playing"] = frontend_music_path_ == "Sfx/SoundBackgroundMusic.wav" &&
+                                  frontend_music_voice_ && frontend_music_voice_->playing();
+    state["frontend_music_path"] = godot::String::utf8(frontend_music_path_.c_str());
+    state["frontend_music_playing"] = frontend_music_voice_ && frontend_music_voice_->playing();
+    state["loading_progress"] =
+        menu_ && menu_->screen() == "loading" ? menu_->loading_progress() : -1;
+    state["loading_intro_complete"] = menu_ && menu_->loading_intro_complete();
+    state["menu_music_position"] =
+        frontend_music_voice_ ? frontend_music_voice_->playback_position() : 0;
+    state["menu_music_gain"] = frontend_music_voice_ ? frontend_music_voice_->linear_gain() : 0;
+    state["menu_music_frames"] = frontend_music_.sample().frame_count();
+    const auto* frontend = pause_menu_ ? pause_menu_.get() : menu_.get();
+    state["frontend_assertion"] =
+        frontend ? godot::String::utf8(std::string(frontend->assertion_message()).c_str())
+                 : godot::String();
     state["track_generation"] = static_cast<int64_t>(race_track_generation_);
     godot::Array tracks;
     for (const auto& track : available_race_tracks_)
@@ -1767,6 +2238,31 @@ godot::Dictionary GameHost::get_competition_state() const {
     state["pause_action"] = pause_menu_
                                 ? godot::String::utf8(std::string(pause_menu_->action()).c_str())
                                 : godot::String();
+    godot::Array ammunition_notices, weapon_ammunition;
+    if (session_) {
+        for (const auto& notice : session_->ammunition_notices()) {
+            godot::Dictionary entry;
+            entry["text"] = godot::String::utf8(notice.text.c_str());
+            entry["remaining"] = notice.remaining;
+            ammunition_notices.push_back(entry);
+        }
+        const auto& player = *session_->racers()[session_->player_index()].vehicle;
+        for (std::size_t slot = 0; slot < 3; ++slot)
+            weapon_ammunition.push_back(player.combat()->slot(static_cast<WeaponSlot>(slot)).ammunition);
+        state["nitrous_ammunition"] = player.equipment().nitrous_ammo;
+    }
+    state["ammunition_notices"] = ammunition_notices;
+    state["weapon_ammunition"] = weapon_ammunition;
+    state["camera_view"] = static_cast<int>(camera_view_);
+    state["cockpit_target"] = static_cast<int>(camera_target_index());
+    state["cockpit_alpha"] = entry_ ? entry_->interpolation_alpha() : 0;
+    state["cockpit_rpm"] = presented_cockpit_rpm_;
+    state["cockpit_steering_fraction"] = presented_cockpit_steering_;
+    const auto cockpit_target = camera_target_index();
+    if (cockpit_target < current_cockpit_states_.size() && cockpit_target < previous_cockpit_states_.size()) {
+        state["cockpit_previous_rpm"] = previous_cockpit_states_[cockpit_target].rpm;
+        state["cockpit_current_rpm"] = current_cockpit_states_[cockpit_target].rpm;
+    }
     state["camera_target"] = debug_overlay_ ? debug_overlay_->ui().race_options().selected_ai : -1;
     state["pause_selection"] = pause_menu_ ? pause_menu_->selected() : -1;
     if (session_) {
@@ -1775,6 +2271,19 @@ godot::Dictionary GameHost::get_competition_state() const {
         state["countdown_digit"] =
             RaceStart::digit(session_->start_sequence().displayed_remaining());
     }
+    godot::Array loadouts;
+    if (session_)
+        for (const auto& racer : session_->racers()) {
+            godot::Dictionary item;
+            item["character"] = godot::String::utf8(racer.character.c_str());
+            item["paint"] = racer.loadout.paint_job;
+            godot::Array weapons;
+            for (const auto& name : racer.loadout.weapons)
+                weapons.push_back(godot::String::utf8(name.c_str()));
+            item["weapons"] = weapons;
+            loadouts.push_back(item);
+        }
+    state["loadouts"] = loadouts;
     godot::Array flags;
     if (debug_overlay_) {
         const auto& options = debug_overlay_->ui().race_options();
@@ -1796,6 +2305,8 @@ godot::Dictionary GameHost::get_competition_state() const {
         state["idle_return_remaining"] = session_->idle_return_remaining();
         state["eliminated"] = session_->ending() == RaceEndReason::eliminated;
     }
+    if (menu_ && menu_->screen() == "loading")
+        state["phase"] = "loading";
     return state;
 }
 godot::Vector2 GameHost::get_race_debug_inspect_position(int index) const {

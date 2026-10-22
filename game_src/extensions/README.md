@@ -102,3 +102,51 @@ change AI/physics. Esc opens the original race menu; Continue/Esc resumes and
 Restart Race restores the complete starting grid and countdown. Godot SceneTree
 pause freezes the scheduler, native audio and RenderingServer particles while
 the host continues menu/debug input. Replay remains unavailable.
+
+## Frame pacing graph
+
+The top-right render profile includes a 600-sample wall-clock frame interval graph,
+with a green reference line at 1000 / the current display refresh rate. Refresh
+rate and runtime VSync mode come from DisplayServer and are polled once per second;
+unknown refresh rates and headless output remain explicit in diagnostic metadata. No display or
+VSync settings are changed. The adapter samples monotonic microseconds once per
+engine process frame, not scaled/clamped process delta or simulation dt. Repeated
+manual test draws in one engine frame do not create extra samples.
+
+The compact panel shows mean FPS and the latest interval on one row, a 36-pixel
+graph, then nearest-rank P99 and maximum. Padding and row spacing are local to
+this panel. Triangle counts, display/VSync details, redundant statistics and
+explanatory captions are omitted from the HUD; full timing/display metadata
+remains available through the diagnostic interface. At 120 Hz the green reference is approximately
+8.33 ms. The graph auto-scales to retain stalls; samples are not clipped or smoothed. Every retained sample is drawn, including
+when the graph is narrower than the sample count, so narrow spikes are not skipped.
+These are CPU callback-to-callback intervals including scheduling/presentation
+waits, not GPU execution times or measured panel scanout timestamps. The debug
+interface `get_frame_timing_state` returns chronological retained samples and
+summary/display metadata for capture tools. History is bounded in memory and
+survives scene restarts with the overlay; sampling does not write a file per frame.
+
+Validation on the configured Vulkan Forward+ host reported 120.00017 Hz and
+VSync Enabled. A 20-second real AI race capture retained a final 600-interval
+window with mean 8.33163 ms, P95 8.880 ms, P99 15.202 ms, maximum 17.071 ms and
+7 intervals above the 12.5 ms threshold. Mean cadence matches the 8.33332 ms
+budget while occasional long intervals remain observable; this does not identify
+their cause. Ignored build artifacts contain the JSON/CSV history and graph PNG.
+The native capture checks repeated same-frame draws and a deliberately injected
+100 ms stall. The bounded-history/percentile test, overlay interaction/render
+smoke, ten-restart RID lifecycle, portable core tests and boundary/progress checks
+passed. No simulation policy or VSync mode was changed by these diagnostics.
+
+Frame attribution and the subsequent resource-preparation investigation are
+recorded in `docs/agent/frame_pacing.md`. The graph anchor is now the host callback
+entry, before route/debug construction. Use `python scripts/profile_frames.py`
+for an opt-in native resource/stage trace; ordinary play does not collect it.
+
+## Frontend unavailable actions
+
+Unimplemented frontend business operations now display a portable recoverable
+ASSERTION FAILED / Not implemented modal even without the debug overlay. Enter,
+Esc or OK closes it without running the rejected action. Season/Multiplayer,
+unsupported option writes, Garage purchases and Replay use this common path.
+Single/Quick menu launches and Loading are live; see
+`docs/agent/evidence/menu_race_launch.md` for scope and acceptance.

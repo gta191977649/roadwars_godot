@@ -25,6 +25,8 @@ struct HudQuad {
     TextureHandle texture;
     std::array<std::array<float, 2>, 4> positions{}, uv{};
     std::array<std::array<float, 4>, 4> colors{};
+    // Isotropic 640x480 reference space, centered horizontally and bottom aligned.
+    bool preserve_aspect{};
 };
 struct MaterialHandle {
     std::uint64_t value{};
@@ -87,6 +89,8 @@ class Renderer {
     virtual Result update_instance(InstanceHandle instance, const Transform& transform) = 0;
     virtual void destroy_instance(InstanceHandle instance) = 0;
     virtual void set_instance_visible(InstanceHandle, bool) {}
+    // A view-only mask; it must not overwrite simulation-owned visibility.
+    virtual void set_instance_camera_hidden(InstanceHandle, bool) {}
     virtual void set_instance_static(InstanceHandle, bool) {}
     // Visual-only discontinuity: do not interpolate an instance across a teleport.
     virtual void reset_instance_interpolation(InstanceHandle) {}
@@ -123,6 +127,8 @@ class Renderer {
     virtual void destroy_material(MaterialHandle) {}
     virtual void destroy_texture(TextureHandle) {}
     // Alpha-mixed pools use the lower atlas; flame uses it with additive blending.
+    // Optional host-side preparation; does not advance or trigger an effect.
+    virtual void prewarm_particles(std::uint32_t, MaterialHandle, bool, bool) {}
     virtual ParticleSystemHandle create_particles(std::uint32_t, MaterialHandle, bool = false,
                                                   bool = false) {
         return {};

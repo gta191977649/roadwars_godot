@@ -1,6 +1,7 @@
 #include "game_src/unresolved/original_camera.hpp"
 #include <algorithm>
 #include <cmath>
+#include <utility>
 
 namespace roadwars {
 namespace {
@@ -111,7 +112,7 @@ bool intersect(Vec3 a, Vec3 b, Vec3 c, Vec3 d, Vec3& point) {
 } // namespace
 
 // RE-STUB: 93b4e4c301a5694b55e16977c2e52f4971bd9089659e3d58617c8af2368436c8:function:0040d4cb
-// Preserve the original HOODZ field used by chase-camera height; other camera modes are separate.
+// Preserve original configuration axis remapping; only HOODZ enters the stock chase path.
 Result load_original_camera_settings(ResourceStore& resources, std::string_view vehicle,
                                      OriginalCameraSettings& settings, std::string& error) {
     Configuration config;
@@ -121,10 +122,25 @@ Result load_original_camera_settings(ResourceStore& resources, std::string_view 
         return Result::not_found;
     }
     OriginalCameraSettings result;
-    if (config.number("CAMERAINFO", "HOODZ", result.hood_height_offset) != Result::ok) {
+    if (config.number("CAMERAINFO", "HOODZ", result.hood_height_offset) != Result::ok ||
+        !std::isfinite(result.hood_height_offset)) {
         error = "Original camera HOODZ setting unavailable";
         return Result::invalid_argument;
     }
+    float in_x{}, in_y{}, in_z{}, hood_x{}, hood_y{};
+    for (const auto& [key, value] :
+         std::array<std::pair<std::string_view, float*>, 5>{{{"INCARX", &in_x},
+                                                          {"INCARY", &in_y},
+                                                          {"INCARZ", &in_z},
+                                                          {"HOODX", &hood_x},
+                                                          {"HOODY", &hood_y}}}) {
+        if (config.number("CAMERAINFO", key, *value) != Result::ok || !std::isfinite(*value)) {
+            error = "Original camera setting unavailable or invalid: " + std::string(key);
+            return Result::invalid_argument;
+        }
+    }
+    result.in_car_local_position = {-in_x, in_z, in_y};
+    result.hood_local_position = {hood_x, result.hood_height_offset, hood_y};
     std::vector<std::byte> bytes;
     MeshObject body;
     if (resources.read(prefix + "/Body/SpatialObject.msh", bytes) != Result::ok) {
@@ -137,6 +153,7 @@ Result load_original_camera_settings(ResourceStore& resources, std::string_view 
     for (const auto& child : body.children)
         if (child.name == "1024Body") {
             result.body_local_position = child.position;
+            result.body_local_angles = child.angles_degrees;
             found = true;
             break;
         }
@@ -144,8 +161,102 @@ Result load_original_camera_settings(ResourceStore& resources, std::string_view 
         error = "Original camera 1024Body node unavailable";
         return Result::unavailable;
     }
+    // 0040ee2c binds the native cockpit eye to HoodPoint (+44cc), not the unused
+    // INCAR configuration. Root serialized translation is replaced by VehicleState.
+    std::vector<std::size_t> path;
+    const auto find = [&](auto&& self, const MeshObject& node) -> bool {
+        if (node.name == "HoodPoint")
+            return true;
+        for (std::size_t i = 0; i < node.children.size(); ++i) {
+            path.push_back(i);
+            if (self(self, node.children[i]))
+                return true;
+            path.pop_back();
+        }
+        return false;
+    };
+    if (!find(find, body)) {
+        error = "Original camera HoodPoint node unavailable";
+        return Result::unavailable;
+    }
+    result.hood_point_local_position = original_mesh_node_pose(body, path, {}, {}).origin;
     settings = result;
     error.clear();
+    return Result::ok;
+}
+
+CameraView next_camera_view(CameraView view) {
+    switch (view) {
+    case CameraView::near_chase:
+        return CameraView::far_chase;
+    case CameraView::far_chase:
+        return CameraView::hood;
+    case CameraView::hood:
+        return CameraView::cockpit;
+    case CameraView::cockpit:
+        return CameraView::near_chase;
+    }
+    return CameraView::near_chase;
+}
+
+// RE-STUB: 93b4e4c301a5694b55e16977c2e52f4971bd9089659e3d58617c8af2368436c8:function:00409420
+// Native cockpit eye/orientation, plus explicitly modern far-chase and hood modes.
+Result camera_view_frame(CameraView view, const VehicleState& vehicle,
+                         const VehicleParameters& parameters, const OriginalCameraSettings& settings,
+                         const TrackCollision* track, const CameraFrame& near_frame,
+                         CameraFrame& output) {
+    if (view == CameraView::near_chase) {
+        output = near_frame;
+        return Result::ok;
+    }
+    const auto finite = [](Vec3 v) {
+        return std::isfinite(v.x) && std::isfinite(v.y) && std::isfinite(v.z);
+    };
+    if (!finite(vehicle.position) || !std::isfinite(vehicle.heading_degrees) ||
+        !std::isfinite(vehicle.pitch_degrees) || !std::isfinite(vehicle.roll_degrees))
+        return Result::invalid_argument;
+    if (view == CameraView::far_chase) {
+        output = near_frame;
+        const Vec3 direction = normalized(subtract(near_frame.transform.origin, near_frame.pivot));
+        output.transform.origin = add(near_frame.transform.origin, scale(direction, 2.6f));
+        output.transform.origin.y += .5f;
+        if (track) {
+            const float radius = length(subtract(output.transform.origin, output.pivot)) + 2;
+            const auto walls = track->nearby_walls(output.transform.origin, output.transform.origin,
+                                                   radius, true);
+            const float wall_distance = original_camera_wall_distance(
+                output.transform.origin, output.heading_degrees, output.pivot, parameters.length,
+                walls);
+            if (wall_distance != 0) {
+                const float desired = std::max(.1f, wall_distance - 1);
+                const auto direction_to_eye =
+                    normalized(subtract(output.transform.origin, output.pivot));
+                output.transform.origin = add(output.pivot, scale(direction_to_eye, desired));
+            }
+            const auto ground = track->sample(output.transform.origin);
+            if (ground.hit)
+                output.transform.origin.y = std::max(output.transform.origin.y, ground.point.y + .5f);
+        }
+        return finite(output.transform.origin) ? Result::ok : Result::invalid_argument;
+    }
+    if (view != CameraView::hood && view != CameraView::cockpit)
+        return Result::invalid_argument;
+    const auto pose = original_vehicle_transform(vehicle.position, vehicle.heading_degrees,
+                                                  vehicle.pitch_degrees, vehicle.roll_degrees);
+    const Vec3 local = view == CameraView::cockpit
+                           ? settings.hood_point_local_position
+                           : add(settings.body_local_position, settings.hood_local_position);
+    if (!finite(local) || !finite(settings.body_local_angles))
+        return Result::invalid_argument;
+    const Vec3 eye = add(vehicle.position, vector(pose, local));
+    output = original_camera_frame(eye, eye, vehicle.heading_degrees,
+                                    vehicle.pitch_degrees + settings.body_local_angles.y);
+    const auto orientation = original_vehicle_transform(
+        eye, vehicle.heading_degrees, vehicle.pitch_degrees + settings.body_local_angles.y,
+        vehicle.roll_degrees + settings.body_local_angles.z);
+    output.transform.basis = {scale(orientation.basis[0], -1), orientation.basis[1],
+                              scale(orientation.basis[2], -1)};
+    output.vertical_fov_degrees = near_frame.vertical_fov_degrees;
     return Result::ok;
 }
 

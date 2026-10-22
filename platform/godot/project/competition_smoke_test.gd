@@ -1,6 +1,7 @@
 extends SceneTree
 
 var host
+const Presentation = preload("res://presentation_assertions.gd")
 
 func _initialize() -> void:
     call_deferred("run_test")
@@ -14,6 +15,9 @@ func require(value: bool, message: String) -> bool:
 func pump(frames: int = 2) -> bool:
     for frame in range(frames):
         if not require(host.competition_test_step(0.0, false), "Competition presentation failed"):
+            return false
+        if not Presentation.verify_presentation(host, host.get_presentation_state()):
+            quit(1)
             return false
         await process_frame
     return true
@@ -284,6 +288,9 @@ func run_test() -> void:
         if not require(host.competition_test_step(0.25, false), "Competition simulation failed"):
             return
         var state: Dictionary = host.get_competition_state()
+        if state.get("phase", "") != "results" and not Presentation.verify_presentation(host, host.get_presentation_state()):
+            quit(1)
+            return
         if not moving_pause_checked and state.get("player_node", -1) in [14, 15]:
             moving_pause_checked = true
             root.size = Vector2i(1280, 960)
@@ -296,22 +303,32 @@ func run_test() -> void:
             if not await pump():
                 return
             var frozen_ticks = host.get_simulation_ticks()
+            var frozen_presentation: Dictionary = host.get_presentation_state()
             host.set_process(true)
             for sample in range(30):
                 await process_frame
             host.set_process(false)
-            if not require(host.get_simulation_ticks() == frozen_ticks,
-                           "Moving-race pause advanced scheduler ticks"):
+            if not require(host.get_simulation_ticks() == frozen_ticks and
+                           host.get_presentation_state() == frozen_presentation,
+                           "Moving-race pause advanced scheduler ticks or transforms"):
                 return
             if DisplayServer.get_name() != "headless":
                 await RenderingServer.frame_post_draw
-                var before = root.get_texture().get_image().get_region(Rect2i(0, 700, 1280, 250)).get_data()
+                var before_image = root.get_texture().get_image().get_region(Rect2i(0, 700, 1280, 250))
                 host.set_process(true)
                 for sample in range(20):
                     await process_frame
                 host.set_process(false)
                 await RenderingServer.frame_post_draw
-                if not require(before == root.get_texture().get_image().get_region(Rect2i(0, 700, 1280, 250)).get_data(),
+                var after_image = root.get_texture().get_image().get_region(Rect2i(0, 700, 1280, 250))
+                var pixels_match = Presentation.frozen_pixels_match(before_image, after_image)
+                if not pixels_match:
+                    for argument in OS.get_cmdline_user_args():
+                        if argument.begins_with("--capture-dir="):
+                            var folder = argument.trim_prefix("--capture-dir=")
+                            before_image.save_png(folder.path_join("pause_pixels_before.png"))
+                            after_image.save_png(folder.path_join("pause_pixels_after.png"))
+                if not require(pixels_match and host.get_presentation_state() == frozen_presentation,
                                "Moving-race pause changed world pixels"):
                     return
             if not await capture("pause_moving"):
@@ -328,6 +345,41 @@ func run_test() -> void:
             print("COMPETITION_PROGRESS ", state)
         if frame == 80:
             if not await capture("race_running"):
+                return
+            key_event(KEY_F8, true)
+            key_event(KEY_F8, false)
+            if not await pump():
+                return
+            for target in [0, -1]:
+                var world: Dictionary = host.get_presentation_state().instances
+                for row in [0, 2 if target == 0 else 1]:
+                    var position = host.get_race_debug_inspect_position(row)
+                    mouse_motion(position)
+                    if not await pump():
+                        return
+                    mouse_button(position, true)
+                    if not await pump():
+                        return
+                    mouse_button(position, false)
+                    if not await pump():
+                        return
+                if not require(host.get_competition_state().camera_target == target and
+                               world == host.get_presentation_state().instances,
+                               "Moving camera cut changed world interpolation history"):
+                    return
+                for sample in range(120):
+                    var dt = [1.0/120, 1.0/144, 1.0/59, 1.0/240][sample % 4]
+                    if not require(host.competition_test_step(dt, false), "Moving spectate step failed"):
+                        return
+                    if not Presentation.verify_presentation(host, host.get_presentation_state()):
+                        quit(1)
+                        return
+                    await process_frame
+                if not await capture("race_spectate_" + str(target)):
+                    return
+            key_event(KEY_F8, true)
+            key_event(KEY_F8, false)
+            if not await pump():
                 return
         await process_frame
     if not require(moving_pause_checked, "Moving-pause validation point was not reached"):

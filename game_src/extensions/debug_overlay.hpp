@@ -1,5 +1,6 @@
 #pragma once
 #include "game_src/interfaces/race_debug.hpp"
+#include "game_src/extensions/frame_timing.hpp"
 #include <array>
 #include <cstdint>
 #include <deque>
@@ -48,6 +49,14 @@ class DebugOverlay {
     DebugOverlay& operator=(const DebugOverlay&) = delete;
     ImDrawData* frame(float width, float height, float delta, float dpi_scale,
                       std::uint64_t triangles, bool interactive);
+    void record_frame_interval(float ms) { frame_timing_.record(ms); }
+    void set_display_timing(float refresh_hz, std::string vsync) {
+        refresh_hz_ = refresh_hz;
+        vsync_ = std::move(vsync);
+    }
+    const FrameTiming& frame_timing() const { return frame_timing_; }
+    float refresh_hz() const { return refresh_hz_; }
+    const std::string& vsync() const { return vsync_; }
     void mouse_position(float x, float y);
     void mouse_button(int button, bool down);
     void mouse_wheel(float x, float y);
@@ -72,6 +81,9 @@ class DebugOverlay {
     std::array<float, 2> race_track_position(int index) const;
 
   private:
+    FrameTiming frame_timing_;
+    float refresh_hz_{};
+    std::string vsync_{"Unknown"};
     void current() const;
     void draw_race_debug(float width, float height);
     std::shared_ptr<DebugMessages> messages_;

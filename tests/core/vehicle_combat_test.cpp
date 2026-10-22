@@ -284,6 +284,16 @@ int main(int argc, char** argv) {
                 descriptor.name == "Reactive Mines" || descriptor.name == "Arachnoids";
             assert(persistent || combat.callback_tokens().empty());
             assert(persistent || combat.slot(descriptor.slot).ready);
+            if ((descriptor.name == "Rocket Launcher" || weapon_is_guided(descriptor.name)) &&
+                combat.slot(descriptor.slot).ammunition > 0) {
+                // Reusing a fired missile must not light the next attached missile.
+                assert(combat.request(descriptor.slot, 0, isolated.heading, isolated.pitch,
+                                      isolated.body_pitch));
+                combat.refresh_visuals(isolated);
+                for (const auto& visual : combat.visuals())
+                    if (visual.kind == VehicleCombatVisualKind::missile_flare)
+                        assert(!visual.visible);
+            }
             // Destroy all coordinator-owned active instances through a successful reload.
             // Persistent mines have no invented lifetime timeout.
             require(combat.load(installed, first_car, {}, error), error);

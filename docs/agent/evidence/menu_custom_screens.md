@@ -71,8 +71,10 @@ therefore remains in `game_src/unresolved`.
   coordinates (70,18), scale .7. Their renderer uses icon half-size 72 for the
   selected item and 36 otherwise. A single continue icon centers at (540,392);
   summary garage/start icons center at (98,392)/(540,392). Selected overlay
-  alpha runs between 0 and .7. Label compositing is not yet bit-identical to the
-  original render-to-surface path.
+  alpha runs between 0 and .7. Labels use the shared Arial15 font (menu+0x7c),
+  centered horizontally and vertically at source-surface (70,18), scale .7.
+  Portable glyph placement applies the same source-surface-to-icon scaling;
+  rasterization is not claimed bit-identical to the original surface path.
 - `00494a1d` loads `Tracks/<track>/16RaceSummaryBackground.bmp`. Racer portraits
   start at (71,148); paired columns differ by 290 pixels and each subsequent
   pair by 55 pixels vertically. Points-box offset is (+46,+1); player names are
@@ -158,3 +160,25 @@ Keyboard and joystick names follow all 104 cases in `00486ac0`/`00487374`.
 bound to the target SHA256. Unsupported codes use the original empty fallback.
 Dialog variants use the original localized question strings, select No initially,
 and retain the preceding presentation rather than displaying an empty backdrop.
+
+
+## Summary font correction (2026-10-22)
+
+Retained static evidence: summary_icon_fonts_ghidra.json, with the same executable
+hash as this document. 004a9879 initializes menu+0x7c with FontArial15 and spacing
+zero. 004927c0 passes that owner, (70,18) and .7 to 004a91f0, which draws icon
+labels with both centering flags before the full source surface is resized.
+The reconstruction incorrectly used Font18Imp, an independent selected/unselected
+font scale, and a position below the icon. The shared action-icon helper now uses
+Arial15 and transforms the baked source coordinates and size together with the
+icon. This also restores the same wrapper contract for results/standings icons.
+The installed summary icon surface is 256x256, with padded icon artwork; placing
+text relative to the full destination center moved it outside its original band.
+
+The middle summary rows were separately checked in 00494a1d: Cyber16 labels use
+scale1 at x210 and y344/376/408; Font18Imp values use scale1 centered at x349,
+white with .7 alpha. Those already matched the static reference and were retained.
+No arbitrary per-resolution font substitution or global UI scaling was introduced.
+Native Vulkan Single/Quick menu smoke passed and the updated Summary capture was
+visually inspected. Core and Godot builds passed, core CTest66/66 passed. These
+are reconstructed rendering checks, not a running-original screenshot comparison.

@@ -2,9 +2,11 @@
 #include "game_src/interfaces/host.hpp"
 #include "game_src/interfaces/race_debug.hpp"
 #include <godot_cpp/classes/rendering_server.hpp>
-#include <godot_cpp/variant/rid.hpp>
 #include <godot_cpp/variant/dictionary.hpp>
+#include <godot_cpp/variant/rid.hpp>
 #include <godot_cpp/variant/transform3d.hpp>
+#include <map>
+#include <tuple>
 #include <unordered_map>
 #include <unordered_set>
 
@@ -20,6 +22,7 @@ class ServerRenderer final : public Renderer {
     Result update_instance(InstanceHandle, const Transform&) override;
     void destroy_instance(InstanceHandle) override;
     void set_instance_visible(InstanceHandle, bool) override;
+    void set_instance_camera_hidden(InstanceHandle, bool) override;
     void set_instance_static(InstanceHandle, bool) override;
     void reset_instance_interpolation(InstanceHandle) override;
     Result set_instance_mesh(InstanceHandle, MeshHandle) override;
@@ -30,6 +33,7 @@ class ServerRenderer final : public Renderer {
     std::size_t live_rids() const;
     Result draw_hud(std::span<const HudQuad>) override;
     void resize_hud(float width, float height);
+    void set_first_person(bool enabled) { first_person_ = enabled; }
     void set_hud_visible(bool visible);
     TextureHandle upload_texture(std::uint32_t width, std::uint32_t height,
                                  std::span<const std::byte> rgba) override;
@@ -39,6 +43,7 @@ class ServerRenderer final : public Renderer {
     void configure_scene(const SceneSettings&) override;
     void create_fog_fixture(float aspect);
     void create_billboard_fixture();
+    void clear_sky();
     Result configure_sky(std::span<const Vec3>, std::span<const std::array<float, 2>>,
                          std::span<const std::uint32_t>, MaterialHandle) override;
     MeshHandle upload_surface(std::span<const Vec3> positions,
@@ -50,6 +55,7 @@ class ServerRenderer final : public Renderer {
                               std::span<const std::array<float, 4>>) override;
     void destroy_material(MaterialHandle material) override;
     void destroy_texture(TextureHandle texture) override;
+    void prewarm_particles(std::uint32_t, MaterialHandle, bool, bool) override;
     ParticleSystemHandle create_particles(std::uint32_t, MaterialHandle, bool = false,
                                           bool = false) override;
     Result set_instance_vertex_color(InstanceHandle, std::uint32_t) override;
@@ -76,6 +82,10 @@ class ServerRenderer final : public Renderer {
     PoseHistory camera_pose_;
     float camera_fov_{50}, previous_camera_fov_{50}, presented_camera_fov_{50};
     bool interpolation_enabled_{};
+    bool first_person_{};
+    float hud_width_{640}, hud_height_{480};
+    std::vector<std::array<godot::Vector2, 4>> aspect_hud_pixels_;
+    std::unordered_set<std::uint64_t> camera_hidden_, invisible_instances_;
     godot::RenderingServer* server_{};
     godot::RID viewport_, scenario_, camera_, shader_, material_;
     godot::RID environment_, light_, light_instance_;
@@ -94,5 +104,9 @@ class ServerRenderer final : public Renderer {
         std::uint32_t capacity{};
     };
     std::unordered_map<std::uint64_t, ParticleResources> particle_systems_;
+    std::unordered_map<std::uint32_t, godot::RID> particle_process_shaders_;
+    std::map<std::pair<std::uint32_t, bool>, godot::RID> particle_draw_shaders_;
+    std::map<std::tuple<std::uint32_t, std::uint64_t, bool, bool>, ParticleSystemHandle>
+        particle_warmups_;
 };
 } // namespace roadwars

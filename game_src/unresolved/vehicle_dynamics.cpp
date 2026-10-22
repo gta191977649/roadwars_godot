@@ -137,6 +137,8 @@ Result load_vehicle_geometry(ResourceStore& resources, std::string_view vehicle,
         if (decode_msh(bytes, *item.second, error) != Result::ok)
             return Result::invalid_argument;
     }
+    // The live chassis root is positioned by VehicleState, not its export-time translation.
+    body.position = {};
     auto bounds = [](const MeshObject& object, Vec3& lower, Vec3& upper) {
         bool found = false;
         for (const auto& part : object.parts)

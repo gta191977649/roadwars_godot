@@ -30,13 +30,23 @@ int main() {
     assert(pool.draw_order()[0] == 1 && pool.draw_order()[1] == 0);
     std::uint32_t frame{};
     assert(pool.atlas_frame(0, frame) == Result::ok);
-    assert(pool.atlas_frame(1, frame) == Result::unavailable);
+    assert(pool.atlas_frame(1, frame) == Result::ok);
     assert(pool.atlas_frame(40, frame) == Result::invalid_argument);
     const auto older_life = pool.particles()[0].remaining_life;
     assert(pool.advance(.02f, 0, {}, {}, random) == Result::ok);
     assert(pool.draw_order().size() == 1 && pool.draw_order()[0] == 0);
     // Original live-count traversal bound stops after removing the youngest head.
     assert(pool.particles()[0].remaining_life == older_life);
+    // Every emitted slot must remain drawable through several complete pool wraps.
+    pool.reset();
+    for (unsigned tick = 0; tick < 1200; ++tick) {
+        assert(pool.advance(1.f / 60, 1, {}, {}, random) == Result::ok);
+        for (const auto slot : pool.draw_order()) {
+            assert(pool.atlas_frame(slot, frame) == Result::ok && frame < 4);
+        }
+        if (tick > 12)
+            assert(pool.draw_order().size() >= 2);
+    }
     pool.stop(true);
     assert(!pool.enabled() && pool.draw_order().empty());
     const auto before = draws;

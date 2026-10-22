@@ -132,3 +132,18 @@ clean-first fixtures, cross-process build locking and repeated core/Godot no-op
 builds passed. Six pre-existing empty Ninja dependency records were repaired;
 their original corruption cause was not established. Rebuilding those objects
 removed the stale RaceSession layout mismatch observed by the competition smoke.
+
+## CLI Single Race launch randomization (2026-10-22)
+
+The --race launch continues to use RaceSession::load and RaceLoadoutTable::assign
+for every participant, including the player: paint, available weapons and equipment
+follow the existing recovered ordering. The launcher no longer injects seed 1 when
+--seed is omitted. GameHost selects a fresh time-derived seed once at startup; an
+explicit --seed still overrides it for reproducible diagnostics. This seed policy
+is a modern launch convenience, not a recovered original startup-seeding claim.
+Restart retains the current race setup. No loadout algorithm or RNG draw order
+changes were made.
+
+Validation: core/Godot builds, core CTest 66/66, headless full competition
+smoke and progress/boundary checks passed. Four real host startups verified two
+distinct default seeds and two explicit seed-1 results.

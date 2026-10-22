@@ -131,6 +131,7 @@ Result RacePresentation::load_vehicle_visual(ResourceStore& resources, std::stri
         return Result::invalid_argument;
     const auto vehicle_path = "Cars/" + std::string(vehicle) + "/Body";
     std::vector<std::byte> bytes;
+    vehicle_mesh_.position = {}; // VehicleState replaces the serialized chassis root pose.
     const auto body_textures = paint_job > 0 ? "Cars/" + std::string(vehicle) +
                                                    "/Paint/Paint Job " + std::to_string(paint_job)
                                              : vehicle_path;
@@ -201,7 +202,7 @@ Result RacePresentation::add_opponent(ResourceStore& resources, std::string_view
 // RE-STUB: 93b4e4c301a5694b55e16977c2e52f4971bd9089659e3d58617c8af2368436c8:function:00411ecc
 Result RacePresentation::replace_player_visual(ResourceStore& resources, std::string_view vehicle,
                                                const RaceLoadout& loadout, std::string& error) {
-    if (loadout.paint_job < 1 || loadout.paint_job > 6)
+    if (loadout.paint_job < 0 || loadout.paint_job > 6)
         return Result::invalid_argument;
     damage_visuals_.clear();
     for (const auto index : vehicle_instances_) {
@@ -446,6 +447,126 @@ Result RacePresentation::update_combat_visual(std::size_t id, const Transform& p
     swap_visual(visual);
     return Result::ok;
 }
+// Modern loading-time preparation, independent of the recovered effect timeline.
+Result RacePresentation::prepare_combat(ResourceStore& resources, const RaceSession& session,
+                                        std::string& error) {
+    const auto prepare = [&](std::size_t capacity, std::string_view texture, bool mix,
+                             bool lower_atlas = false) {
+        if (!capacity)
+            return;
+        const auto separator = texture.find_last_of('/');
+        MeshPart part;
+        part.texture = texture.substr(separator + 1);
+        renderer_.prewarm_particles(static_cast<std::uint32_t>(capacity),
+                                    material(resources, std::string(texture.substr(0, separator)),
+                                             part, mix ? 0x125 : 0x127),
+                                    mix, lower_atlas);
+    };
+    // These bounded pools already exist in the session before gameplay. Prepare
+    // their actual capacities, rather than assuming a particular effects scalar.
+    for (const auto& particles : session.vehicle_particles()) {
+        prepare(particles.sparks.particles().size(), "Textures/16ParticleFX.bmp", false);
+        for (const auto& tire : particles.tires)
+            prepare(tire.particles().size(), "Textures/xxParticleFX.bmp", true, true);
+        prepare(particles.damage.particles().size(), "Textures/16ParticleFX.bmp", false);
+        prepare(particles.damage.particles().size(), "Textures/xxParticleFX.bmp", true);
+    }
+    for (const auto& chimney : session.chimneys())
+        prepare(chimney.pool.particles().size(), chimney.pool.texture_path(), true, true);
+    for (const auto& pool : session.nitrous_trails())
+        prepare(pool.particles().size(), pool.texture_path(), pool.uses_tire_atlas());
+    for (const auto& pools : session.rear_blast_pools())
+        for (const auto& blast : pools) {
+            prepare(blast.primary_particles().size(), "Textures/16ParticleFX.bmp", false, true);
+            prepare(blast.secondary_particles().size(), "Textures/xxParticleFX.bmp", true, true);
+        }
+    const auto weapon = [&](std::string_view name, float missile_count) -> Result {
+        WeaponImpactPool impact;
+        auto result = impact.configure(name, session.special_effects_scalar(), missile_count);
+        if (result == Result::ok) {
+            prepare(impact.particles().size(), impact.texture_path(), false);
+            if (impact.requires_secondary_sprite())
+                prepare(1, VulcanImpactSprite{}.texture_path(), false);
+        } else if (result != Result::unavailable)
+            return result;
+        WeaponTrailPool trail;
+        result = trail.configure(name, session.special_effects_scalar());
+        if (result == Result::ok)
+            prepare(trail.particles().size(), trail.texture_path(), trail.uses_tire_atlas());
+        else if (result != Result::unavailable)
+            return result;
+        return Result::ok;
+    };
+    for (std::size_t owner = 0; owner < session.racers().size(); ++owner) {
+        const auto& racer = session.racers()[owner];
+        const auto* combat = racer.vehicle->combat();
+        if (!combat)
+            continue;
+        const auto missiles = combat->guided_missiles().size();
+        for (const auto& asset : combat->assets()) {
+            if (!asset.descriptor)
+                continue;
+            if (weapon(asset.descriptor->name, missiles ? static_cast<float>(missiles) : 1) !=
+                Result::ok) {
+                error = "Combat particle preparation failed";
+                return Result::unavailable;
+            }
+            const auto base = "Cars/Shared/Weapons/" +
+                              std::string(weapon_slot_name(asset.descriptor->slot)) + "/" +
+                              std::string(asset.descriptor->name);
+            const auto visual = [&](VehicleCombatVisualKind kind, std::size_t index,
+                                    const MeshObject& mesh, const std::string& path) {
+                const std::array<std::size_t, 4> key{
+                    owner + 1, static_cast<std::size_t>(asset.descriptor->slot),
+                    static_cast<std::size_t>(kind), index};
+                if (combat_visual_ids_.contains(key))
+                    return Result::ok;
+                std::size_t id{};
+                const auto result = add_combat_visual(resources, mesh, path, id, error);
+                if (result == Result::ok)
+                    combat_visual_ids_.emplace(key, id);
+                return result;
+            };
+            if (asset.has_weapon_mesh &&
+                visual(VehicleCombatVisualKind::mounted, 0, asset.weapon, base) != Result::ok)
+                return Result::unavailable;
+            for (std::size_t m = 0; m < asset.muzzle_meshes.size(); ++m)
+                if (visual(VehicleCombatVisualKind::muzzle_flash, m, asset.muzzle_meshes[m],
+                           base) != Result::ok)
+                    return Result::unavailable;
+            const auto capacity = combat->projectile_capacity(asset.descriptor->slot);
+            for (std::size_t m = 0; m < capacity; ++m) {
+                const auto kind = asset.descriptor->slot == WeaponSlot::rear
+                                      ? VehicleCombatVisualKind::rear_instance
+                                      : VehicleCombatVisualKind::projectile;
+                if (asset.has_ammunition_mesh &&
+                    visual(kind, m, asset.ammunition, base) != Result::ok)
+                    return Result::unavailable;
+                if (asset.has_flare_mesh && visual(VehicleCombatVisualKind::missile_flare, m,
+                                                   asset.flare_mesh, base) != Result::ok)
+                    return Result::unavailable;
+                if (asset.has_leg_meshes)
+                    for (std::size_t leg = 0; leg < 2; ++leg)
+                        if (visual(VehicleCombatVisualKind::rear_leg, m * 2 + leg,
+                                   asset.leg_meshes[leg], base) != Result::ok)
+                            return Result::unavailable;
+            }
+            if (asset.has_mount_housing)
+                for (std::size_t m = 0; m < asset.mount_housing_meshes.size(); ++m)
+                    if (visual(VehicleCombatVisualKind::mount_housing, m,
+                               asset.mount_housing_meshes[m],
+                               "Cars/" + racer.character + "/Paint/Paint Job " +
+                                   std::to_string(racer.loadout.paint_job)) != Result::ok)
+                        return Result::unavailable;
+        }
+    }
+    for (const auto& asset : session.scene_combat().assets())
+        if (weapon(asset.name, 1) != Result::ok) {
+            error = "Scene particle preparation failed";
+            return Result::unavailable;
+        }
+    return Result::ok;
+}
 // RE-STUB: 93b4e4c301a5694b55e16977c2e52f4971bd9089659e3d58617c8af2368436c8:function:004f878f
 Result RacePresentation::update_combat(ResourceStore& resources, const RaceSession& session,
                                        std::string& error) {
@@ -463,9 +584,8 @@ Result RacePresentation::update_combat(ResourceStore& resources, const RaceSessi
             return Result::ok;
         auto found = combat_particle_ids_.find(key);
         if (found == combat_particle_ids_.end()) {
-            if (std::none_of(particles.begin(), particles.end(),
-                             [](const ParticleRenderState& particle) { return particle.active; }))
-                return Result::ok;
+            // Allocate known bounded pools during the initial loading submission,
+            // even when all slots are inactive. No emitter is advanced here.
             const auto separator = texture.find_last_of('/');
             MeshPart part;
             part.texture = texture.substr(separator + 1);
@@ -598,8 +718,6 @@ Result RacePresentation::update_combat(ResourceStore& resources, const RaceSessi
             return Result::ok;
         auto found = combat_particle_ids_.find(key);
         if (found == combat_particle_ids_.end()) {
-            if (pool.active_count() == 0)
-                return Result::ok;
             MeshPart part;
             const auto path = std::string(pool.texture_path());
             const auto separator = path.find_last_of('/');
@@ -1025,6 +1143,24 @@ void RacePresentation::update_vehicle(const Transform& pose) {
                 transform.basis[axis] = rotate(wheel.basis[axis]);
         }
         renderer_.update_instance(instance.handle, transform);
+    }
+}
+void RacePresentation::set_camera_vehicle_hidden(int target, std::size_t player_index) {
+    const auto mask = [&](const auto& indices, bool hidden) {
+        for (const auto index : indices)
+            renderer_.set_instance_camera_hidden(instances_[index].handle, hidden);
+    };
+    mask(vehicle_instances_, target == static_cast<int>(player_index));
+    for (std::size_t i = 0; i < opponents_.size(); ++i)
+        mask(opponents_[i].instances, target == static_cast<int>(i));
+    for (const auto& [key, id] : combat_visual_ids_) {
+        const auto kind = static_cast<VehicleCombatVisualKind>(key[2]);
+        const bool attached = kind == VehicleCombatVisualKind::mounted ||
+                              kind == VehicleCombatVisualKind::muzzle_flash ||
+                              kind == VehicleCombatVisualKind::rear_leg ||
+                              kind == VehicleCombatVisualKind::mount_housing;
+        mask(combat_visuals_[id].instances, attached && target >= 0 &&
+             key[0] == static_cast<std::size_t>(target + 1));
     }
 }
 void RacePresentation::snap_racer(std::size_t index, std::size_t player_index) {

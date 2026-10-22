@@ -1,7 +1,10 @@
 #pragma once
 #include "game_src/unresolved/frontend_canvas.hpp"
 #include "game_src/unresolved/frontend_custom.hpp"
+#include "game_src/unresolved/race_loadout.hpp"
+#include <array>
 #include <memory>
+#include <optional>
 
 namespace roadwars {
 class FrontendVideo;
@@ -21,6 +24,14 @@ struct FrontendSelection {
     bool available{}, fade{};
     float radius{50};
 };
+enum class FrontendRaceMode { none, single, quick };
+struct FrontendRaceRequest {
+    FrontendRaceMode mode{FrontendRaceMode::none};
+    std::string character, track;
+    int laps{3};
+    std::uint32_t seed{1};
+    std::optional<RaceLoadout> player_loadout;
+};
 class MenuFrontend {
   public:
     MenuFrontend(ResourceStore&, Renderer&);
@@ -36,6 +47,7 @@ class MenuFrontend {
                              std::string& error);
     std::string_view screen() const { return screen_; }
     std::string_view action() const { return action_; }
+    std::string_view assertion_message() const { return assertion_message_; }
     int selected() const { return selected_; }
     double screen_time() const { return time_; }
     bool quit_requested() const { return quit_; }
@@ -44,6 +56,21 @@ class MenuFrontend {
     std::vector<std::string> take_sound_events();
     std::span<const FrontendSelection> selections() const { return selections_; }
     std::span<const HudQuad> commands() const { return canvas_.commands(); }
+    void set_race_seed(std::uint32_t seed) { race_request_.seed = seed; }
+    const FrontendRaceRequest& race_request() const { return race_request_; }
+    bool race_requested() const {
+        return screen_ == "loading" && live_loading_ && loading_target_ == "race";
+    }
+    Result set_loading_progress(float fraction, std::string_view message, std::string& error);
+    bool loading_fade_complete() const {
+        return custom_.loading_progress >= 1 && loading_finish_time_ >= .3;
+    }
+    float loading_progress() const { return custom_.loading_progress; }
+    bool loading_intro_complete() const { return screen_ == "loading" && time_ >= .3; }
+    std::string music_path() const;
+    std::string_view selected_character() const { return character_; }
+    float music_gain_scale() const;
+    bool menu_music_requested() const;
     static std::span<const FrontendScreenInfo> screens();
     static std::array<int, 2> icon_center(int count, int slot);
 
@@ -53,10 +80,17 @@ class MenuFrontend {
     FrontendCanvas canvas_;
     std::unique_ptr<FrontendVideo> video_;
     std::unique_ptr<FrontendScene> scene_;
+    std::array<std::unique_ptr<FrontendScene>, 7> prepared_garage_;
+    std::array<std::vector<FrontendOptionRow>, 7> prepared_garage_rows_;
+    int garage_loading_step_{}, active_scene_variant_{};
+    bool garage_prepared_{};
+    Result advance_garage_loading(double elapsed, std::string& error);
     FrontendSprite video_frame_;
     int video_index_{-1};
     std::string screen_, title_, action_, variant_, character_{"ANIMAL"}, track_{"DARK FOREST"};
     std::string connection_{"IPX"};
+    std::string assertion_message_;
+    void show_unimplemented_action();
     std::vector<std::string> history_;
     std::vector<std::string> sounds_;
     float sfx_gain_{1};
@@ -68,7 +102,11 @@ class MenuFrontend {
     double time_{}, exit_time_{-1}, fade_seconds_{.3}, timeout_seconds_{};
     double pulse_time_{};
     bool back_enabled_{}, fade_in_{}, times_out_{}, preview_{}, quit_{};
-    bool live_results_{}, live_pause_{};
+    bool live_results_{}, live_pause_{}, live_loading_{};
+    FrontendRaceRequest race_request_;
+    std::string loading_target_{"race"};
+    double loading_finish_time_{};
+    Result prepare_race(std::string& error);
     int selected_{}, scroll_{}, language_{};
     std::string pending_;
     Result enter(std::string_view id, std::string& error);

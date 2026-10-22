@@ -502,7 +502,7 @@ DebugOverlay::~DebugOverlay() {
 }
 void DebugOverlay::current() const { ImGui::SetCurrentContext(context_); }
 ImDrawData* DebugOverlay::frame(float width, float height, float delta, float dpi,
-                                std::uint64_t triangles, bool interactive) {
+                                std::uint64_t, bool interactive) {
     current();
     auto& io = ImGui::GetIO();
     // A high-DPI desktop can host a small pixel viewport. Keep the tools usable
@@ -549,14 +549,50 @@ ImDrawData* DebugOverlay::frame(float width, float height, float delta, float dp
     ImGui::SetNextWindowPos(ImVec2(width - 12 * scale_, 12 * scale_), ImGuiCond_Always,
                             ImVec2(1, 0));
     ImGui::SetNextWindowBgAlpha(0.78f);
+    ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(6 * scale_, 4 * scale_));
+    ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, ImVec2(4 * scale_, 2 * scale_));
     ImGui::Begin("Render profile", nullptr,
                  ImGuiWindowFlags_NoDecoration | ImGuiWindowFlags_AlwaysAutoResize |
                      ImGuiWindowFlags_NoInputs | ImGuiWindowFlags_NoSavedSettings |
                      ImGuiWindowFlags_NoFocusOnAppearing);
-    ImGui::Text("FPS          %.1f", io.Framerate);
-    ImGui::Text("Frame time   %.2f ms", delta * 1000.0f);
-    ImGui::Text("Triangles    %llu", static_cast<unsigned long long>(triangles));
+    const float target_ms = refresh_hz_ > 0 ? 1000.0f / refresh_hz_ : 0;
+    const auto timing = frame_timing_.summary(target_ms);
+    const float latest_ms = frame_timing_.count()
+        ? frame_timing_.data()[(frame_timing_.offset() + frame_timing_.count() - 1) %
+                               FrameTiming::kCapacity] : 0;
+    ImGui::Text("%.0f FPS   %.2f ms", timing.mean > 0 ? 1000.0f / timing.mean : 0,
+                latest_ms);
+    const float ceiling = std::max({33.333f, target_ms * 2, timing.maximum * 1.1f});
+    ImGui::Dummy(ImVec2(250 * scale_, 36 * scale_));
+    const auto graph_min = ImGui::GetItemRectMin();
+    const auto graph_max = ImGui::GetItemRectMax();
+    auto* draw = ImGui::GetWindowDrawList();
+    draw->AddRectFilled(graph_min, graph_max, ImGui::GetColorU32(ImGuiCol_FrameBg));
+    // Plot every sample, even when there are more samples than horizontal pixels.
+    // PlotLines' display-width sampling can skip the very spikes we are diagnosing.
+    std::array<ImVec2, FrameTiming::kCapacity> points;
+    const auto padding = ImGui::GetStyle().FramePadding;
+    for (int i = 0; i < frame_timing_.count(); ++i) {
+        const float value = frame_timing_.data()[
+            (frame_timing_.offset() + i) % FrameTiming::kCapacity];
+        const float x = graph_min.x + padding.x +
+                        (graph_max.x - graph_min.x - 2 * padding.x) * i /
+                            std::max(1, frame_timing_.count() - 1);
+        const float y = graph_max.y - padding.y -
+                        (graph_max.y - graph_min.y - 2 * padding.y) * value / ceiling;
+        points[i] = ImVec2(x, y);
+    }
+    draw->AddPolyline(points.data(), frame_timing_.count(), IM_COL32(255, 203, 90, 255), 0,
+                       std::max(1.0f, scale_));
+    if (target_ms > 0) {
+        const float y = graph_max.y - padding.y -
+                        (graph_max.y - graph_min.y - 2 * padding.y) * target_ms / ceiling;
+        ImGui::GetWindowDrawList()->AddLine(ImVec2(graph_min.x, y), ImVec2(graph_max.x, y),
+                                            IM_COL32(90, 220, 140, 255));
+    }
+    ImGui::Text("P99 %.2f   Max %.2f ms", timing.p99, timing.maximum);
     ImGui::End();
+    ImGui::PopStyleVar(2);
     ImGui::SetNextWindowPos(ImVec2(12 * scale_, 12 * scale_), ImGuiCond_FirstUseEver);
     ImGui::SetNextWindowSize(
         ImVec2(std::min(

@@ -4,20 +4,20 @@
 
 Functions: **9295**. Known classes/types: **132**.
 
-**Undecided scope: 7401 functions. These remain unresolved work, not completed exclusions.**
+**Undecided scope: 7392 functions. These remain unresolved work, not completed exclusions.**
 
-Classified functions: 1892/9295 (20.4%)
+Classified functions: 1901/9295 (20.5%)
 
-Required implemented (including verified): 54/429 (12.6%)
+Required implemented (including verified): 54/438 (12.3%)
 
-Required verified: 0/429 (0.0%)
+Required verified: 0/438 (0.0%)
 
 Unassigned function ownership: 9035
 
 | Function status | Count |
 | --- | ---: |
-| not_started | 8865 |
-| analyzing | 376 |
+| not_started | 8856 |
+| analyzing | 385 |
 | understood | 0 |
 | implemented | 54 |
 | verified | 0 |
@@ -307,7 +307,7 @@ The bootstrap triangle and host interfaces are new infrastructure and do not cou
 </details>
 
 <details>
-<summary>unresolved / function / game (427)</summary>
+<summary>unresolved / function / game (436)</summary>
 
 | Address | Original name | Class ID | Recovered name | Scope | Status | Confidence | Source | Evidence |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- |
@@ -324,6 +324,7 @@ The bootstrap triangle and host interfaces are new infrastructure and do not cou
 | 00407f9c | FUN_00407f9c |  |  | required | analyzing | high |  | docs/agent/evidence/roadwars_inventory.json;docs/agent/evidence/weapon_runtime.md;docs/agent/evidence/vehicle_combat.md |
 | 004081e3 | CreateIndirect |  |  | required | analyzing | high | game_src/unresolved/contact_weapon_runtime.cpp | docs/agent/evidence/roadwars_inventory.json;docs/agent/evidence/weapon_ownership_audit_ghidra.json;docs/agent/evidence/contact_weapon_runtime.md |
 | 00408213 | FUN_00408213 |  |  | required | analyzing | high | game_src/unresolved/contact_weapon_runtime.cpp | docs/agent/evidence/roadwars_inventory.json;docs/agent/evidence/contact_weapon_runtime.md |
+| 00409420 | FUN_00409420 |  |  | required | analyzing | high | game_src/unresolved/original_camera.cpp | docs/agent/evidence/roadwars_inventory.json;docs/agent/evidence/camera_views.md;docs/agent/evidence/camera_views_ghidra.json |
 | 004094fb | FUN_004094fb |  |  | required | analyzing | high | game_src/unresolved/original_camera.cpp;game_src/unresolved/race_start.cpp | docs/agent/evidence/roadwars_inventory.json;docs/agent/evidence/original_camera.md;docs/agent/evidence/race_start.md;docs/agent/evidence/race_start_ghidra.json |
 | 0040ab6a | FUN_0040ab6a |  |  | required | analyzing | high | game_src/unresolved/original_camera.cpp | docs/agent/evidence/roadwars_inventory.json;docs/agent/evidence/original_camera.md |
 | 0040c300 | FUN_0040c300 |  |  | required | analyzing | high |  | docs/agent/evidence/roadwars_inventory.json;docs/agent/evidence/weapon_runtime.md;docs/agent/evidence/vehicle_combat.md |
@@ -379,7 +380,7 @@ The bootstrap triangle and host interfaces are new infrastructure and do not cou
 | 004215fd | FUN_004215fd |  |  | required | analyzing | high | game_src/unresolved/race_collision.cpp;game_src/unresolved/vehicle_damage_visuals.cpp | docs/agent/evidence/roadwars_inventory.json;docs/agent/evidence/race_session_combat_live.md;docs/agent/evidence/vehicle_damage_visuals.md |
 | 004224c0 | FUN_004224c0 |  |  | required | analyzing | high | game_src/unresolved/vehicle_damage_visuals.cpp | docs/agent/evidence/roadwars_inventory.json;docs/agent/evidence/vehicle_damage_visuals.md |
 | 0042299b | FUN_0042299b |  |  | required | analyzing | high | game_src/unresolved/vehicle_damage_visuals.cpp | docs/agent/evidence/roadwars_inventory.json;docs/agent/evidence/vehicle_damage_visuals.md |
-| 004242cb | FUN_004242cb |  |  | required | analyzing | high | game_src/unresolved/race_ai_combat.cpp | docs/agent/evidence/race_ai_combat.md;docs/agent/evidence/roadwars_inventory.json |
+| 004242cb | FUN_004242cb |  |  | required | analyzing | high | game_src/unresolved/race_ai_combat.cpp;game_src/unresolved/race_frontend_equipment.cpp | docs/agent/evidence/race_ai_combat.md;docs/agent/evidence/roadwars_inventory.json;docs/agent/evidence/ammunition_notices.md;docs/agent/evidence/ammunition_notices_ghidra.json |
 | 00424ae8 | FUN_00424ae8 |  |  | required | implemented | high | game_src/unresolved/vehicle_input.cpp | docs/agent/evidence/vehicle_input_ghidra.json;docs/agent/evidence/transmission.md |
 | 00424c8b | FUN_00424c8b |  |  | required | implemented | high | game_src/unresolved/vehicle_input.cpp | docs/agent/evidence/vehicle_input_ghidra.json;docs/agent/evidence/transmission.md |
 | 00424d3e | FUN_00424d3e |  |  | required | analyzing | high | game_src/unresolved/race_ai_combat.cpp;game_src/unresolved/vehicle_input.cpp | docs/agent/evidence/race_ai_combat.md;docs/agent/evidence/transmission.md;docs/agent/evidence/vehicle_input_ghidra.json |
@@ -410,6 +411,8 @@ The bootstrap triangle and host interfaces are new infrastructure and do not cou
 | 0042d88c | FUN_0042d88c |  |  | required | implemented | high | game_src/unresolved/vehicle_dynamics.cpp | docs/agent/evidence/vehicle_dynamics.md;docs/agent/evidence/transmission.md;docs/agent/evidence/race_session_combat_live.md |
 | 0042da4b | FUN_0042da4b |  |  | required | analyzing | high | game_src/unresolved/vehicle_dynamics.cpp | docs/agent/evidence/vehicle_dynamics.md;docs/agent/evidence/transmission.md;docs/agent/evidence/race_session_combat_live.md |
 | 0042e8f0 | FUN_0042e8f0 |  |  | required | analyzing | high | game_src/unresolved/collision_audio.cpp;game_src/unresolved/wall_response.cpp | docs/agent/evidence/wall_response.md;docs/agent/evidence/collision_audio.md |
+| 0042f549 | FUN_0042f549 |  |  | required | analyzing | high | game_src/unresolved/cockpit_frontend.cpp | docs/agent/evidence/roadwars_inventory.json;docs/agent/evidence/cockpit.md;docs/agent/evidence/cockpit_ghidra.json;docs/agent/evidence/cockpit_rotation_ghidra.json |
+| 004301f5 | FUN_004301f5 |  |  | required | analyzing | high | game_src/unresolved/cockpit_frontend.cpp | docs/agent/evidence/roadwars_inventory.json;docs/agent/evidence/cockpit.md;docs/agent/evidence/cockpit_ghidra.json;docs/agent/evidence/cockpit_rotation_ghidra.json |
 | 00430f70 | FUN_00430f70 |  |  | required | implemented | high | game_src/unresolved/track_collision.cpp | docs/agent/evidence/track_collision.md |
 | 00431499 | FUN_00431499 |  |  | required | implemented | high | game_src/unresolved/track_collision.cpp | docs/agent/evidence/track_collision.md |
 | 004315cd | FUN_004315cd |  |  | required | implemented | high | game_src/unresolved/track_collision.cpp | docs/agent/evidence/track_collision.md |
@@ -434,9 +437,10 @@ The bootstrap triangle and host interfaces are new infrastructure and do not cou
 | 00435928 | FUN_00435928 |  |  | required | analyzing | high | game_src/unresolved/special_weapon_effects.cpp | docs/agent/evidence/roadwars_inventory.json;docs/agent/evidence/special_weapon_effects.md |
 | 00435a93 | FUN_00435a93 |  |  | required | analyzing | high | game_src/unresolved/special_weapon_effects.cpp | docs/agent/evidence/roadwars_inventory.json;docs/agent/evidence/special_weapon_effects.md |
 | 00436270 | FUN_00436270 |  |  | required | analyzing | high | game_src/unresolved/tire_audio.cpp | docs/agent/evidence/roadwars_inventory.json;docs/agent/evidence/tire_audio.md |
-| 00438393 | FUN_00438393 |  |  | required | analyzing | high | game_src/unresolved/frontend_scene.cpp | docs/agent/evidence/roadwars_inventory.json;docs/agent/evidence/frontend_scene.md |
+| 00438393 | FUN_00438393 |  |  | required | analyzing | high | game_src/unresolved/frontend_scene.cpp | docs/agent/evidence/roadwars_inventory.json;docs/agent/evidence/frontend_scene.md;docs/agent/evidence/menu_race_launch.md;docs/agent/evidence/garage_character_music_ghidra.json |
 | 0043d79c | FUN_0043d79c |  |  | required | analyzing | high | game_src/unresolved/frontend_custom.cpp | docs/agent/evidence/roadwars_inventory.json;docs/agent/evidence/menu_custom_screens.md |
 | 0044000a | FUN_0044000a |  |  | required | analyzing | high | game_src/unresolved/frontend_custom.cpp;game_src/unresolved/frontend_scene.cpp | docs/agent/evidence/roadwars_inventory.json;docs/agent/evidence/menu_custom_screens.md;docs/agent/evidence/frontend_scene.md |
+| 00443569 | FUN_00443569 |  |  | required | analyzing | high |  | docs/agent/evidence/roadwars_inventory.json;docs/agent/evidence/menu_race_launch.md;docs/agent/evidence/garage_character_music_ghidra.json |
 | 0044bac7 | FUN_0044bac7 |  |  | required | analyzing | high | game_src/unresolved/frontend_scene.cpp | docs/agent/evidence/roadwars_inventory.json;docs/agent/evidence/frontend_scene.md |
 | 0044c720 | FUN_0044c720 |  |  | required | analyzing | high |  | docs/agent/evidence/roadwars_inventory.json;docs/agent/evidence/weapon_runtime.md;docs/agent/evidence/vehicle_combat.md |
 | 0044c83e | FUN_0044c83e |  |  | required | analyzing | high |  | docs/agent/evidence/roadwars_inventory.json;docs/agent/evidence/weapon_runtime.md;docs/agent/evidence/vehicle_combat.md |
@@ -489,7 +493,9 @@ The bootstrap triangle and host interfaces are new infrastructure and do not cou
 | 004603f3 | FUN_004603f3 |  |  | required | implemented | high | game_src/unresolved/original_camera.cpp | docs/agent/evidence/roadwars_inventory.json;docs/agent/evidence/original_camera.md |
 | 00460fdf | FUN_00460fdf |  |  | required | analyzing | high | game_src/unresolved/menu_frontend.cpp | docs/agent/evidence/roadwars_inventory.json;docs/agent/evidence/menu_frontend.md |
 | 00462ab9 | FUN_00462ab9 |  |  | required | analyzing | confirmed | game_src/unresolved/race_music.cpp | docs/agent/evidence/roadwars_inventory.json;docs/agent/evidence/race_music.md;docs/agent/evidence/race_music_ghidra.json |
+| 00462bed | FUN_00462bed |  |  | required | analyzing | high | game_src/unresolved/race_music.cpp | docs/agent/evidence/roadwars_inventory.json;docs/agent/evidence/menu_race_launch.md;docs/agent/evidence/menu_race_launch_ghidra.json |
 | 00462cbc | FUN_00462cbc |  |  | required | analyzing | confirmed | game_src/unresolved/race_music.cpp | docs/agent/evidence/roadwars_inventory.json;docs/agent/evidence/race_music.md;docs/agent/evidence/race_music_ghidra.json |
+| 0046305d | FUN_0046305d |  |  | required | analyzing | high | game_src/unresolved/race_music.cpp | docs/agent/evidence/roadwars_inventory.json;docs/agent/evidence/menu_race_launch.md;docs/agent/evidence/garage_character_music_ghidra.json |
 | 00464f50 | FUN_00464f50 |  |  | required | analyzing | high |  | docs/agent/evidence/roadwars_inventory.json;docs/agent/evidence/weapon_runtime.md;docs/agent/evidence/vehicle_combat.md |
 | 00465038 | FUN_00465038 |  |  | required | analyzing | high | game_src/unresolved/rear_weapon_effects.cpp | docs/agent/evidence/roadwars_inventory.json;docs/agent/evidence/rear_weapon_effects.md;docs/agent/evidence/weapon_runtime.md;docs/agent/evidence/vehicle_combat.md |
 | 0046517e | FUN_0046517e |  |  | required | analyzing | high | game_src/unresolved/rear_weapon_effects.cpp | docs/agent/evidence/roadwars_inventory.json;docs/agent/evidence/rear_weapon_effects.md |
@@ -553,9 +559,10 @@ The bootstrap triangle and host interfaces are new infrastructure and do not cou
 | 0048c313 | FUN_0048c313 |  |  | required | analyzing | high | game_src/unresolved/race_frontend_equipment.cpp | docs/agent/evidence/roadwars_inventory.json;docs/agent/evidence/race_equipment_hud.md |
 | 0048c90c | FUN_0048c90c |  |  | required | analyzing | high | game_src/unresolved/race_frontend_equipment.cpp | docs/agent/evidence/roadwars_inventory.json;docs/agent/evidence/race_equipment_hud.md |
 | 0048cb23 | FUN_0048cb23 |  |  | required | analyzing | high | game_src/unresolved/race_frontend_equipment.cpp | docs/agent/evidence/roadwars_inventory.json;docs/agent/evidence/race_equipment_hud.md |
+| 0048cd1b | FUN_0048cd1b |  |  | required | analyzing | high | game_src/unresolved/race_frontend_equipment.cpp | docs/agent/evidence/roadwars_inventory.json;docs/agent/evidence/ammunition_notices.md;docs/agent/evidence/ammunition_notices_ghidra.json |
 | 0048cf43 | FUN_0048cf43 |  |  | required | analyzing | high | game_src/unresolved/race_frontend.cpp | docs/agent/evidence/roadwars_inventory.json;docs/agent/evidence/race_frontend.md;docs/agent/evidence/race_equipment_hud.md |
 | 0048fd6d | FUN_0048fd6d |  |  | required | analyzing | high | game_src/unresolved/frontend_custom.cpp | docs/agent/evidence/roadwars_inventory.json;docs/agent/evidence/menu_custom_screens.md |
-| 00494a1d | FUN_00494a1d |  |  | required | analyzing | high | game_src/unresolved/frontend_custom.cpp | docs/agent/evidence/roadwars_inventory.json;docs/agent/evidence/menu_custom_screens.md |
+| 00494a1d | FUN_00494a1d |  |  | required | analyzing | high | game_src/unresolved/frontend_custom.cpp | docs/agent/evidence/roadwars_inventory.json;docs/agent/evidence/menu_custom_screens.md;docs/agent/evidence/summary_icon_fonts_ghidra.json |
 | 0049ce70 | FUN_0049ce70 |  |  | required | analyzing | high |  | docs/agent/evidence/roadwars_inventory.json;docs/agent/evidence/weapon_runtime.md;docs/agent/evidence/vehicle_combat.md |
 | 0049cf6a | FUN_0049cf6a |  |  | required | analyzing | high |  | docs/agent/evidence/roadwars_inventory.json;docs/agent/evidence/weapon_runtime.md;docs/agent/evidence/vehicle_combat.md |
 | 0049d0b7 | FUN_0049d0b7 |  |  | required | analyzing | high | game_src/unresolved/rear_weapon_effects.cpp | docs/agent/evidence/roadwars_inventory.json;docs/agent/evidence/rear_weapon_effects.md |
@@ -575,9 +582,11 @@ The bootstrap triangle and host interfaces are new infrastructure and do not cou
 | 004a622b | FUN_004a622b |  |  | required | analyzing | high | game_src/unresolved/rear_weapon_effects.cpp | docs/agent/evidence/roadwars_inventory.json;docs/agent/evidence/rear_weapon_effects.md |
 | 004a62b5 | FUN_004a62b5 |  |  | required | analyzing | high | game_src/unresolved/rear_weapon_effects.cpp | docs/agent/evidence/roadwars_inventory.json;docs/agent/evidence/rear_weapon_effects.md |
 | 004a682a | FUN_004a682a |  |  | required | analyzing | high | game_src/unresolved/frontend_custom.cpp | docs/agent/evidence/roadwars_inventory.json;docs/agent/evidence/menu_custom_screens.md |
-| 004a91f0 | FUN_004a91f0 |  |  | required | analyzing | high | game_src/unresolved/menu_frontend.cpp | docs/agent/evidence/roadwars_inventory.json;docs/agent/evidence/menu_frontend.md |
-| 004aa5f3 | FUN_004aa5f3 |  |  | required | analyzing | high | game_src/unresolved/frontend_custom.cpp | docs/agent/evidence/roadwars_inventory.json;docs/agent/evidence/menu_custom_screens.md |
-| 004ab60d | FUN_004ab60d |  |  | required | analyzing | high | game_src/unresolved/menu_frontend.cpp | docs/agent/evidence/roadwars_inventory.json;docs/agent/evidence/menu_frontend.md |
+| 004a91f0 | FUN_004a91f0 |  |  | required | analyzing | high | game_src/unresolved/menu_frontend.cpp | docs/agent/evidence/roadwars_inventory.json;docs/agent/evidence/menu_frontend.md;docs/agent/evidence/summary_icon_fonts_ghidra.json |
+| 004aa4d3 | FUN_004aa4d3 |  |  | required | analyzing | high | game_src/unresolved/menu_frontend.cpp | docs/agent/evidence/roadwars_inventory.json;docs/agent/evidence/menu_race_launch.md;docs/agent/evidence/menu_race_launch_ghidra.json |
+| 004aa5f3 | FUN_004aa5f3 |  |  | required | analyzing | high | game_src/unresolved/frontend_custom.cpp | docs/agent/evidence/roadwars_inventory.json;docs/agent/evidence/menu_custom_screens.md;docs/agent/evidence/menu_race_launch.md;docs/agent/evidence/menu_race_launch_ghidra.json |
+| 004aac8f | FUN_004aac8f |  |  | required | analyzing | high | game_src/unresolved/menu_frontend.cpp | docs/agent/evidence/roadwars_inventory.json;docs/agent/evidence/menu_race_launch.md;docs/agent/evidence/menu_race_launch_ghidra.json |
+| 004ab60d | FUN_004ab60d |  |  | required | analyzing | high | game_src/unresolved/menu_frontend.cpp | docs/agent/evidence/roadwars_inventory.json;docs/agent/evidence/menu_frontend.md;docs/agent/evidence/menu_race_launch.md;docs/agent/evidence/menu_race_launch_ghidra.json |
 | 004ac5a6 | FUN_004ac5a6 |  |  | required | analyzing | high | game_src/unresolved/frontend_custom.cpp | docs/agent/evidence/roadwars_inventory.json;docs/agent/evidence/menu_custom_screens.md |
 | 004adecd | FUN_004adecd |  |  | required | analyzing | high | game_src/unresolved/menu_frontend.cpp | docs/agent/evidence/roadwars_inventory.json;docs/agent/evidence/menu_frontend.md |
 | 004ae02b | FUN_004ae02b |  |  | required | analyzing | high | game_src/unresolved/menu_frontend.cpp | docs/agent/evidence/roadwars_inventory.json;docs/agent/evidence/menu_frontend.md |
@@ -2223,7 +2232,7 @@ The bootstrap triangle and host interfaces are new infrastructure and do not cou
 </details>
 
 <details>
-<summary>unresolved / function / unknown (7403)</summary>
+<summary>unresolved / function / unknown (7394)</summary>
 
 | Address | Original name | Class ID | Recovered name | Scope | Status | Confidence | Source | Evidence |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- |
@@ -2277,7 +2286,6 @@ The bootstrap triangle and host interfaces are new infrastructure and do not cou
 | 0040860d | FUN_0040860d |  |  | undecided | not_started | unknown |  | docs/agent/evidence/roadwars_inventory.json |
 | 00408663 | FUN_00408663 |  |  | undecided | not_started | unknown |  | docs/agent/evidence/roadwars_inventory.json |
 | 00408e09 | FUN_00408e09 |  |  | undecided | not_started | unknown |  | docs/agent/evidence/roadwars_inventory.json |
-| 00409420 | FUN_00409420 |  |  | undecided | not_started | unknown |  | docs/agent/evidence/roadwars_inventory.json |
 | 0040a378 | FUN_0040a378 |  |  | undecided | not_started | unknown |  | docs/agent/evidence/roadwars_inventory.json |
 | 0040b3d2 | FUN_0040b3d2 |  |  | undecided | not_started | unknown |  | docs/agent/evidence/roadwars_inventory.json |
 | 0040c3a8 | FUN_0040c3a8 |  |  | undecided | not_started | unknown |  | docs/agent/evidence/roadwars_inventory.json |
@@ -2363,7 +2371,7 @@ The bootstrap triangle and host interfaces are new infrastructure and do not cou
 | 00422ff6 | FUN_00422ff6 |  |  | undecided | not_started | unknown |  | docs/agent/evidence/roadwars_inventory.json |
 | 004231af | FUN_004231af |  |  | undecided | not_started | unknown |  | docs/agent/evidence/roadwars_inventory.json |
 | 00424290 | FUN_00424290 |  |  | undecided | not_started | unknown |  | docs/agent/evidence/roadwars_inventory.json |
-| 004246c0 | FUN_004246c0 |  |  | undecided | not_started | unknown |  | docs/agent/evidence/roadwars_inventory.json |
+| 004246c0 | FUN_004246c0 |  |  | undecided | not_started | unknown | game_src/unresolved/race_frontend_equipment.cpp | docs/agent/evidence/roadwars_inventory.json;docs/agent/evidence/ammunition_notices.md;docs/agent/evidence/ammunition_notices_ghidra.json |
 | 004249f6 | FUN_004249f6 |  |  | undecided | not_started | unknown |  | docs/agent/evidence/roadwars_inventory.json |
 | 00424a2d | FUN_00424a2d |  |  | undecided | not_started | unknown |  | docs/agent/evidence/roadwars_inventory.json |
 | 00424aa2 | FUN_00424aa2 |  |  | undecided | not_started | unknown |  | docs/agent/evidence/roadwars_inventory.json |
@@ -2401,8 +2409,6 @@ The bootstrap triangle and host interfaces are new infrastructure and do not cou
 | 0042c778 | FUN_0042c778 |  |  | undecided | not_started | unknown |  | docs/agent/evidence/roadwars_inventory.json |
 | 0042f270 | FUN_0042f270 |  |  | undecided | not_started | unknown |  | docs/agent/evidence/roadwars_inventory.json |
 | 0042f366 | FUN_0042f366 |  |  | undecided | not_started | unknown |  | docs/agent/evidence/roadwars_inventory.json |
-| 0042f549 | FUN_0042f549 |  |  | undecided | not_started | unknown |  | docs/agent/evidence/roadwars_inventory.json |
-| 004301f5 | FUN_004301f5 |  |  | undecided | not_started | unknown |  | docs/agent/evidence/roadwars_inventory.json |
 | 004308e7 | FUN_004308e7 |  |  | undecided | not_started | unknown |  | docs/agent/evidence/roadwars_inventory.json |
 | 00431581 | FUN_00431581 |  |  | undecided | not_started | unknown |  | docs/agent/evidence/roadwars_inventory.json |
 | 004337e0 | FUN_004337e0 |  |  | undecided | not_started | unknown |  | docs/agent/evidence/roadwars_inventory.json |
@@ -2450,7 +2456,6 @@ The bootstrap triangle and host interfaces are new infrastructure and do not cou
 | 00443230 | FUN_00443230 |  |  | undecided | not_started | unknown |  | docs/agent/evidence/roadwars_inventory.json |
 | 0044348a | FUN_0044348a |  |  | undecided | not_started | unknown |  | docs/agent/evidence/roadwars_inventory.json |
 | 004434d8 | FUN_004434d8 |  |  | undecided | not_started | unknown |  | docs/agent/evidence/roadwars_inventory.json |
-| 00443569 | FUN_00443569 |  |  | undecided | not_started | unknown |  | docs/agent/evidence/roadwars_inventory.json |
 | 0044a0f0 | FUN_0044a0f0 |  |  | undecided | not_started | unknown |  | docs/agent/evidence/roadwars_inventory.json |
 | 0044b577 | FUN_0044b577 |  |  | undecided | not_started | unknown |  | docs/agent/evidence/roadwars_inventory.json |
 | 0044be2b | FUN_0044be2b |  |  | undecided | not_started | unknown |  | docs/agent/evidence/roadwars_inventory.json |
@@ -2599,9 +2604,7 @@ The bootstrap triangle and host interfaces are new infrastructure and do not cou
 | 00462765 | FUN_00462765 |  |  | undecided | not_started | unknown |  | docs/agent/evidence/roadwars_inventory.json |
 | 004628d4 | FUN_004628d4 |  |  | undecided | not_started | unknown |  | docs/agent/evidence/roadwars_inventory.json |
 | 00462b19 | FUN_00462b19 |  |  | undecided | not_started | unknown |  | docs/agent/evidence/roadwars_inventory.json |
-| 00462bed | FUN_00462bed |  |  | undecided | not_started | unknown |  | docs/agent/evidence/roadwars_inventory.json |
 | 00462f91 | FUN_00462f91 |  |  | undecided | not_started | unknown |  | docs/agent/evidence/roadwars_inventory.json |
-| 0046305d | FUN_0046305d |  |  | undecided | not_started | unknown |  | docs/agent/evidence/roadwars_inventory.json |
 | 00463388 | FUN_00463388 |  |  | undecided | not_started | unknown |  | docs/agent/evidence/roadwars_inventory.json |
 | 0046344b | FUN_0046344b |  |  | undecided | not_started | unknown |  | docs/agent/evidence/roadwars_inventory.json |
 | 00464fd5 | ~CMiniFrameWnd | 93b4e4c301a5694b55e16977c2e52f4971bd9089659e3d58617c8af2368436c8:class:00626270 |  | undecided | not_started | unknown | game_src/unresolved/types/cmini_frame_wnd_00626270.cpp | docs/agent/evidence/roadwars_inventory.json |
@@ -2734,7 +2737,6 @@ The bootstrap triangle and host interfaces are new infrastructure and do not cou
 | 0048b0b0 | FUN_0048b0b0 |  |  | undecided | not_started | unknown |  | docs/agent/evidence/roadwars_inventory.json |
 | 0048b8e7 | FUN_0048b8e7 |  |  | undecided | not_started | unknown |  | docs/agent/evidence/roadwars_inventory.json |
 | 0048bbd0 | FUN_0048bbd0 |  |  | undecided | not_started | unknown |  | docs/agent/evidence/roadwars_inventory.json |
-| 0048cd1b | FUN_0048cd1b |  |  | undecided | not_started | unknown |  | docs/agent/evidence/roadwars_inventory.json |
 | 0048e910 | FUN_0048e910 |  |  | undecided | not_started | unknown |  | docs/agent/evidence/roadwars_inventory.json |
 | 0048e945 | FUN_0048e945 |  |  | undecided | not_started | unknown |  | docs/agent/evidence/roadwars_inventory.json |
 | 0048e9e7 | FUN_0048e9e7 |  |  | undecided | not_started | unknown |  | docs/agent/evidence/roadwars_inventory.json |
@@ -2753,7 +2755,7 @@ The bootstrap triangle and host interfaces are new infrastructure and do not cou
 | 0048f3ac | FUN_0048f3ac |  |  | undecided | not_started | unknown |  | docs/agent/evidence/roadwars_inventory.json |
 | 0048f940 | FUN_0048f940 |  |  | undecided | not_started | unknown |  | docs/agent/evidence/roadwars_inventory.json |
 | 0048fbee | FUN_0048fbee |  |  | undecided | not_started | unknown |  | docs/agent/evidence/roadwars_inventory.json |
-| 004927c0 | FUN_004927c0 |  |  | undecided | not_started | unknown |  | docs/agent/evidence/roadwars_inventory.json |
+| 004927c0 | FUN_004927c0 |  |  | undecided | not_started | unknown |  | docs/agent/evidence/roadwars_inventory.json;docs/agent/evidence/summary_icon_fonts_ghidra.json |
 | 00492980 | FUN_00492980 |  |  | undecided | not_started | unknown |  | docs/agent/evidence/roadwars_inventory.json |
 | 00492b19 | FUN_00492b19 |  |  | undecided | not_started | unknown |  | docs/agent/evidence/roadwars_inventory.json |
 | 00492bcf | FUN_00492bcf |  |  | undecided | not_started | unknown |  | docs/agent/evidence/roadwars_inventory.json |
@@ -2844,15 +2846,13 @@ The bootstrap triangle and host interfaces are new infrastructure and do not cou
 | 004a667b | FUN_004a667b |  |  | undecided | not_started | unknown |  | docs/agent/evidence/roadwars_inventory.json |
 | 004a9731 | FUN_004a9731 |  |  | undecided | not_started | unknown |  | docs/agent/evidence/roadwars_inventory.json |
 | 004a9838 | FUN_004a9838 |  |  | undecided | not_started | unknown |  | docs/agent/evidence/roadwars_inventory.json |
-| 004a9879 | FUN_004a9879 |  |  | undecided | not_started | unknown |  | docs/agent/evidence/roadwars_inventory.json |
+| 004a9879 | FUN_004a9879 |  |  | undecided | not_started | unknown |  | docs/agent/evidence/roadwars_inventory.json;docs/agent/evidence/summary_icon_fonts_ghidra.json |
 | 004a9d8c | FUN_004a9d8c |  |  | undecided | not_started | unknown |  | docs/agent/evidence/roadwars_inventory.json |
 | 004a9fff | FUN_004a9fff |  |  | undecided | not_started | unknown |  | docs/agent/evidence/roadwars_inventory.json |
 | 004aa295 | FUN_004aa295 |  |  | undecided | not_started | unknown |  | docs/agent/evidence/roadwars_inventory.json |
 | 004aa449 | FUN_004aa449 |  |  | undecided | not_started | unknown |  | docs/agent/evidence/roadwars_inventory.json |
-| 004aa4d3 | FUN_004aa4d3 |  |  | undecided | not_started | unknown |  | docs/agent/evidence/roadwars_inventory.json |
 | 004aa9b4 | FUN_004aa9b4 |  |  | undecided | not_started | unknown |  | docs/agent/evidence/roadwars_inventory.json |
 | 004aaae7 | FUN_004aaae7 |  |  | undecided | not_started | unknown |  | docs/agent/evidence/roadwars_inventory.json |
-| 004aac8f | FUN_004aac8f |  |  | undecided | not_started | unknown |  | docs/agent/evidence/roadwars_inventory.json |
 | 004ab401 | FUN_004ab401 |  |  | undecided | not_started | unknown |  | docs/agent/evidence/roadwars_inventory.json |
 | 004ac258 | FUN_004ac258 |  |  | undecided | not_started | unknown |  | docs/agent/evidence/roadwars_inventory.json |
 | 004ac49b | FUN_004ac49b |  |  | undecided | not_started | unknown |  | docs/agent/evidence/roadwars_inventory.json |

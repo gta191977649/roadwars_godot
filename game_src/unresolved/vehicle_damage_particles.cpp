@@ -73,10 +73,10 @@ Result VehicleDamageParticles::advance(float dt, float damage, Vec3 source, Vec3
             particle.atlas_frame = random.next() % 4;
             particle.size = 2.5f;
             particle.active = true;
-            // Native004e7c35 resets slot0 regardless of selected slot. The slot
-            // constructor leaves all other animation timers uninitialized.
-            animation_[0] = 0;
-            animation_known_[0] = true;
+            // Modern visual correction: initialize the emitted slot instead of
+            // reproducing 004e7c35's slot-zero write and indeterminate timers.
+            animation_[next_slot_] = 0;
+            animation_known_[next_slot_] = true;
             order_.insert(order_.begin(), static_cast<std::uint32_t>(next_slot_));
             next_slot_ = (next_slot_ + 1) % 40;
         }

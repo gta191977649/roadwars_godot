@@ -352,6 +352,75 @@ int main(int argc, char** argv) {
                 return 1;
             }
         }
+        const auto press = [&](bool accept, bool right, bool down, bool back) {
+            assert(menu.advance(0, {}, error) == Result::ok);
+            FrontendInput input;
+            input.accept = accept;
+            input.right = right;
+            input.down = down;
+            input.back = back;
+            assert(menu.advance(.31, input, error) == Result::ok);
+        };
+        assert(menu.start(error, "main_menu") == Result::ok);
+        press(false, true, false, false);
+        press(false, true, false, false); // SEASON RACE
+        press(true, false, false, false);
+        assert(menu.screen() == "main_menu" && menu.assertion_message() == "SEASON RACE");
+        const auto frozen_time = menu.screen_time();
+        press(false, true, false, false);
+        assert(menu.selected() == 2 && menu.screen_time() == frozen_time);
+        press(false, false, false, true);
+        assert(menu.assertion_message().empty() && menu.screen() == "main_menu");
+        // Multiplayer uses the same modal, including pointer dismissal.
+        press(false, false, false, false);
+        FrontendInput left;
+        left.left = true;
+        menu.advance(.31, left, error);
+        menu.advance(0, {}, error);
+        menu.advance(.31, left, error);
+        menu.advance(0, {}, error);
+        press(false, false, true, false);
+        press(true, false, false, false);
+        assert(menu.assertion_message() == "MULTIPLAYER");
+        menu.advance(0, {}, error);
+        FrontendInput close;
+        close.pointer_accept = true;
+        close.pointer_x = 320;
+        close.pointer_y = 315;
+        assert(menu.advance(0, close, error) == Result::ok && menu.assertion_message().empty());
+        assert(menu.start(error, "main_menu") == Result::ok);
+        assert(menu.menu_music_requested());
+        press(false, true, false, false); // SINGLE RACE
+        press(true, false, false, false);
+        assert(menu.screen() == "select_character");
+        press(true, false, false, false);
+        assert(menu.screen() == "select_track");
+        press(false, false, true, false); // Dark Forest
+        press(true, false, false, false);
+        assert(menu.screen() == "start_race_summary" && !menu.race_requested());
+        assert(menu.race_request().mode == FrontendRaceMode::single);
+        assert(menu.race_request().player_loadout &&
+               menu.race_request().player_loadout->weapons[0].empty());
+        assert(menu.race_request().laps == 2);
+        press(false, false, false, true);
+        assert(menu.screen() == "select_track");
+        press(true, false, false, false);
+        press(false, true, false, false);
+        press(true, false, false, false);
+        assert(menu.screen() == "loading" && menu.race_requested() && !menu.menu_music_requested());
+        assert(menu.music_path() ==
+               "Characters/" + std::string(menu.selected_character()) + "/ThemeMusic.wav");
+        assert(menu.selected_character() == menu.race_request().character);
+        press(false, false, false, true);
+        assert(menu.screen() == "loading" && menu.race_requested());
+        assert(menu.start(error, "main_menu") == Result::ok);
+        press(true, false, false, false); // QUICK RACE
+        press(true, false, false, false);
+        press(false, false, true, false);
+        press(true, false, false, false);
+        assert(menu.screen() == "loading" && menu.race_requested());
+        assert(menu.race_request().mode == FrontendRaceMode::quick &&
+               !menu.race_request().player_loadout);
         assert(menu.show_pause({}, error) == Result::ok && menu.screen() == "pause");
         FrontendInput accept;
         accept.accept = true;

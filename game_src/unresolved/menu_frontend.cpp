@@ -5,6 +5,7 @@
 #include "game_src/unresolved/frontend_video.hpp"
 #include <algorithm>
 #include <cmath>
+#include <cstdio>
 
 namespace roadwars {
 namespace {
@@ -88,14 +89,26 @@ Result MenuFrontend::start(std::string& error, std::string_view initial_screen) 
     if (result != Result::ok)
         return result;
     history_.clear();
+    live_loading_ = false;
+    race_request_.mode = FrontendRaceMode::none;
     option_values_.clear();
     screen_.clear();
     previous_ = {};
     preview_ = quit_ = live_results_ = live_pause_ = false;
+    garage_prepared_ = false;
+    for (auto& scene : prepared_garage_)
+        scene.reset();
     return enter(initial_screen, error);
 }
 // RE: 93b4e4c301a5694b55e16977c2e52f4971bd9089659e3d58617c8af2368436c8:function:004a91f0
 Result MenuFrontend::enter(std::string_view id, std::string& error) {
+    if (screen_ == "modify_vehicle" && garage_prepared_)
+        prepared_garage_rows_[active_scene_variant_] = custom_.rows;
+    if (id == "main_menu") {
+        race_request_.mode = FrontendRaceMode::none;
+        race_request_.player_loadout.reset();
+        live_loading_ = false;
+    }
     const bool modal = id == "dialog" || id == "pause";
     if (modal && !video_)
         backdrop_.assign(canvas_.commands().begin(), canvas_.commands().end());
@@ -114,6 +127,7 @@ Result MenuFrontend::enter(std::string_view id, std::string& error) {
     exit_time_ = -1;
     pending_.clear();
     action_.clear();
+    assertion_message_.clear();
     selections_.clear();
     selected_ = scroll_ = 0;
     fade_seconds_ = .3;
@@ -240,6 +254,63 @@ Result MenuFrontend::enter(std::string_view id, std::string& error) {
         if (variant_ == "empty" && (id == "load_season" || id == "select_session"))
             custom_.rows.clear();
     }
+    if (!preview_ && race_request_.mode != FrontendRaceMode::none &&
+        (id == "start_race_summary" || id == "loading" || id == "modify_vehicle")) {
+        custom_.preview_data = false;
+        custom_.racers.clear();
+        Configuration characters;
+        if (characters.load(resources_, "Screens/SelectCharacter/Data.ini") != Result::ok)
+            return Result::unavailable;
+        float count{};
+        if (characters.number("INFO", "NUMSELECTIONS", count) != Result::ok || count < 6 ||
+            count > 256 || std::floor(count) != count)
+            return Result::invalid_argument;
+        std::vector<std::string> available, lineup;
+        for (int i = 0; i < static_cast<int>(count); ++i) {
+            const auto section = "SELECTION" + std::to_string(i);
+            float enabled{};
+            if (characters.number(section, "ISAVAILABLE", enabled) != Result::ok)
+                return Result::invalid_argument;
+            auto name = characters.value(section, "VALUE");
+            if (enabled && ResourceStore::canonical(name) != ResourceStore::canonical(character_))
+                available.push_back(std::move(name));
+        }
+        auto seed = race_request_.seed;
+        if (select_race_characters(seed, available, character_, 5, 6, lineup, error) != Result::ok)
+            return Result::unavailable;
+        for (const auto& name : lineup)
+            custom_.racers.push_back({name, name, 0, 25000, true, {}});
+        if (id == "modify_vehicle") {
+            custom_.racers = {{character_, character_, 0, 25000, true, {}}};
+            custom_.fields["DRIVE TRAIN"] = "STOCK";
+            custom_.fields["TRANSMISSION"] = "AUTOMATIC";
+            custom_.fields["TIRES"] = "STREET / POOR";
+            custom_.fields["ARMOR"] = "NONE";
+            custom_.fields["FRONT"] = "NONE";
+            custom_.fields["SIDE"] = "NONE";
+            custom_.fields["REAR"] = "NONE";
+        }
+        if (id == "start_race_summary") {
+            Configuration world;
+            float meters{};
+            if (world.load(resources_, "Tracks/" + track_ + "/World/Data.txt") != Result::ok ||
+                world.number("OUTPUT", "TRACKLENGTH(M)", meters) != Result::ok ||
+                !std::isfinite(meters) || meters <= 0)
+                return Result::unavailable;
+            char miles[32];
+            std::snprintf(miles, sizeof(miles), "%.2f", meters / 1609.344f);
+            custom_.rows = {{"LAPS", {std::to_string(race_request_.laps)}},
+                            {"MILES", {miles}},
+                            {"TIRES", {world.value("AI", "TIRES")}}};
+        }
+        if (id == "loading") {
+            custom_.message =
+                loading_target_ == "garage" ? "STARTING" : "LOADING VEHICLES AND TRACK";
+            custom_.loading_progress = 0;
+            loading_finish_time_ = 0;
+            back_enabled_ = false;
+        }
+    }
     if (id == "dialog")
         selected_ = 1;
     if (id == "modify_vehicle" || id == "victory" || id == "defeat") {
@@ -251,11 +322,32 @@ Result MenuFrontend::enter(std::string_view id, std::string& error) {
         for (int i = 0; i < 6; ++i)
             if (variant_ == variants[i])
                 scene_variant = i + 1;
-        const auto result = scene_->load(id, character_, scene_variant, error);
-        if (result != Result::ok)
-            return result;
-    } else if (scene_ && !modal)
+        if (!preview_ && id == "modify_vehicle" && garage_prepared_) {
+            if (scene_->loaded()) {
+                scene_->set_visible(false);
+                prepared_garage_[active_scene_variant_] = std::move(scene_);
+            }
+            scene_ = std::move(prepared_garage_[scene_variant]);
+            if (!scene_) {
+                error = "Prepared garage scene unavailable";
+                return Result::unavailable;
+            }
+            active_scene_variant_ = scene_variant;
+            scene_->set_visible(true);
+            custom_.rows = prepared_garage_rows_[scene_variant];
+        } else {
+            const auto result = scene_->load(id, character_, scene_variant, error);
+            if (result != Result::ok)
+                return result;
+        }
+    } else if (scene_ && !modal) {
         scene_->stop();
+        if (id != "loading") {
+            garage_prepared_ = false;
+            for (auto& scene : prepared_garage_)
+                scene.reset();
+        }
+    }
     return draw(error);
 }
 std::array<int, 2> MenuFrontend::icon_center(int count, int slot) {
@@ -312,6 +404,7 @@ Result MenuFrontend::navigate(std::string_view id, std::string& error) {
     return Result::ok;
 }
 // RE: 93b4e4c301a5694b55e16977c2e52f4971bd9089659e3d58617c8af2368436c8:function:004ab60d
+// RE-STUB: 93b4e4c301a5694b55e16977c2e52f4971bd9089659e3d58617c8af2368436c8:function:004aac8f
 Result MenuFrontend::activate(std::string& error) {
     if (screen_ == "race_results" && live_results_)
         return navigate("main_menu", error);
@@ -342,8 +435,8 @@ Result MenuFrontend::activate(std::string& error) {
         return navigate("modify_vehicle", error);
     }
     if (screen_ == "create_season") {
-        history_.push_back(screen_);
-        return navigate("select_league", error);
+        action_ = "unavailable_business_action:Create Season";
+        return Result::ok;
     }
     if (screen_ == "pause" && !custom_.rows.empty()) {
         const auto& row = custom_.rows[selected_];
@@ -363,8 +456,15 @@ Result MenuFrontend::activate(std::string& error) {
         action_ = "unavailable_business_action:" + row.label;
         return Result::ok;
     }
+    if (live_loading_ && screen_ == "loading")
+        return Result::ok;
     if (selections_.empty()) {
         action_ = "unavailable_business_action:" + screen_;
+        if (!variant_.empty())
+            action_ += "/" + variant_;
+        if (!custom_.rows.empty() && selected_ >= 0 &&
+            static_cast<std::size_t>(selected_) < custom_.rows.size())
+            action_ += "/" + custom_.rows[selected_].label;
         return Result::ok;
     }
     if (selected_ < 0 || static_cast<std::size_t>(selected_) >= selections_.size())
@@ -381,13 +481,16 @@ Result MenuFrontend::activate(std::string& error) {
     if (screen_ == "main_menu") {
         if (value == "OPTIONS")
             target = "select_option";
-        else if (value == "SINGLE RACE" || value == "QUICK RACE")
+        else if (value == "SINGLE RACE" || value == "QUICK RACE") {
+            original_random(race_request_.seed);
+            race_request_.mode =
+                value == "SINGLE RACE" ? FrontendRaceMode::single : FrontendRaceMode::quick;
+            race_request_.player_loadout.reset();
             target = "select_character";
-        else if (value == "SEASON RACE")
-            target = "season_type";
-        else if (value == "MULTIPLAYER")
-            target = "select_connection";
-        else if (value == "EXIT")
+        } else if (value == "SEASON RACE" || value == "MULTIPLAYER") {
+            action_ = "unavailable_business_action:" + value;
+            return Result::ok;
+        } else if (value == "EXIT")
             target = "info";
     } else if (screen_ == "select_option") {
         if (value == "GRAPHICS")
@@ -405,19 +508,40 @@ Result MenuFrontend::activate(std::string& error) {
         target = "select_track";
     } else if (screen_ == "select_track") {
         track_ = value;
-        target = "start_race_summary";
-    } else if (screen_ == "season_type")
-        target = value == "NEW SEASON" ? "create_season" : "load_season";
-    else if (screen_ == "select_league")
+        if (race_request_.mode != FrontendRaceMode::none) {
+            if (prepare_race(error) != Result::ok)
+                return Result::unavailable;
+            target =
+                race_request_.mode == FrontendRaceMode::quick ? "loading" : "start_race_summary";
+            live_loading_ = race_request_.mode == FrontendRaceMode::quick;
+            loading_target_ = "race";
+        } else
+            target = "start_race_summary";
+    } else if (screen_ == "season_type") {
+        action_ = "unavailable_business_action:" + value;
+        return Result::ok;
+    } else if (screen_ == "select_league")
         target = "select_character";
-    else if (screen_ == "host_or_join")
-        target = value == "JOIN" ? "select_session" : "select_character";
-    else if (screen_ == "select_connection") {
+    else if (screen_ == "host_or_join") {
+        action_ = "unavailable_business_action:Multiplayer/" + value;
+        return Result::ok;
+    } else if (screen_ == "select_connection") {
         connection_ = value;
         target = "host_or_join";
+    } else if (screen_ == "start_race_summary" && value == "GARAGE" && !preview_) {
+        target = "loading";
+        loading_target_ = "garage";
+        live_loading_ = true;
+        garage_loading_step_ = 0;
+        garage_prepared_ = false;
     } else if (screen_ == "start_race_summary" && value == "GARAGE")
         target = "modify_vehicle";
-    else if (value == "CONTINUE")
+    else if (screen_ == "start_race_summary" && value == "START RACE" &&
+             race_request_.mode == FrontendRaceMode::single) {
+        live_loading_ = true;
+        loading_target_ = "race";
+        target = "loading";
+    } else if (value == "CONTINUE")
         target = "main_menu";
     if (target.empty()) {
         action_ = "unavailable_business_action:" + value;
@@ -426,11 +550,120 @@ Result MenuFrontend::activate(std::string& error) {
     history_.push_back(screen_);
     return navigate(target, error);
 }
+void MenuFrontend::show_unimplemented_action() {
+    constexpr std::string_view prefix = "unavailable_business_action:";
+    if (action_.starts_with(prefix))
+        assertion_message_ = action_.substr(prefix.size());
+}
+Result MenuFrontend::advance_garage_loading(double elapsed, std::string& error) {
+    time_ += elapsed;
+    const auto load_scene = [&](int variant) {
+        auto scene = std::make_unique<FrontendScene>(resources_, renderer_);
+        const auto result = scene->load("modify_vehicle", character_, variant, error);
+        if (result != Result::ok)
+            return result;
+        scene->set_visible(false);
+        prepared_garage_[variant] = std::move(scene);
+        return Result::ok;
+    };
+    const auto load_rows = [&](int variant, std::string_view name) {
+        return frontend_custom_rows(resources_, "modify_vehicle", prepared_garage_rows_[variant],
+                                    error, name);
+    };
+    const int step = garage_loading_step_;
+    if (step == 0) {
+        ++garage_loading_step_;
+        return set_loading_progress(0, "STARTING", error);
+    }
+    if (step == 1) {
+        if (load_scene(0) != Result::ok || load_rows(0, "") != Result::ok)
+            return Result::unavailable;
+    } else if (step == 2) {
+        if (load_scene(1) != Result::ok)
+            return Result::unavailable;
+    } else if (step == 3) {
+        if (load_rows(1, "tires") != Result::ok)
+            return Result::unavailable;
+    } else if (step >= 4 && step <= 8) {
+        constexpr std::array<int, 5> variants{4, 3, 2, 5, 6};
+        constexpr std::array<std::string_view, 5> names{"armor", "weapons", "drive_train", "repair",
+                                                        "paint"};
+        if (load_scene(variants[step - 4]) != Result::ok ||
+            load_rows(variants[step - 4], names[step - 4]) != Result::ok)
+            return Result::unavailable;
+    } else if (step == 9) {
+        ++garage_loading_step_;
+        garage_prepared_ = true;
+        return set_loading_progress(1, "FINISHED", error);
+    } else {
+        if (!loading_fade_complete())
+            return draw(error);
+        live_loading_ = false;
+        variant_.clear();
+        return enter("modify_vehicle", error);
+    }
+    constexpr std::array<std::string_view, 8> messages{
+        "LOADING GARAGE",       "LOADING STORE",        "LOADING TIRE STORE",
+        "LOADING ARMOR STORE",  "LOADING WEAPON STORE", "LOADING DRIVE TRAIN STORE",
+        "LOADING REPAIR STORE", "LOADING PAINT STORE"};
+    ++garage_loading_step_;
+    return set_loading_progress(static_cast<float>(step) / 10, messages[step - 1], error);
+}
+Result MenuFrontend::set_loading_progress(float fraction, std::string_view message,
+                                          std::string& error) {
+    if (screen_ != "loading" || !std::isfinite(fraction) || fraction < 0 || fraction > 1 ||
+        fraction < custom_.loading_progress)
+        return Result::invalid_argument;
+    if (custom_.loading_progress < 1 && fraction == 1)
+        loading_finish_time_ = 0;
+    custom_.loading_progress = fraction;
+    custom_.message = translate("Misc", message);
+    return draw(error);
+}
+std::string MenuFrontend::music_path() const {
+    if (screen_ == "loading" || screen_ == "modify_vehicle")
+        return "Characters/" + character_ + "/ThemeMusic.wav";
+    return menu_music_requested() ? "Sfx/SoundBackgroundMusic.wav" : "";
+}
+float MenuFrontend::music_gain_scale() const {
+    if (screen_ != "loading" || loading_target_ != "race")
+        return 1;
+    return static_cast<float>(custom_.loading_progress >= 1
+                                  ? std::max(0.0, 1 - loading_finish_time_ / .3)
+                                  : std::min(1.0, time_ / .3));
+}
+bool MenuFrontend::menu_music_requested() const {
+    return screen_ != "publisher_1" && screen_ != "publisher_2" && screen_ != "intro" &&
+           screen_ != "loading";
+}
+// RE-STUB: 93b4e4c301a5694b55e16977c2e52f4971bd9089659e3d58617c8af2368436c8:function:004aa4d3
+Result MenuFrontend::prepare_race(std::string& error) {
+    race_request_.character = character_;
+    race_request_.track = track_;
+    Configuration world;
+    float laps{};
+    if (world.load(resources_, "Tracks/" + track_ + "/World/Data.txt") != Result::ok ||
+        world.number("DATA", "NUMLAPS", laps) != Result::ok || !std::isfinite(laps) || laps < 1 ||
+        laps > 10 || std::floor(laps) != laps) {
+        error = "Original track lap count unavailable";
+        return Result::unavailable;
+    }
+    race_request_.laps = static_cast<int>(laps);
+    if (race_request_.mode == FrontendRaceMode::single) {
+        RaceLoadout stock;
+        stock.paint_job = 0; // Original body texture, without a repaint operation.
+        stock.armor = {"NONE", "NONE"};
+        race_request_.player_loadout = std::move(stock);
+    } else
+        race_request_.player_loadout.reset();
+    return Result::ok;
+}
 Result MenuFrontend::preview(std::string_view id, double seconds, std::string_view variant,
                              std::string& error) {
     if (!std::isfinite(seconds) || seconds < 0 || seconds > 86400)
         return Result::invalid_argument;
     preview_ = true;
+    live_loading_ = false;
     variant_ = variant;
     history_.clear();
     previous_ = {};
@@ -464,16 +697,36 @@ Result MenuFrontend::show_pause(std::span<const HudQuad> backdrop, std::string& 
 Result MenuFrontend::advance(double elapsed, const FrontendInput& input, std::string& error) {
     if (!std::isfinite(elapsed) || elapsed < 0 || elapsed > 86400)
         return Result::invalid_argument;
+    if (screen_ == "loading" && custom_.loading_progress >= 1)
+        loading_finish_time_ += elapsed;
+    if (screen_ == "loading" && live_loading_ && loading_target_ == "garage") {
+        previous_ = input;
+        return advance_garage_loading(elapsed, error);
+    }
     const auto edge = [](bool now, bool before) { return now && !before; };
+    if (!assertion_message_.empty()) {
+        const bool dismiss_pointer = edge(input.pointer_accept, previous_.pointer_accept) &&
+                                     input.pointer_x >= 256 && input.pointer_x < 384 &&
+                                     input.pointer_y >= 300 && input.pointer_y < 330;
+        if (edge(input.accept, previous_.accept) || edge(input.back, previous_.back) ||
+            dismiss_pointer) {
+            assertion_message_.clear();
+            action_.clear();
+        }
+        previous_ = input;
+        return draw(error);
+    }
     if (exit_time_ < 0) {
         bool hit = false;
         if ((input.pointer_moved || input.pointer_accept) && !selections_.empty() &&
-            !find_screen(screen_)->custom) {
+            (!find_screen(screen_)->custom || screen_ == "start_race_summary")) {
             const int count = static_cast<int>(selections_.size());
             for (int slot = 0; slot < std::min(6, count); ++slot) {
                 const int index =
                     count <= 6 ? slot : scroll_ + (slot < 3 ? slot : slot - 3 + count / 2);
-                const auto center = icon_center(count, slot);
+                const auto center = screen_ == "start_race_summary"
+                                        ? std::array<int, 2>{slot == 0 ? 98 : 540, 392}
+                                        : icon_center(count, slot);
                 const float radius = selections_[index].radius;
                 if (input.pointer_x >= center[0] - radius && input.pointer_x < center[0] + radius &&
                     input.pointer_y >= center[1] - radius && input.pointer_y < center[1] + radius) {
@@ -511,6 +764,13 @@ Result MenuFrontend::advance(double elapsed, const FrontendInput& input, std::st
             selected_ = std::clamp(selected_ + dy, 0, static_cast<int>(custom_.rows.size()) - 1);
             auto& row = custom_.rows[selected_];
             if (dx && row.available && !row.values.empty()) {
+                if (screen_ == "graphics" || screen_ == "sound" || screen_ == "game" ||
+                    screen_ == "keyboard" || screen_ == "joystick") {
+                    action_ = "unavailable_business_action:" + screen_ + "/" + row.label;
+                    show_unimplemented_action();
+                    previous_ = input;
+                    return draw(error);
+                }
                 row.selected = (row.selected + row.values.size() + dx) % row.values.size();
                 if (screen_ == "modify_vehicle" && !variant_.empty()) {
                     const auto result = update_store_selection(error);
@@ -546,6 +806,11 @@ Result MenuFrontend::advance(double elapsed, const FrontendInput& input, std::st
             auto result = activate(error);
             if (result != Result::ok)
                 return result;
+            show_unimplemented_action();
+            if (!assertion_message_.empty()) {
+                previous_ = input;
+                return draw(error);
+            }
         }
     }
     previous_ = input;
@@ -604,7 +869,11 @@ Result MenuFrontend::draw_custom(std::string& error) {
     }
     custom_.elapsed = time_;
     custom_.selected = static_cast<std::size_t>(selected_);
-    custom_.preview_data = !live_pause_ && !(screen_ == "race_results" && live_results_);
+    const bool live_race_menu = !preview_ && race_request_.mode != FrontendRaceMode::none &&
+                                (screen_ == "start_race_summary" || screen_ == "loading" ||
+                                 (screen_ == "modify_vehicle" && variant_.empty()));
+    custom_.preview_data =
+        !live_race_menu && !live_pause_ && !(screen_ == "race_results" && live_results_);
     return FrontendCustom::draw(canvas_, custom_, error);
 }
 Result MenuFrontend::show_race_results(std::span<const FrontendPreviewRacer> racers,
@@ -751,6 +1020,22 @@ Result MenuFrontend::draw(std::string& error) {
     }
     if (preview_)
         canvas_.text(FrontendFont::small, 4, 4, "PREVIEW DATA", false, 1, 0xffffff00, 0xffffff00);
+    if (!assertion_message_.empty()) {
+        // Modern recoverable assertion UI; the rejected business action is not executed.
+        canvas_.rectangle({0, 0, 640, 480}, {0, 0, 0, .65f});
+        canvas_.rectangle({62, 138, 516, 204}, {.8f, .16f, .12f, 1});
+        canvas_.rectangle({64, 140, 512, 200}, {.045f, .045f, .055f, 1});
+        canvas_.text(FrontendFont::body, 320, 158, "ASSERTION FAILED", true, 1, 0xffff7070,
+                     0xffff7070);
+        canvas_.text(FrontendFont::body, 320, 192, "Not implemented", true);
+        constexpr std::size_t columns = 42;
+        for (std::size_t at = 0, row = 0; at < assertion_message_.size() && row < 3;
+             at += columns, ++row)
+            canvas_.text(FrontendFont::small, 320, static_cast<float>(228 + row * 20),
+                         assertion_message_.substr(at, columns), true);
+        canvas_.rectangle({256, 300, 128, 30}, {.22f, .22f, .26f, 1});
+        canvas_.text(FrontendFont::small, 320, 309, "OK", true);
+    }
     auto result = canvas_.submit();
     if (result != Result::ok)
         error = canvas_.error();

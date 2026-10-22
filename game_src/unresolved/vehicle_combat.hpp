@@ -144,6 +144,7 @@ class VehicleCombat {
     VehicleCombatSlotView slot(WeaponSlot) const;
     std::span<const VehicleCombatAsset> assets() const { return assets_; }
     std::span<const VehicleCombatVisual> visuals() const { return visuals_; }
+    std::size_t projectile_capacity(WeaponSlot) const;
     std::vector<CombatAudioEvent> drain_audio_events();
     std::span<const GuidedMissileState> guided_missiles() const;
     const ContactWeaponRuntime* contact_weapon() const;

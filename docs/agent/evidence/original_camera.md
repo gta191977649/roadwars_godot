@@ -38,3 +38,13 @@ Native integration smoke command: python scripts/smoke_race.py --camera (or add 
 
 
 The 2026-10-22 orbit regression test additionally checks fixed projected body height during a full manual orbit, constant eye-to-pivot radius across a 180-degree return, continuous interruption at its halfway point, translated body pivots, finite extreme pitch input and wrapped yaw. The focused `roadwars_original_camera_test` build and execution passed after this change. The root integration run owns complete core/Godot rebuilds and native camera smoke checks.
+
+
+## Four-view follow-up (2026-10-22)
+
+See camera_views.md for native mode2 HoodPoint eye recovery and cockpit.md for
+the matching 2D presentation. The near chase formulas above are unchanged. Far
+chase and hood are explicitly modern views. Native mode1 is still not recovered;
+these extensions must not be presented as completion of all original dispatch.
+The live host applies target and mode cuts without advancing simulation and
+retains the same fixed interpolation interval for cockpit instruments.

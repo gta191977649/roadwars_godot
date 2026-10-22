@@ -3,42 +3,11 @@ extends SceneTree
 func _initialize() -> void:
     call_deferred("run_test")
 
-func snapshot(host) -> Array:
-    return [host.get_vehicle_position(),host.get_vehicle_heading(),host.get_vehicle_speed(),host.get_crash_sound_count(),host.get_tire_sound_start_count(),host.get_particle_count(),host.get_skid_vertex_count(),host.get_simulation_ticks()]
-
-func verify_presentation(host, before: Dictionary) -> bool:
-    var pending: Dictionary = host.get_presentation_state()
-    # Simulation may change snapshots, but only presentation may submit transforms.
-    for id in before.instances:
-        if pending.instances.has(id) and pending.instances[id].presented != before.instances[id].presented:
-            push_error("Simulation submitted a raw instance transform before presentation")
-            return false
-    if pending.camera.presented != before.camera.presented:
-        push_error("Simulation submitted a raw camera transform before presentation")
-        return false
-    var physics = snapshot(host)
-    host.present_test_frame()
-    var presented: Dictionary = host.get_presentation_state()
-    var alpha: float = host.get_simulation_alpha()
-    for id in pending.instances:
-        var pose: Dictionary = presented.instances[id]
-        var expected: Transform3D = pose.previous.interpolate_with(pose.current, alpha)
-        if not pose.presented.is_equal_approx(expected):
-            push_error("Instance presentation differs from its simulation interval")
-            return false
-    var camera: Dictionary = presented.camera
-    if not camera.presented.is_equal_approx(camera.previous.interpolate_with(camera.current, alpha)):
-        push_error("Camera presentation differs from the shared simulation interval")
-        return false
-    host.present_test_frame()
-    if physics != snapshot(host) or presented != host.get_presentation_state():
-        push_error("Presentation mutated physics or its own simulation snapshots")
-        return false
-    return true
+const Presentation = preload("res://presentation_assertions.gd")
 
 func run_test() -> void:
     var reference: Array = []
-    for fps in [60,10,15,30,59,75,119,120,144,165,240]:
+    for fps in [60,10,15,30,59,75,119,120,144,165,240,0]:
         var host = ClassDB.instantiate("GameHost")
         root.add_child(host)
         host.set_process(false)
@@ -49,20 +18,26 @@ func run_test() -> void:
             return
         for phase in range(3):
             var seconds = 3 if phase==0 else 1
-            for frame in range(fps*seconds):
+            var remaining: float = seconds
+            var frame = 0
+            var irregular = [1.0/240, 1.0/59, 0.35, 1.0/119, 0.002, 0.9]
+            while remaining > 0.0000000001:
+                var dt: float = minf(remaining, 1.0/fps if fps > 0 else irregular[frame % irregular.size()])
+                remaining -= dt
+                frame += 1
                 var before: Dictionary = host.get_presentation_state()
-                if not host.drive_test_step(1.0/fps,1 if phase==1 else 0,1 if phase<2 else 0,1 if phase==2 else 0,false):
+                if not host.drive_test_step(dt,1 if phase==1 else 0,1 if phase<2 else 0,1 if phase==2 else 0,false):
                     push_error("Fixed-clock host step failed")
                     quit(1)
                     return
-                if not verify_presentation(host, before):
+                if not Presentation.verify_presentation(host, before):
                     quit(1)
                     return
                 if host.get_simulation_alpha()<0 or host.get_simulation_alpha()>1:
                     push_error("Invalid render interpolation fraction")
                     quit(1)
                     return
-        var state = snapshot(host)
+        var state = Presentation.snapshot(host)
         if host.get_simulation_ticks()!=300:
             push_error("Render frame count changed simulation tick count")
             quit(1)
@@ -82,7 +57,7 @@ func run_test() -> void:
             quit(1)
             return
         host.free()
-        print("Fixed host at ",fps," render FPS: identical 300-tick vehicle/effect state")
+        print("Fixed host at ", str(fps) + " FPS" if fps > 0 else "irregular intervals + 350/900ms stalls", ": identical 300-tick vehicle/effect state")
     # Exercise actual Godot callbacks. Godot can clamp process(delta) after stalls;
     # the host must recover wall time from its monotonic clock instead.
     var real_host = ClassDB.instantiate("GameHost")
@@ -113,7 +88,8 @@ func run_test() -> void:
     Engine.time_scale=1
     root.remove_child(real_host)
     real_host.free()
-    await process_frame
-    await process_frame
+    # The audio mixer releases playback/stream references on its own thread.
+    # Uncapped headless process frames can both finish before its next mix block.
+    await create_timer(0.1).timeout
     print("ROADWARS_TIMING_SMOKE_OK: independent fixed simulation; interpolated native presentation; recovered stall ticks=",recovered,"; engine pause; lifecycle")
     quit(0)

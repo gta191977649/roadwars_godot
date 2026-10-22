@@ -71,19 +71,31 @@ int main() {
     }
 
     Reader reader;
-    const std::string ini = "[CAMERAINFO]\nHOODZ=.7\n";
+    const std::string ini =
+        "[CAMERAINFO]\nHOODZ=.7\nHOODX=.1\nHOODY=.6\nINCARX=.33\nINCARY=.2\nINCARZ=.6\n";
     for (char c : ini)
         reader.files["Cars/Animal/Data/Data.ini"].push_back(std::byte(c));
     auto& mesh = reader.files["Cars/Animal/Body/SpatialObject.msh"];
     name(mesh, "0Root");
-    u32(mesh, 0);
     u32(mesh, 1);
+    u32(mesh, 1);
+    u32(mesh, std::bit_cast<std::uint32_t>(99.0f));
+    u32(mesh, 0);
+    u32(mesh, 0);
+    u32(mesh, 0);
     name(mesh, "1024Body");
     u32(mesh, 1);
-    u32(mesh, 0);
+    u32(mesh, 1);
     u32(mesh, 0);
     u32(mesh, std::bit_cast<std::uint32_t>(.584f));
     u32(mesh, 0);
+    u32(mesh, 0);
+    name(mesh, "HoodPoint");
+    u32(mesh, 1);
+    u32(mesh, 0);
+    u32(mesh, std::bit_cast<std::uint32_t>(.2f));
+    u32(mesh, std::bit_cast<std::uint32_t>(.5f));
+    u32(mesh, std::bit_cast<std::uint32_t>(1.2f));
     u32(mesh, 0);
     ResourceStore resources(reader);
     OriginalChaseCamera camera;
@@ -95,6 +107,56 @@ int main() {
     require(camera.update(vehicle, params, nullptr, .25f, frame) == Result::ok);
     require(near(frame.transform.origin.z, -6.5f) && near(frame.transform.origin.y, 1.884f));
     require(frame.vertical_fov_degrees == 50 && frame.transform.basis[2].z == -1);
+    {
+        const auto& settings = camera.settings();
+        require(near(settings.in_car_local_position.x, -.33f) &&
+                near(settings.in_car_local_position.y, .6f) &&
+                near(settings.in_car_local_position.z, .2f));
+        require(near(settings.hood_local_position.y, .7f) &&
+                near(settings.hood_local_position.z, .6f));
+        // Root's exported x99 is ignored; child HoodPoint includes body translation.
+        require(near(settings.hood_point_local_position.x, .2f) &&
+                near(settings.hood_point_local_position.y, 1.084f) &&
+                near(settings.hood_point_local_position.z, 1.2f));
+        CameraFrame view;
+        auto selected = CameraView::near_chase;
+        for (int i = 0; i < 4; ++i)
+            selected = next_camera_view(selected);
+        require(selected == CameraView::near_chase);
+        require(camera_view_frame(selected, vehicle, params, settings, nullptr, frame, view) ==
+                Result::ok);
+        require(view.transform.origin.z == frame.transform.origin.z &&
+                view.transform.basis[2].z == frame.transform.basis[2].z &&
+                view.vertical_fov_degrees == frame.vertical_fov_degrees);
+        require(camera_view_frame(CameraView::far_chase, vehicle, params, settings, nullptr,
+                                  frame, view) == Result::ok);
+        require(view.transform.origin.z < frame.transform.origin.z - 2 &&
+                view.transform.origin.y > frame.transform.origin.y + .5f);
+        require(camera_view_frame(CameraView::hood, vehicle, params, settings, nullptr, frame,
+                                  view) == Result::ok);
+        require(near(view.transform.origin.x, .1f) && near(view.transform.origin.y, 1.284f) &&
+                near(view.transform.origin.z, .6f));
+        auto tilted = vehicle;
+        tilted.position = {11, 2, -5};
+        tilted.heading_degrees = 90;
+        tilted.pitch_degrees = 20;
+        tilted.roll_degrees = -15;
+        const auto basis = original_vehicle_transform(tilted.position, 90, 20, -15);
+        const auto p = settings.hood_point_local_position;
+        require(camera_view_frame(CameraView::cockpit, tilted, params, settings, nullptr, frame,
+                                  view) == Result::ok);
+        require(near(view.transform.origin.x,
+                     11 + basis.basis[0].x * p.x + basis.basis[1].x * p.y + basis.basis[2].x * p.z));
+        require(near(view.transform.origin.y,
+                     2 + basis.basis[0].y * p.x + basis.basis[1].y * p.y + basis.basis[2].y * p.z));
+        require(view.transform.basis[1].x == basis.basis[1].x &&
+                view.transform.basis[0].x == -basis.basis[0].x &&
+                view.transform.basis[2].z == -basis.basis[2].z);
+        require(tilted.heading_degrees == 90 && tilted.pitch_degrees == 20 &&
+                tilted.roll_degrees == -15 && tilted.position.x == 11);
+        require(camera_view_frame(static_cast<CameraView>(99), vehicle, params, settings, nullptr,
+                                  frame, view) == Result::invalid_argument);
+    }
     vehicle.engine_throttle = 1;
     require(camera.update(vehicle, params, nullptr, .1f, frame) == Result::ok);
     require(near(frame.transform.origin.z, -6.6f));

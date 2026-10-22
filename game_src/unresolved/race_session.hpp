@@ -14,12 +14,14 @@
 #include "game_src/unresolved/vehicle_equipment_effects.hpp"
 #include "game_src/unresolved/weapon_trails.hpp"
 #include <memory>
+#include <optional>
 
 namespace roadwars {
 struct RaceOptions {
     std::string track{"Dark Forest"}, car{"Animal"};
     int laps{3}, ai_count{5};
     std::uint32_t seed{1}; // Diagnostic seed, not an original startup default claim.
+    std::optional<RaceLoadout> player_loadout;
     int diagnostic_weapon_lock_seconds{
         20}; // Fresh native Single Race default; diagnostic override accepts0 or20.
 };
@@ -56,6 +58,7 @@ class RaceSession {
     Result advance(float delta, const InputState&, std::string& error);
     void set_paused(bool value) { paused_ = value; }
     bool paused() const { return paused_; }
+    std::span<const AmmunitionNotice> ammunition_notices() const { return ammunition_notices_.entries(); }
     void set_player_autopilot(bool value) { player_autopilot_ = value; }
     Result restart(std::string& error);
     std::span<const RaceParticipant> racers() const { return racers_; }
@@ -65,6 +68,7 @@ class RaceSession {
                                                                         : start_.camera();
     }
     const RaceOptions& options() const { return options_; }
+    float special_effects_scalar() const { return special_effects_scalar_; }
     std::size_t player_index() const { return racers_.empty() ? 0 : racers_.size() - 1; }
     RacePhase phase() const { return phase_; }
     RaceEndReason ending() const { return ending_; }
@@ -83,7 +87,7 @@ class RaceSession {
     };
     std::span<const DispatchEvent> dispatch_trace() const { return dispatch_trace_; }
     FrontendFrame frontend_frame(std::vector<FrontendRacer>& storage) const;
-    RaceDebugSnapshot debug_snapshot() const;
+    RaceDebugSnapshot debug_snapshot(bool include_route_geometry = true) const;
     std::vector<std::size_t> ranking() const { return ranking_; }
     const SceneTurretCombat& scene_combat() const { return scene_combat_; }
     struct SceneTrail {
@@ -182,6 +186,7 @@ class RaceSession {
     CombatRaceLoopAudio fire_audio_, nitrous_audio_;
     RaceWeaponInputState weapon_input_;
     int selected_hud_item_{};
+    AmmunitionNotices ammunition_notices_;
     float special_effects_scalar_{};
     int difficulty_{}, weapon_lock_seconds_{};
     ResourceStore* resources_{};

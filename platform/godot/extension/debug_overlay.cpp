@@ -1,8 +1,11 @@
+#include "platform/godot/extension/frame_trace.hpp"
 #include "platform/godot/extension/debug_overlay.hpp"
 #include "game_src/core/not_implemented.hpp"
 #include <algorithm>
 #include <cstdio>
 #include <godot_cpp/classes/display_server.hpp>
+#include <godot_cpp/classes/engine.hpp>
+#include <godot_cpp/classes/time.hpp>
 #include <godot_cpp/classes/file_access.hpp>
 #include <godot_cpp/classes/image.hpp>
 #include <godot_cpp/classes/input_event_key.hpp>
@@ -128,11 +131,44 @@ DebugOverlayAdapter::~DebugOverlayAdapter() {
     server->viewport_remove_canvas(viewport_->get_viewport_rid(), canvas_);
     server->free_rid(canvas_);
 }
+void DebugOverlayAdapter::begin_frame(std::uint64_t now) {
+    const auto frame = godot::Engine::get_singleton()->get_process_frames();
+    // Test helpers may draw the overlay repeatedly in a single engine frame.
+    // Record only real callback intervals, without time_scale or process-delta clamps.
+    if (frame != timing_frame_) {
+        if (timing_usec_ && now > timing_usec_)
+            ui_->record_frame_interval(static_cast<float>(now - timing_usec_) / 1000.0f);
+        timing_usec_ = now;
+        timing_frame_ = frame;
+    }
+}
 void DebugOverlayAdapter::frame(double delta, bool interactive) {
     auto display = godot::DisplayServer::get_singleton();
     const int screen = display->window_get_current_screen();
-    const float dpi = std::max(static_cast<float>(display->screen_get_scale(screen)),
-                               display->screen_get_dpi(screen) / 96.0f);
+    const auto now = godot::Time::get_singleton()->get_ticks_usec();
+    if (!display_poll_usec_ || now - display_poll_usec_ >= 1000000) {
+        FrameStageTimer timer(FrameStage::display_poll);
+        float refresh = 0;
+        std::string vsync = "Unavailable (headless)";
+        if (display->get_name() != "headless") {
+            refresh = display->screen_get_refresh_rate(screen);
+            switch (display->window_get_vsync_mode()) {
+            case godot::DisplayServer::VSYNC_DISABLED: vsync = "Disabled"; break;
+            case godot::DisplayServer::VSYNC_ENABLED: vsync = "Enabled"; break;
+            case godot::DisplayServer::VSYNC_ADAPTIVE: vsync = "Adaptive"; break;
+            case godot::DisplayServer::VSYNC_MAILBOX: vsync = "Mailbox"; break;
+            default: vsync = "Unknown"; break;
+            }
+        }
+        ui_->set_display_timing(refresh, std::move(vsync));
+        display_poll_usec_ = now;
+    }
+    float dpi;
+    {
+        FrameStageTimer timer(FrameStage::dpi_poll);
+        dpi = std::max(static_cast<float>(display->screen_get_scale(screen)),
+                       display->screen_get_dpi(screen) / 96.0f);
+    }
     auto server = godot::RenderingServer::get_singleton();
     triangles_ = static_cast<std::uint64_t>(
         std::max(0, server->viewport_get_render_info(
@@ -170,6 +206,7 @@ void DebugOverlayAdapter::render(ImDrawData* data) {
             if (!command.ElemCount)
                 continue;
             if (used == draw_items_.size()) {
+                trace_resource(FrameResource::ui_item);
                 DrawItem item{server->canvas_item_create(), server->canvas_item_create()};
                 server->canvas_item_set_parent(item.clip, canvas_);
                 server->canvas_item_set_parent(item.triangles, item.clip);

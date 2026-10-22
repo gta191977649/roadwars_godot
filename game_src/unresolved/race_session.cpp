@@ -225,7 +225,14 @@ Result RaceSession::load(ResourceStore& resources, const TrackCollision& collisi
                         return Result::unavailable;
             return Result::ok;
         };
-        if (loadouts.assign(random_state_, racer.loadout, installers, error) != Result::ok)
+        if (equipment_index == static_cast<std::size_t>(options.ai_count) &&
+            options.player_loadout) {
+            racer.loadout = *options.player_loadout;
+            for (std::size_t slot = 0; slot < racer.loadout.weapons.size(); ++slot)
+                if (!racer.loadout.weapons[slot].empty() &&
+                    installers.weapon(slot, racer.loadout.weapons[slot]) != Result::ok)
+                    return Result::unavailable;
+        } else if (loadouts.assign(random_state_, racer.loadout, installers, error) != Result::ok)
             return Result::unavailable;
         std::vector<std::pair<std::string, std::string>> drivetrain;
         for (const auto& item : racer.loadout.drivetrain)
@@ -249,6 +256,7 @@ Result RaceSession::load(ResourceStore& resources, const TrackCollision& collisi
                 Result::ok ||
             decode_msh(bytes, body, error) != Result::ok)
             return Result::unavailable;
+        body.position = {}; // Live chassis origin is supplied by the vehicle state.
         racer.weapon_mounts = race_weapon_mount_count(body);
         TrackSpawn rear;
         if (!start(body, {}, "RearWeaponMount", rear)) {
@@ -326,6 +334,7 @@ Result RaceSession::restart(std::string& error) {
     fire_audio_.reset();
     nitrous_audio_.reset();
     weapon_input_ = {};
+    ammunition_notices_.clear();
     selected_hud_item_ = 0; // 0040d4cb initializes4ab0=1;00487fbe therefore selects map.
     for (auto& chimney : chimneys_) {
         if (chimney.pool.configure(chimney_view_distance_) != Result::ok)
@@ -729,6 +738,8 @@ Result RaceSession::advance(float dt, const InputState& input, std::string& erro
         phase_ = RacePhase::finished;
     // 00482339 branches on the pre-subtraction countdown. A step that first
     // clamps the countdown to zero still skips the warning until the next step.
+    if (ending_ == RaceEndReason::none && ammunition_notices_.advance(dt) != Result::ok)
+        return Result::invalid_argument;
     warning_countdown_ready_ = countdown_ == 0;
     countdown_ = std::max(0.f, countdown_ - dt);
     error.clear();
@@ -771,8 +782,11 @@ Result RaceSession::refresh_side_target(std::size_t owner, std::string& error) {
                                       racer.side_target, error);
 }
 void RaceSession::activate_nitrous(std::size_t owner) {
-    if (activate_vehicle_nitrous(racers_[owner].vehicle->equipment()))
+    if (activate_vehicle_nitrous(racers_[owner].vehicle->equipment())) {
         callbacks_.insert({RaceCallbackKey::Domain::nitrous, owner, 0});
+        if (owner == player_index())
+            ammunition_notices_.push("NITROUS BOOST", racers_[owner].vehicle->equipment().nitrous_ammo);
+    }
 }
 Result RaceSession::combat_commands(std::size_t owner, float dt, const InputState& input,
                                     std::string& error) {
@@ -790,10 +804,14 @@ Result RaceSession::combat_commands(std::size_t owner, float dt, const InputStat
                 return Result::invalid_argument;
             if (!allowed())
                 return Result::ok;
-            racer.vehicle->combat()->request(
+            const bool accepted = racer.vehicle->combat()->request(
                 static_cast<WeaponSlot>(slot), racer.vehicle->state().cached_speed,
                 racer.vehicle->state().heading_degrees, racer.vehicle->state().pitch_degrees,
                 racer.vehicle->body_orientation().body_pitch);
+            if (accepted && i == player_index()) {
+                const auto weapon = racer.vehicle->combat()->slot(static_cast<WeaponSlot>(slot));
+                ammunition_notices_.push(weapon.descriptor->name, weapon.ammunition);
+            }
             return Result::ok;
         };
         if (i == player_index() && !player_autopilot_ && !racer.progress.finished) {
@@ -1402,9 +1420,10 @@ FrontendFrame RaceSession::frontend_frame(std::vector<FrontendRacer>& storage) c
         equipment.present[slot] = weapon.descriptor != nullptr;
     }
     frame.equipment = equipment;
+    frame.ammunition_notices = ammunition_notices_.entries();
     return frame;
 }
-RaceDebugSnapshot RaceSession::debug_snapshot() const {
+RaceDebugSnapshot RaceSession::debug_snapshot(bool include_route_geometry) const {
     RaceDebugSnapshot result;
     result.combat_status = "Recovered Single Race combat; original-runtime comparison pending";
     result.selected_hud_item = selected_hud_item_;
@@ -1519,6 +1538,10 @@ RaceDebugSnapshot RaceSession::debug_snapshot() const {
         for (int k = 0; k < 4; ++k)
             result.lines.push_back(
                 {corners[k], corners[(k + 1) % 4], RaceDebugKind::collision, static_cast<int>(i)});
+    }
+    if (!include_route_geometry) {
+        result.lines.insert(result.lines.end(), collision_lines_.begin(), collision_lines_.end());
+        return result;
     }
     const auto nodes = route_.nodes();
     // Lap.bin stores several non-ground Y values; diagnostics project onto the road.

@@ -14,7 +14,9 @@
 #include "platform/godot/extension/combat_audio_adapter.hpp"
 #include "platform/godot/extension/debug_overlay.hpp"
 #include "platform/godot/extension/engine_audio_adapter.hpp"
+#include "platform/godot/extension/frame_trace.hpp"
 #include "platform/godot/extension/game_files.hpp"
+#include "platform/godot/extension/loading_task.hpp"
 #include "platform/godot/extension/original_weapon_input.hpp"
 #include "platform/godot/extension/sfx_audio_adapter.hpp"
 #include "platform/godot/rendering/server_renderer.hpp"
@@ -46,6 +48,8 @@ class GameHost : public godot::Node, public LoopHooks {
     godot::Vector2 get_console_input_position() const;
     bool console_contains(godot::String text) const;
     double get_debug_dpi_scale() const;
+    godot::Dictionary get_frame_timing_state() const;
+    godot::Array get_frame_profile_trace() const;
     int get_debug_live_rids() const;
     int64_t get_render_triangles() const;
     bool get_ui_mouse_visible() const;
@@ -91,6 +95,8 @@ class GameHost : public godot::Node, public LoopHooks {
     int64_t get_simulation_ticks() const;
     double get_simulation_alpha() const;
     void present_test_frame();
+    void cycle_camera_view();
+    void set_camera_view_for_test(int view);
     godot::Dictionary get_presentation_state() const;
     bool test_interpolation_history() const;
     int get_particle_count() const;
@@ -100,6 +106,7 @@ class GameHost : public godot::Node, public LoopHooks {
     void set_skid_marks_visible(bool);
     void set_particles_visible(bool visible);
     bool competition_test_step(double delta, bool autopilot);
+    bool competition_weapon_test_step(double delta, int slot, bool nitrous);
     godot::Dictionary get_competition_state() const;
     godot::Vector2 get_race_debug_checkbox_position(int index) const;
     godot::Vector2 get_race_debug_inspect_position(int index) const;
@@ -112,6 +119,7 @@ class GameHost : public godot::Node, public LoopHooks {
   private:
     std::unique_ptr<DebugOverlayAdapter> debug_overlay_;
     bool ui_mouse_visible_{}, simulation_failed_{};
+    FrameTrace frame_trace_;
     std::uint64_t last_simulation_usec_{};
     std::unique_ptr<ServerRenderer> renderer_;
     std::unique_ptr<Runtime> runtime_;
@@ -123,6 +131,16 @@ class GameHost : public godot::Node, public LoopHooks {
     bool previous_tree_paused_{};
     int inspected_camera_{-1};
     std::unique_ptr<EngineAudioAdapter> frontend_video_voice_;
+    RaceMusic frontend_music_;
+    std::string frontend_music_path_;
+    std::unique_ptr<EngineAudioAdapter> frontend_music_voice_;
+    bool apply_frontend_race_request(double elapsed);
+    LoadingTask prepare_race();
+    LoadingTask race_loading_task_;
+    bool race_assets_prepared_{};
+    std::uint64_t frontend_loading_frame_{};
+    bool frontend_loading_presented_{};
+    std::optional<RaceLoadout> menu_player_loadout_;
     std::unique_ptr<SfxAudioAdapter> frontend_sfx_;
     std::string frontend_audio_screen_;
     void update_frontend_audio();
@@ -155,6 +173,15 @@ class GameHost : public godot::Node, public LoopHooks {
     OriginalWeaponModifiers weapon_modifiers_;
     std::set<std::uint64_t> pressed_keyboard_keys_;
     int previous_mouse_mode_{};
+    CameraView camera_view_{CameraView::near_chase};
+    unsigned pending_camera_cycles_{};
+    std::vector<VehicleState> previous_cockpit_states_, current_cockpit_states_;
+    bool camera_cut_pending_{};
+    float presented_cockpit_rpm_{}, presented_cockpit_steering_{};
+    std::size_t camera_target_index() const;
+    void cut_camera_to_target();
+    void capture_cockpit_states(bool previous);
+    void present_race_frontend(double alpha);
     OriginalChaseCamera chase_camera_;
     MouseOrbitCamera orbit_camera_;
     MouseOrbitInput pending_mouse_;

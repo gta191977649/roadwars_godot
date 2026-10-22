@@ -47,7 +47,7 @@ bool near(Vec3 p, Vec3 center) {
 Result VehicleDamageVisuals::load(ResourceStore& resources, std::string_view vehicle, int paint_job,
                                   std::string& error) {
     if (vehicle.empty() || vehicle.find_first_of("/\\:\r\n") != std::string_view::npos ||
-        paint_job < 1 || paint_job > 6)
+        paint_job < 0 || paint_job > 6)
         return Result::invalid_argument;
     const auto base = "Cars/" + std::string(vehicle);
     Configuration config;
@@ -76,7 +76,8 @@ Result VehicleDamageVisuals::load(ResourceStore& resources, std::string_view veh
         }
         lods[i] = *selected;
     }
-    const auto directory = base + "/Paint/Paint Job " + std::to_string(paint_job) + "/";
+    const auto directory =
+        paint_job ? base + "/Paint/Paint Job " + std::to_string(paint_job) + "/" : base + "/Body/";
     Bitmap paint, damage;
     TextureTransparency transparency{}, damage_transparency{};
     const auto damage_name = texture.substr(0, dot) + "Damage.bmp";

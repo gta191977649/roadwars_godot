@@ -4,6 +4,56 @@
 #include <cmath>
 
 namespace roadwars {
+// RE-STUB: 93b4e4c301a5694b55e16977c2e52f4971bd9089659e3d58617c8af2368436c8:function:004242cb
+// RE-STUB: 93b4e4c301a5694b55e16977c2e52f4971bd9089659e3d58617c8af2368436c8:function:004246c0
+bool AmmunitionNotices::push(std::string_view name, int remaining) {
+    if (name.empty() || name.size() > 240 || remaining < 0)
+        return false;
+    const auto label = ResourceStore::canonical(name);
+    for (auto& entry : entries_) {
+        // Native iteration selects the first empty OR matching-prefix lane.
+        if (entry.remaining == 0 || entry.text.starts_with(label)) {
+            entry.text = label + " " + std::to_string(remaining);
+            entry.remaining = 2;
+            return true;
+        }
+    }
+    return false;
+}
+// RE-STUB: 93b4e4c301a5694b55e16977c2e52f4971bd9089659e3d58617c8af2368436c8:function:0048cd1b
+Result AmmunitionNotices::advance(float delta) {
+    if (!std::isfinite(delta) || delta < 0)
+        return Result::invalid_argument;
+    for (auto& entry : entries_)
+        entry.remaining = std::max(0.f, entry.remaining - delta);
+    return Result::ok;
+}
+Result RaceFrontend::draw_ammunition_notices(std::span<const AmmunitionNotice> notices) {
+    if (notices.size() > 4)
+        return Result::invalid_argument;
+    for (std::size_t lane = 0; lane < notices.size(); ++lane) {
+        const auto& notice = notices[lane];
+        if (!std::isfinite(notice.remaining) || notice.remaining < 0 || notice.remaining > 2 ||
+            notice.text.size() > 256)
+            return Result::invalid_argument;
+        if (notice.remaining == 0)
+            continue;
+        int width = -2;
+        for (unsigned char c : notice.text)
+            width += c == ' ' ? font_.space_width() : font_.glyph(c).width + 2;
+        const int y = 440 - static_cast<int>(lane) * (font_.height() + 5);
+        const auto first = commands_.size();
+        text(320 - width / 2, y, notice.text);
+        if (notice.remaining < .5f) {
+            // Original fade changes BOTH vertex colors to uniform white alpha.
+            const float alpha = std::trunc(notice.remaining / .5f * 255) / 255;
+            for (auto i = first; i < commands_.size(); ++i)
+                for (auto& color : commands_[i].colors)
+                    color = {1, 1, 1, alpha};
+        }
+    }
+    return Result::ok;
+}
 // RE-STUB: 93b4e4c301a5694b55e16977c2e52f4971bd9089659e3d58617c8af2368436c8:function:00487fbe
 Result RaceFrontend::configure_equipment(ResourceStore& resources, std::string_view car,
                                          const std::array<std::string, 3>& weapons,
