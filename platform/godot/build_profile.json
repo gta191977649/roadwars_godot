@@ -19,6 +19,11 @@
     "InputEventMouseButton",
     "ProjectSettings",
     "Engine",
-    "Time"
+    "Time",
+    "DirAccess",
+    "AcceptDialog",
+    "FileDialog",
+    "Button",
+    "EngineDebugger"
   ]
 }

@@ -14,7 +14,7 @@ The original executable is the behavioral reference. Recovered vehicle force hel
 
 ## Frontend
 
-With the original installation configured, normal launch plays both publisher videos,
+After selecting or detecting the original installation, normal launch plays both publisher videos,
 the developer logo and Title, then enters the animated main menu:
 
 ```powershell
@@ -60,7 +60,7 @@ original addresses, intentional diagnostic additions and remaining limits.
 The [acceptance record](docs/agent/evidence/competition_validation.md) lists tests
 and capture coverage.
 
-Copy `config.example.json` to ignored `config.local.json` and set `game_dir` to the original installation containing Data.pak/Data.pkh, and `godot_executable` to Godot 4.7.2. This is the single location defining the local game root.
+Copy `config.example.json` to ignored `config.local.json` and set `game_dir` to the original installation containing Data.pak/Data.pkh, and `godot_executable` to Godot 4.7.2. Only explicit `--debug` launch uses this developer resource root; ordinary launch detects assets or asks for the installation directory.
 
 ```powershell
 python scripts/build.py deps
@@ -186,3 +186,19 @@ Add `// RE: <id>` lines to mapped C++ source. Markers update source paths; they 
 ## Working rules
 
 Agents start at [AGENT.md](AGENT.md). Read the [C++ standards](docs/agent/cpp_standards.md) before code changes. Preserve the original algorithms; do not substitute Godot vehicle physics or label approximations as recovered behavior. Original executables, assets, extracted data, dependencies and build outputs stay outside version control.
+
+## Standalone Release package
+
+Install the Godot export templates matching the dependency lock, then run:
+
+```text
+python scripts/package.py
+```
+
+`--templates-dir` selects a nonstandard template directory and `--godot` selects
+the editor tool. Windows output is `build/bin/windows/RoadWars-RE.exe` plus
+`roadwars_godot.dll`; the project pack is embedded. Copy both files together.
+Place them in the original installation or a descendant such as `bin`, or select
+the game directory using Browse. Selections are not saved. No original assets or
+developer configuration are shipped. See [startup and distribution details](docs/agent/standalone_distribution.md)
+for command-line/debug behavior, engine CWD semantics and platform validation.

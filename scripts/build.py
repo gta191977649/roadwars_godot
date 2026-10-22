@@ -279,9 +279,8 @@ def main():
             selected_track = args.race_track or args.track or ('Dark Forest' if args.race else None)
             if not selected_track:
                 raise ValueError('Usage: .\\build.ps1 --debug trace "Dark Forest"')
-            track = resolve_track(selected_track)
-            vehicle = resolve_car(args.car) if args.car else 'Animal'
-            directory = game_directory()
+            track = resolve_track(selected_track) if args.debug else selected_track
+            vehicle = resolve_car(args.car) if args.debug and args.car else (args.car or 'Animal')
         config = ROOT / 'config.local.json'
         data = load_config() if config.exists() else {}
         executable = data.get('godot_executable') or shutil.which('godot') or shutil.which('godot4')
@@ -299,18 +298,17 @@ def main():
         if args.race:
             command += ['--', '--race', '--race-track=' + track, '--race-vehicle=' + vehicle,
                         '--race-laps=' + str(args.laps if args.laps is not None else 3),
-                        '--race-ai=' + str(args.ai if args.ai is not None else 5),
-                        '--game-dir=' + str(directory)]
+                        '--race-ai=' + str(args.ai if args.ai is not None else 5)]
             if args.seed is not None:
                 command.append('--race-seed=' + str(args.seed))
         elif args.action == 'trace':
-            command += ['--', '--race-track=' + track, '--race-vehicle=' + vehicle, '--game-dir=' + str(directory)]
+            command += ['--', '--race-track=' + track, '--race-vehicle=' + vehicle]
         elif args.original_loop:
             command += ['--', '--original-loop']
         elif args.diagnostic:
             command += ['--', '--diagnostic']
         else:
-            command += ['--', '--game-dir=' + str(game_directory())]
+            command += ['--']
             if args.frontend_screen:
                 command += ['--frontend-screen=' + args.frontend_screen,
                             '--frontend-time=' + str(args.frontend_time),
@@ -318,7 +316,7 @@ def main():
         if args.debug:
             if '--' not in command:
                 command.append('--')
-            command.append('--debug')
+            command += ['--debug', '--game-dir=' + str(game_directory())]
         run(command)
 
 if __name__ == '__main__':

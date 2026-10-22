@@ -1,1 +1,61 @@
-{"version":5,"configurePresets":[{"name":"core","generator":"Ninja","binaryDir":"${sourceDir}/build/core","cacheVariables":{"CMAKE_BUILD_TYPE":"Debug","ROADWARS_BUILD_GODOT":"OFF"}},{"name":"godot","inherits":"core","binaryDir":"${sourceDir}/build/godot","cacheVariables":{"ROADWARS_BUILD_GODOT":"ON"}}],"buildPresets":[{"name":"core","configurePreset":"core"},{"name":"godot","configurePreset":"godot"}],"testPresets":[{"name":"core","configurePreset":"core","output":{"outputOnFailure":true}},{"name":"godot","configurePreset":"godot","output":{"outputOnFailure":true}}]}
+{
+  "version": 5,
+  "configurePresets": [
+    {
+      "name": "core",
+      "generator": "Ninja",
+      "binaryDir": "${sourceDir}/build/core",
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "Debug",
+        "ROADWARS_BUILD_GODOT": "OFF"
+      }
+    },
+    {
+      "name": "godot",
+      "inherits": "core",
+      "binaryDir": "${sourceDir}/build/godot",
+      "cacheVariables": {
+        "ROADWARS_BUILD_GODOT": "ON"
+      }
+    },
+    {
+      "name": "godot-release",
+      "inherits": "godot",
+      "binaryDir": "${sourceDir}/build/godot-release",
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "Release",
+        "BUILD_TESTING": "OFF"
+      }
+    }
+  ],
+  "buildPresets": [
+    {
+      "name": "core",
+      "configurePreset": "core"
+    },
+    {
+      "name": "godot",
+      "configurePreset": "godot"
+    },
+    {
+      "name": "godot-release",
+      "configurePreset": "godot-release"
+    }
+  ],
+  "testPresets": [
+    {
+      "name": "core",
+      "configurePreset": "core",
+      "output": {
+        "outputOnFailure": true
+      }
+    },
+    {
+      "name": "godot",
+      "configurePreset": "godot",
+      "output": {
+        "outputOnFailure": true
+      }
+    }
+  ]
+}

@@ -7,7 +7,11 @@
 #include <cstdio>
 #include <exception>
 #include <godot_cpp/classes/display_server.hpp>
+#include <godot_cpp/classes/dir_access.hpp>
+#include <godot_cpp/classes/button.hpp>
+#include <godot_cpp/classes/project_settings.hpp>
 #include <godot_cpp/classes/engine.hpp>
+#include <godot_cpp/classes/engine_debugger.hpp>
 #include <godot_cpp/classes/file_access.hpp>
 #include <godot_cpp/classes/input.hpp>
 #include <godot_cpp/classes/input_event_key.hpp>
@@ -25,6 +29,12 @@
 
 namespace roadwars {
 void GameHost::_bind_methods() {
+    godot::ClassDB::bind_method(godot::D_METHOD("browse_game_directory"), &GameHost::browse_game_directory);
+    godot::ClassDB::bind_method(godot::D_METHOD("select_game_directory", "path"), &GameHost::select_game_directory);
+    godot::ClassDB::bind_method(godot::D_METHOD("cancel_game_directory"), &GameHost::cancel_game_directory);
+    godot::ClassDB::bind_method(godot::D_METHOD("quit_startup"), &GameHost::quit_startup);
+    godot::ClassDB::bind_method(godot::D_METHOD("get_startup_state"), &GameHost::get_startup_state);
+    godot::ClassDB::bind_method(godot::D_METHOD("validate_game_directory_for_test", "path"), &GameHost::validate_game_directory_for_test);
     godot::ClassDB::bind_method(godot::D_METHOD("get_frame_profile_trace"),
                                 &GameHost::get_frame_profile_trace);
     godot::ClassDB::bind_method(godot::D_METHOD("get_frame_timing_state"),
@@ -248,12 +258,20 @@ void GameHost::set_billboard_fixture_camera(double heading, double pitch) {
 }
 
 void GameHost::_ready() {
+    if (godot::Engine::get_singleton()->is_editor_hint())
+        return;
     set_process_mode(godot::Node::PROCESS_MODE_ALWAYS);
     // Modern launch seed; explicit --race-seed retains reproducible diagnostics.
     diagnostic_race_seed_ = static_cast<std::uint32_t>(
         static_cast<std::uint64_t>(godot::Time::get_singleton()->get_unix_time_from_system() *
                                    1000000.0) ^
         godot::Time::get_singleton()->get_ticks_usec());
+    // --debug is also a Godot engine flag. Accept it before the user-argument
+    // separator so standalone binaries support RoadWars-RE.exe --debug.
+    for (const auto argument : godot::OS::get_singleton()->get_cmdline_args())
+        if (argument == "--debug")
+            developer_build_ = true;
+    developer_build_ |= godot::EngineDebugger::get_singleton()->is_active();
     bool enable_debug_overlay = true;
     for (const auto argument : godot::OS::get_singleton()->get_cmdline_user_args()) {
         if (argument == "--frame-trace")
@@ -298,16 +316,8 @@ void GameHost::_ready() {
         if (argument == "--race-preview")
             race_preview_ = true;
     }
+    update_window_title(0);
     try {
-        if (game_directory_.is_empty() && !diagnostic_ && !original_loop_) {
-            const auto config_text =
-                godot::FileAccess::get_file_as_string("res://../../../config.local.json");
-            const auto config_value = godot::JSON::parse_string(config_text);
-            if (config_value.get_type() == godot::Variant::DICTIONARY) {
-                const godot::Dictionary config = config_value;
-                game_directory_ = config.get("game_dir", "");
-            }
-        }
         if (enable_debug_overlay &&
             (developer_build_ || diagnostic_ || (race_mode_ && !competition_) || original_loop_))
             debug_overlay_ = std::make_unique<DebugOverlayAdapter>(get_viewport());
@@ -315,7 +325,9 @@ void GameHost::_ready() {
             (diagnostic_ || original_loop_ || race_preview_ || !frontend_preview_.is_empty() ||
              race_laps_ < 1 || race_laps_ > 10 || race_ai_count_ < 0 || race_ai_count_ > 5))
             throw std::runtime_error("Invalid or conflicting race launch options");
-        restart_smoke_scene();
+        if (!diagnostic_ && !original_loop_ && !resolve_startup_directory())
+            return;
+        finish_startup();
     } catch (const std::exception& error) {
         godot::UtilityFunctions::push_error(error.what());
         get_tree()->quit(1);
@@ -485,6 +497,8 @@ void GameHost::_notification(int what) {
     }
 }
 void GameHost::_input(const godot::Ref<godot::InputEvent>& event) {
+    if (startup_waiting_ || godot::Engine::get_singleton()->is_editor_hint())
+        return;
     const godot::Ref<godot::InputEventKey> key = event;
     if (key.is_valid()) {
         weapon_modifiers_.update(**key);
@@ -632,6 +646,11 @@ double GameHost::get_view_distance_at(godot::Vector3 p) {
 }
 
 void GameHost::_process(double delta) {
+    if (godot::Engine::get_singleton()->is_editor_hint())
+        return;
+    update_window_title(delta);
+    if (startup_waiting_)
+        return;
     FrameTraceScope trace(frame_trace_);
     if (frame_trace_.enabled()) {
         const auto probe_start = godot::Time::get_singleton()->get_ticks_usec();
@@ -875,7 +894,7 @@ LoadingTask GameHost::prepare_race() {
     camera_cut_pending_ = true;
     co_yield LoadingProgress{0, "STARTING"};
     if (game_directory_.is_empty())
-        throw std::runtime_error("The launcher must supply game_dir from config.local.json");
+        throw std::runtime_error("No validated original game directory is available");
     if (!resources_) {
         files_ = std::make_unique<GameFiles>(game_directory_);
         resources_ = std::make_unique<ResourceStore>(*files_);
@@ -1047,7 +1066,7 @@ Result GameHost::invoke(LoopStage stage, float delta, const InputState& input, L
         if (stage == LoopStage::initialize_0045c8ab) {
             state.mode = GameMode::frontend;
             if (game_directory_.is_empty())
-                throw std::runtime_error("Set game_dir in config.local.json");
+                throw std::runtime_error("Select a valid original game directory");
             files_ = std::make_unique<GameFiles>(game_directory_);
             resources_ = std::make_unique<ResourceStore>(*files_);
             if (resources_->open() != Result::ok)

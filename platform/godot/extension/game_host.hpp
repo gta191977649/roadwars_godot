@@ -22,6 +22,8 @@
 #include "platform/godot/rendering/server_renderer.hpp"
 #include <godot_cpp/classes/input_event.hpp>
 #include <godot_cpp/classes/node.hpp>
+#include <godot_cpp/classes/accept_dialog.hpp>
+#include <godot_cpp/classes/file_dialog.hpp>
 #include <memory>
 #include <set>
 
@@ -34,9 +36,24 @@ class GameHost : public godot::Node, public LoopHooks {
 
   private:
     OriginalWeaponKeys weapon_keys_;
+    bool startup_waiting_{};
+    double title_elapsed_{1.0};
+    void update_window_title(double delta);
+    godot::String startup_error_;
+    godot::AcceptDialog* startup_prompt_{};
+    godot::FileDialog* startup_browser_{};
+    bool resolve_startup_directory();
+    void show_startup_prompt(godot::String error);
+    void finish_startup();
 
   public:
     void _ready() override;
+    void browse_game_directory();
+    void select_game_directory(godot::String path);
+    void cancel_game_directory();
+    void quit_startup();
+    godot::Dictionary get_startup_state() const;
+    godot::Dictionary validate_game_directory_for_test(godot::String path) const;
     bool is_race_music_playing() const;
     double get_race_music_position() const;
     double get_race_music_gain() const;

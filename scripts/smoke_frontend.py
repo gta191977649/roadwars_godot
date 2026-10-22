@@ -23,6 +23,8 @@ def main():
     if args.headless:
         command.append('--headless')
     command += ['--', '--no-debug-overlay', '--capture-dir=' + str(capture_dir)]
+    if args.default_config:
+        command.append('--debug')
     if not args.default_config:
         command += ['--game-dir=' + str(game_directory())]
     options = {}
