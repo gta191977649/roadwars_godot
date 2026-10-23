@@ -90,6 +90,7 @@ RaceFrontend::RaceFrontend(Renderer& renderer)
     : renderer_(renderer), cockpit_(std::make_unique<CockpitFrontend>(renderer)) {}
 RaceFrontend::~RaceFrontend() { stop(); }
 void RaceFrontend::stop() {
+    fade_remaining_ = 0;
     cockpit_->stop();
     equipment_loaded_ = false;
     if (loaded_ || !textures_.empty())
@@ -166,6 +167,11 @@ Result RaceFrontend::load(ResourceStore& resources, std::string_view track, Vec3
     track_map_ = map != 0;
     lap_update_ = lap != 0;
     map_ = {start, scale, static_cast<int>(sx), static_cast<int>(sy), static_cast<int>(rotation)};
+    const std::array<std::byte, 4> black{std::byte{0}, std::byte{0}, std::byte{0}, std::byte{255}};
+    fade_pixel_ = {renderer_.upload_texture(1, 1, black), 1, 1};
+    if (!fade_pixel_.texture.value)
+        return fail(Result::unavailable, "race fade texture upload failed");
+    textures_.push_back(fade_pixel_.texture);
     const std::array<std::pair<std::string, Sprite*>, 8> assets{
         {{"RaceInterface/xxSpeedOMeter.bmp", &meter_},
          {"RaceInterface/16SpeedOMeterNeedle.bmp", &needle_},
@@ -312,7 +318,7 @@ Result RaceFrontend::update(const FrontendFrame& frame) {
                 commands_[i].colors[vertex] = {1, vertex < 2 ? 0.f : 1.f, 0, 102.f / 255};
     }
     if (!visible_)
-        return renderer_.draw_hud(commands_);
+        return submit();
     const bool terminal = player.eliminated || player.finished;
     if (!terminal && frame.start_countdown && *frame.start_countdown > 0) {
         const float remaining = *frame.start_countdown;
@@ -339,7 +345,7 @@ Result RaceFrontend::update(const FrontendFrame& frame) {
             }
         }
         if (remaining >= 3)
-            return renderer_.draw_hud(commands_);
+            return submit();
     }
     if (!terminal && speedometer_ && !frame.cockpit) {
         sprite(meter_, {512, 352, meter_.width, meter_.height});
@@ -441,6 +447,16 @@ Result RaceFrontend::update(const FrontendFrame& frame) {
     if (frame.cockpit)
         for (auto& command : commands_)
             command.preserve_aspect = true;
+    return submit();
+}
+void RaceFrontend::advance_fade(float delta) {
+    if (std::isfinite(delta) && delta >= 0)
+        fade_remaining_ = std::max(0.f, fade_remaining_ - delta);
+}
+Result RaceFrontend::submit() {
+    // User-requested transition covers the world and HUD, including hidden-HUD intros.
+    if (fade_remaining_ > 0)
+        sprite(fade_pixel_, {0, 0, 640, 480}, fade_remaining_ / .5f);
     return renderer_.draw_hud(commands_);
 }
 } // namespace roadwars

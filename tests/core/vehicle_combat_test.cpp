@@ -191,6 +191,19 @@ int main(int argc, char** argv) {
             std::array<std::string, 3> names;
             names[static_cast<std::size_t>(descriptor.slot)] = descriptor.name;
             require(combat.load(installed, first_car, names, error), error);
+            if (descriptor.name == "Flame Thrower") {
+                unsigned fire_nodes{};
+                const auto check = [&](const auto& self, const MeshObject& mesh) -> void {
+                    if (mesh.name == "295ULFire") {
+                        ++fire_nodes;
+                        assert(!mesh.visible);
+                    }
+                    for (const auto& child : mesh.children)
+                        self(self, child);
+                };
+                check(check, combat.assets()[0].weapon);
+                assert(fire_nodes == 1 && combat.assets()[0].weapon.visible);
+            }
             const auto initial = combat.slot(descriptor.slot).ammunition;
             if (descriptor.name == "Battering Spikes") {
                 assert(initial == 0 && !combat.request(descriptor.slot, 0, 20, 0));

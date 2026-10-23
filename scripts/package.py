@@ -8,7 +8,7 @@ import shutil
 import subprocess
 import sys
 from local_config import ROOT, load_config
-from build import build_lock
+from build import build_lock, build_target
 
 VERSION = json.loads((ROOT / 'scripts/dependencies.lock.json').read_text())['godot_version']
 TARGETS = {
@@ -54,7 +54,10 @@ def main():
         raise ValueError('Pass --godot or put the matching Godot editor on PATH')
     if not subprocess.check_output([godot, '--version'], text=True).startswith(VERSION + '.'):
         raise ValueError('Godot editor version does not match ' + VERSION)
-    # Fixed, isolated build/staging directories; never rewrite the developer DLL.
+    # The editor imports native classes with debug bindings; the exported game
+    # loads only the separately compiled Release library.
+    build_target('godot', args.jobs)
+    # Fixed, isolated Release build/staging directories.
     build = ROOT / 'build/godot-release'
     with build_lock('godot-release'):
         manifest = build / 'build.ninja'
@@ -79,10 +82,20 @@ def main():
             shutil.copy2(source / name, stage / name)
         (stage / 'bin').mkdir(exist_ok=True)
         shutil.copy2(extension, stage / 'bin' / library)
+        editor_library = 'roadwars_editor' + Path(library).suffix
+        shutil.copy2(ROOT / 'platform/godot/project/bin' / library, stage / 'bin' / editor_library)
         # Stage only this host's library declaration: other hosts need native builds.
         manifest = (stage / 'roadwars.gdextension').read_text().split('[libraries]')[0]
         key = {'windows': 'windows.x86_64', 'linux': 'linux.x86_64', 'macos': 'macos'}[target]
-        (stage / 'roadwars.gdextension').write_text(manifest + '[libraries]\n' + key + ' = "res://bin/' + library + '"\n')
+        family, *architecture = key.split('.')
+        arch = '.' + '.'.join(architecture) if architecture else ''
+        libraries = (family + '.debug' + arch + ' = "res://bin/' + editor_library + '"\n' +
+                     family + '.release' + arch + ' = "res://bin/' + library + '"\n')
+        (stage / 'roadwars.gdextension').write_text(manifest + '[libraries]\n' + libraries)
+        # Preload the known native bootstrap at engine initialization rather than
+        # hot-discovering its non-reloadable library during the first editor scan.
+        (stage / '.godot').mkdir()
+        (stage / '.godot/extension_list.cfg').write_text('res://roadwars.gdextension\n')
         presets = (ROOT / 'platform/godot/export_presets.cfg').read_text()
         index = ['Windows', 'Linux', 'macOS'].index(preset)
         marker = f'[preset.{index}.options]'
@@ -91,7 +104,7 @@ def main():
         (stage / 'export_presets.cfg').write_text(presets)
         destination = ROOT / 'build/bin' / target
         destination.mkdir(parents=True, exist_ok=True)
-        subprocess.run([godot, '--headless', '--path', str(stage), '--editor', '--import', '--quit'], cwd=stage, check=True)
+        subprocess.run([godot, '--headless', '--path', str(stage), '--editor', '--import'], cwd=stage, check=True)
         subprocess.run([godot, '--headless', '--path', str(stage), '--export-release', preset, str(destination / executable)], cwd=stage, check=True)
         if not (destination / executable).exists():
             raise ValueError('Export did not produce ' + executable)

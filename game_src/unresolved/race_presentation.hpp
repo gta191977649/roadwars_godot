@@ -52,6 +52,8 @@ class RacePresentation {
         return frontend_.configure_equipment(resources, car, weapons, error);
     }
     Result update_frontend(const FrontendFrame& frame) { return frontend_.update(frame); }
+    void start_fade_in() { frontend_.start_fade_in(); }
+    void advance_fade(float delta) { frontend_.advance_fade(delta); }
     Result add_opponent(ResourceStore&, std::string_view vehicle, std::string& error,
                         const TireSelection& tires = {}, int paint_job = 0);
     Result replace_player_visual(ResourceStore&, std::string_view vehicle, const RaceLoadout&,
@@ -94,12 +96,14 @@ class RacePresentation {
                 bool vehicle, int wheel_index = -1, int parent_node = -1,
                 std::vector<std::size_t> node_path = {});
     MaterialHandle material(ResourceStore&, const std::string& base, const MeshPart& part,
-                            std::uint32_t flags);
+                            std::uint32_t flags, bool chrome = false);
     CameraFrame camera_;
     float camera_far_distance_{};
     Renderer& renderer_;
     RaceFrontend frontend_;
     bool developer_build_{};
+    bool chrome_enabled_{};
+    TextureHandle chrome_texture_;
     TrackCollision collision_;
     TrackRenderSettings render_settings_;
     ViewDistanceMap view_distances_;

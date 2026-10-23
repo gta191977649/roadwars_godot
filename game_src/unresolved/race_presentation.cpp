@@ -1,5 +1,6 @@
 #include "game_src/unresolved/race_presentation.hpp"
 #include "game_src/unresolved/bitmap.hpp"
+#include "game_src/unresolved/chrome_mapping.hpp"
 #include "game_src/unresolved/contact_orientation.hpp"
 #include "game_src/unresolved/race_session.hpp"
 #include "game_src/unresolved/vehicle_combat.hpp"
@@ -86,6 +87,11 @@ Result RacePresentation::load(ResourceStore& resources, std::string_view track,
         view_distances_.load(resources, track, error) != Result::ok)
         return Result::invalid_argument;
     try {
+        if (load_chrome_mapping(resources, renderer_, chrome_texture_, chrome_enabled_, error) !=
+            Result::ok)
+            throw std::runtime_error(error);
+        if (chrome_texture_.value)
+            textures_.push_back(chrome_texture_);
         SceneSettings settings;
         settings.fog_color = render_settings_.fog_color;
         settings.directional_light = render_settings_.directional_light;
@@ -235,7 +241,7 @@ Result RacePresentation::configure_racers(ResourceStore& resources, std::string_
 // RE-STUB: 93b4e4c301a5694b55e16977c2e52f4971bd9089659e3d58617c8af2368436c8:function:004d2fcd
 // RE-STUB: 93b4e4c301a5694b55e16977c2e52f4971bd9089659e3d58617c8af2368436c8:function:004ea597
 MaterialHandle RacePresentation::material(ResourceStore& resources, const std::string& base,
-                                          const MeshPart& part, std::uint32_t flags) {
+                                           const MeshPart& part, std::uint32_t flags, bool chrome) {
     auto key = ResourceStore::canonical(base + "/" + part.texture);
     const auto shared_paint = damage_paint_textures_.find(key);
     if (shared_paint != damage_paint_textures_.end())
@@ -243,13 +249,15 @@ MaterialHandle RacePresentation::material(ResourceStore& resources, const std::s
     for (const auto component : part.color)
         key += ":" + std::to_string(std::bit_cast<std::uint32_t>(component));
     key += ":flags=" + std::to_string(flags);
+    key += ":chrome=" + std::to_string(chrome ? chrome_texture_.value : 0);
     const auto found = materials_.find(key);
     if (found != materials_.end())
         return found->second;
     if (shared_paint != damage_paint_textures_.end()) {
-        const auto handle = renderer_.create_material(
-            shared_paint->second.handle,
-            surface_settings(part, flags, shared_paint->second.transparency));
+        auto settings = surface_settings(part, flags, shared_paint->second.transparency);
+        if (chrome)
+            settings.chrome_map = chrome_texture_;
+        const auto handle = renderer_.create_material(shared_paint->second.handle, settings);
         if (!handle.value)
             throw std::runtime_error("Mutable original paint material upload failed: " + key);
         materials_.emplace(key, handle);
@@ -305,7 +313,9 @@ MaterialHandle RacePresentation::material(ResourceStore& resources, const std::s
     if (!texture.value)
         throw std::runtime_error("Texture upload failed: " + key);
     textures_.push_back(texture);
-    const auto settings = surface_settings(part, flags, transparency);
+    auto settings = surface_settings(part, flags, transparency);
+    if (chrome)
+        settings.chrome_map = chrome_texture_;
     const auto handle = renderer_.create_material(texture, settings);
     if (!handle.value)
         throw std::runtime_error("Material upload failed: " + key);
@@ -348,7 +358,10 @@ void RacePresentation::upload(ResourceStore& resources, const MeshObject& object
         for (const auto& coordinate : part.uv)
             uv.push_back({coordinate.x, coordinate.y});
         const auto mesh = renderer_.upload_surface(part.positions, uv, part.indices,
-                                                   material(resources, base, part, object.flags),
+                                                   material(resources, base, part, object.flags,
+                                                       chrome_mapping_applies(chrome_enabled_,
+                                                           object.flags, part_index,
+                                                           vehicle && chrome_texture_.value)),
                                                    part.normals, part.colors);
         if (!mesh.value)
             throw std::runtime_error("Mesh upload failed: " + object.name);
@@ -1035,7 +1048,10 @@ Result RacePresentation::update_damage_visual(ResourceStore& resources,
         const auto& part = node->parts[instance.part_index];
         MaterialHandle surface;
         if (ResourceStore::canonical(part.texture) == paint_name) {
-            std::string key = std::to_string(node->flags);
+            const bool chrome = chrome_mapping_applies(chrome_enabled_, node->flags,
+                                                       instance.part_index, chrome_texture_.value);
+            std::string key = std::to_string(node->flags) + ":chrome=" +
+                              std::to_string(chrome ? chrome_texture_.value : 0);
             for (const auto color : part.color)
                 key += ":" + std::to_string(std::bit_cast<std::uint32_t>(color));
             const auto cached = visual.materials.find(key);
@@ -1047,9 +1063,11 @@ Result RacePresentation::update_damage_visual(ResourceStore& resources,
                 if (shared != materials_.end())
                     surface = shared->second;
                 else {
-                    surface = renderer_.create_material(
-                        visual.paint,
-                        surface_settings(part, node->flags, source.texture_transparency()));
+                    auto settings =
+                        surface_settings(part, node->flags, source.texture_transparency());
+                    if (chrome)
+                        settings.chrome_map = chrome_texture_;
+                    surface = renderer_.create_material(visual.paint, settings);
                     if (!surface.value)
                         return Result::unavailable;
                     materials_.emplace(global_key, surface);
@@ -1058,7 +1076,9 @@ Result RacePresentation::update_damage_visual(ResourceStore& resources,
             }
         } else {
             const auto base = std::string(source.texture_path().substr(0, slash));
-            surface = material(resources, base, part, node->flags);
+            surface = material(resources, base, part, node->flags,
+                chrome_mapping_applies(chrome_enabled_, node->flags, instance.part_index,
+                                       chrome_texture_.value));
         }
         std::vector<std::array<float, 2>> uv;
         for (const auto coordinate : part.uv)
@@ -1393,5 +1413,7 @@ void RacePresentation::stop() {
     meshes_.clear();
     materials_.clear();
     textures_.clear();
+    chrome_texture_ = {};
+    chrome_enabled_ = false;
 }
 } // namespace roadwars

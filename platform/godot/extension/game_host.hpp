@@ -88,6 +88,7 @@ class GameHost : public godot::Node, public LoopHooks {
     bool frontend_test_step(double elapsed, godot::String command);
     void start_fog_fixture();
     void start_billboard_fixture();
+    godot::Dictionary start_chrome_fixture();
     void set_billboard_fixture_camera(double heading, double pitch);
     int get_live_rids() const;
     bool is_engine_audio_playing() const;
@@ -136,6 +137,7 @@ class GameHost : public godot::Node, public LoopHooks {
   private:
     std::unique_ptr<DebugOverlayAdapter> debug_overlay_;
     bool ui_mouse_visible_{}, simulation_failed_{};
+    std::optional<bool> chrome_mapping_override_;
     FrameTrace frame_trace_;
     std::uint64_t last_simulation_usec_{};
     std::unique_ptr<ServerRenderer> renderer_;

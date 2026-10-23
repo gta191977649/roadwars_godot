@@ -7,7 +7,10 @@ RE function mappings and does not advance reverse-engineering completion.
 
 `python scripts/package.py --templates-dir <matching-template-directory>` builds
 the native `godot-release` preset, imports an allowlisted staging project and
-exports through the matching Godot editor. `--godot` overrides the tool location;
+exports through the matching Godot editor. The tool import uses the Debug binding
+library; only the Release DLL is selected for the distributed package. The known
+non-reloadable bootstrap extension is prelisted before the first editor scan,
+avoiding late native-library discovery during scene import. `--godot` overrides the tool location;
 `--jobs` controls compilation. The editor version and template `version.txt` must
 match the dependency lock. Missing templates are an explicit error; they are not
 automatically downloaded. The default template location follows Godot's native
@@ -79,7 +82,9 @@ The exported EXE smoke runs independently from the repository with only EXE+DLL:
 root/bin/deep-ancestor installation placement, isolated missing-assets failure,
 explicit remote root, and a real Single Race load. Frontend race/return/BGM smoke,
 developer-config menu smoke, competition lifecycle smoke and diagnostic renderer
-lifecycle smoke passed. Both direct `RoadWars-RE.exe --debug` and separated `RoadWars-RE.exe -- --debug`
+lifecycle smoke passed. Exported-package smoke also passed direct and separated debug activation with
+an executable-adjacent developer config, while normal startup ignored that file.
+Both direct `RoadWars-RE.exe --debug` and separated `RoadWars-RE.exe -- --debug`
 are supported. Godot consumes the direct flag; its active engine debugger also
 enables the host diagnostics. An executable-adjacent developer config takes
 precedence over the repository config when debug mode is explicitly enabled.

@@ -95,6 +95,8 @@ class RaceFrontend {
     const FrontendMapSettings& map_settings() const { return map_; }
     std::span<const HudQuad> commands() const { return commands_; }
     void set_visible(bool visible) { visible_ = visible; }
+    void start_fade_in() { fade_remaining_ = .5f; }
+    void advance_fade(float delta);
 
   private:
     struct Sprite {
@@ -107,6 +109,7 @@ class RaceFrontend {
     void text(int x, int y, std::string_view, bool countdown = false);
     Result draw_equipment(const FrontendEquipmentFrame&);
     Result draw_ammunition_notices(std::span<const AmmunitionNotice>);
+    Result submit();
     Renderer& renderer_;
     std::unique_ptr<CockpitFrontend> cockpit_;
     bool loaded_{}, visible_{true}, speedometer_{}, track_map_{}, lap_update_{};
@@ -122,5 +125,7 @@ class RaceFrontend {
     std::array<HudRect, 5> damage_regions_;
     int internal_offset_{}, shell_offset_{};
     bool equipment_loaded_{};
+    Sprite fade_pixel_;
+    float fade_remaining_{};
 };
 } // namespace roadwars

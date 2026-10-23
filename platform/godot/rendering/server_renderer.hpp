@@ -15,6 +15,11 @@ class ServerRenderer final : public Renderer {
   public:
     explicit ServerRenderer(godot::RID viewport, bool original_coordinates = false);
     ~ServerRenderer() override;
+    ChromeMappingOptions chrome_mapping_options() const override { return chrome_options_; }
+    Result set_chrome_mapping_enabled(bool enabled) override {
+        chrome_options_.enabled = enabled;
+        return Result::ok;
+    }
     ServerRenderer(const ServerRenderer&) = delete;
     ServerRenderer& operator=(const ServerRenderer&) = delete;
     MeshHandle upload_mesh(std::span<const Vec3>, std::span<const std::uint32_t>) override;
@@ -43,6 +48,7 @@ class ServerRenderer final : public Renderer {
     void configure_scene(const SceneSettings&) override;
     void create_fog_fixture(float aspect);
     void create_billboard_fixture();
+    godot::Dictionary create_chrome_fixture(float aspect);
     void clear_sky();
     Result configure_sky(std::span<const Vec3>, std::span<const std::array<float, 2>>,
                          std::span<const std::uint32_t>, MaterialHandle) override;
@@ -92,12 +98,15 @@ class ServerRenderer final : public Renderer {
     godot::RID hud_canvas_, hud_item_;
     godot::RID sky_, sky_material_, sky_shader_;
     bool original_coordinates_{};
+    // User-authorized installed-resource compatibility, not an original filename fallback.
+    ChromeMappingOptions chrome_options_{true, "Textures/16cr1.bmp"};
     SceneSettings scene_settings_{};
     std::uint64_t next_handle_{1};
     std::unordered_map<std::uint64_t, godot::RID> meshes_, instances_;
     std::unordered_map<std::uint64_t, godot::RID> textures_, materials_, material_shaders_;
     std::unordered_map<std::uint64_t, godot::RID> material_textures_;
     std::unordered_set<std::uint64_t> billboard_materials_, static_instances_;
+    std::unordered_set<std::uint64_t> chrome_materials_;
     struct ParticleResources {
         godot::RID particles, instance, mesh, process_shader, process_material, draw_shader,
             draw_material;

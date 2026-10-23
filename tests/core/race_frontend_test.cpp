@@ -130,7 +130,7 @@ int main(int argc, char** argv) {
     assert(hud.map_settings().rotation_degrees == 90);
     assert(std::abs(hud.map_settings().scale - 0.0459997f) < 1e-8f);
     const auto texture_count = renderer.textures.size();
-    assert(texture_count == 24); // Ten external HUD textures plus fourteen preloaded cockpit assets.
+    assert(texture_count == 25); // HUD/cockpit textures and the opaque transition pixel.
     std::array<FrontendRacer, 1> racers{{{{0, 0, 0}, 0}}};
     FrontendFrame frame;
     frame.racers = racers;
@@ -266,6 +266,20 @@ int main(int argc, char** argv) {
     frame.ammunition_notices = {};
     frame.developer_build = false;
     hud.set_visible(false);
+    assert(hud.update(frame) == Result::ok && renderer.frame.empty());
+    hud.start_fade_in();
+    assert(hud.update(frame) == Result::ok && renderer.frame.size() == 1);
+    assert(renderer.frame.back().positions[2] == (std::array<float, 2>{640, 480}));
+    assert(renderer.frame.back().colors[0][3] == 1);
+    hud.set_visible(true);
+    frame.start_countdown = 10;
+    assert(hud.update(frame) == Result::ok && renderer.frame.size() == 1);
+    assert(renderer.frame.back().colors[0][3] == 1);
+    frame.start_countdown.reset();
+    hud.set_visible(false);
+    hud.advance_fade(.25f);
+    assert(hud.update(frame) == Result::ok && renderer.frame.back().colors[0][3] == .5f);
+    hud.advance_fade(.25f);
     assert(hud.update(frame) == Result::ok && renderer.frame.empty());
     hud.stop();
     assert(renderer.textures.empty());

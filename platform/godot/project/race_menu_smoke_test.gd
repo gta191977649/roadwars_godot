@@ -246,6 +246,17 @@ func run_test() -> void:
         await capture("single_loading" if single else "quick_loading")
         if not await wait_loading("countdown", "single_loading" if single else "quick_loading"):
             return
+        if DisplayServer.get_name() != "headless":
+            await RenderingServer.frame_post_draw
+            var black_frame := root.get_texture().get_image()
+            for y in range(0, black_frame.get_height(), 32):
+                for x in range(0, black_frame.get_width(), 32):
+                    var pixel := black_frame.get_pixel(x, y)
+                    if not require(maxf(pixel.r, maxf(pixel.g, pixel.b)) < 0.01,
+                                   "Loading-to-race first frame was not black at %s: %s" % [Vector2i(x, y), pixel]):
+                        return
+        if not require(host.competition_test_step(0.5, false), "Race fade-in step failed"):
+            return
         var state: Dictionary = host.get_competition_state()
         if not require(state.get("phase", "") == "countdown" and
                        str(state.get("track", "")).to_upper() == "DARK FOREST" and

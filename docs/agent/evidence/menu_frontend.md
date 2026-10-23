@@ -11,6 +11,15 @@ receivers are uncertain and are not portable ABI declarations.
 
 ## Startup and intentional host adaptations
 
+The user-requested Loading-to-race transition starts with an opaque black
+fullscreen quad and fades to the race over0.5seconds. RaceFrontend owns the
+transition texture/timer; GameHost starts it after releasing Loading and advances
+it with the existing fixed ticks. It covers both world and HUD even during the
+hidden-HUD intro, without changing simulation scheduling. This is a modern
+presentation adaptation, not an original-executable behavior claim. The HUD
+asset test checks full/half/zero alpha and cleanup; the race menu smoke test
+checks the first rendered race frame is black on both Single and Quick routes.
+
 `004ab60d` calls the publisher AVI wrapper `004ab401` for Avi1 and Avi2, then
 creates `Screens/Intro/Logo.bmp` and `Screens/Title/Title.bmp` through `004e19f6`.
 Avi1 fills the display. Avi2 is centered with dimensions limited to 320x240.

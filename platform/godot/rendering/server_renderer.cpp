@@ -14,6 +14,7 @@
 #include <godot_cpp/variant/array.hpp>
 #include <godot_cpp/variant/packed_byte_array.hpp>
 #include <godot_cpp/variant/packed_color_array.hpp>
+#include <godot_cpp/variant/packed_float32_array.hpp>
 #include <godot_cpp/variant/packed_int32_array.hpp>
 #include <godot_cpp/variant/packed_vector2_array.hpp>
 #include <godot_cpp/variant/packed_vector3_array.hpp>
@@ -443,6 +444,8 @@ godot::Dictionary ServerRenderer::presentation_snapshot() const {
     result["aspect_hud_pixels"] = quads;
     result["camera_hidden_instances"] = static_cast<int>(camera_hidden_.size());
     result["camera_near"] = first_person_ ? .1f : scene_settings_.near_distance;
+    result["chrome_materials"] = static_cast<int>(chrome_materials_.size());
+    result["chrome_mapping_enabled"] = chrome_options_.enabled.value_or(false);
     for (const auto& [id, pose] : instance_poses_)
         instances[static_cast<int64_t>(id)] = history(pose);
     result["instances"] = instances;
@@ -549,6 +552,9 @@ MaterialHandle ServerRenderer::create_material(TextureHandle texture,
     const auto found = textures_.find(texture.value);
     if (found == textures_.end())
         return {};
+    const auto chrome = textures_.find(settings.chrome_map.value);
+    if (settings.chrome_map.value && chrome == textures_.end())
+        return {};
     trace_resource(FrameResource::material);
     const auto rid = server_->material_create();
     const auto shader = server_->shader_create();
@@ -558,6 +564,7 @@ MaterialHandle ServerRenderer::create_material(TextureHandle texture,
             code += std::string("#define ") + name + "\n";
     };
     define(settings.unshaded, "RW_UNSHADED");
+    define(settings.chrome_map.value != 0, "RW_CHROME");
     define(settings.depth_write && settings.depth_test, "RW_DEPTH_WRITE");
     define(!settings.depth_test, "RW_NO_DEPTH_TEST");
     define(settings.fog, "RW_FOG");
@@ -571,6 +578,20 @@ MaterialHandle ServerRenderer::create_material(TextureHandle texture,
     server_->shader_set_code(shader, godot::String(code.c_str()));
     server_->material_set_shader(rid, shader);
     server_->material_set_param(rid, "diffuse_map", found->second);
+    if (settings.chrome_map.value) {
+        server_->material_set_param(rid, "chrome_map", chrome->second);
+        server_->material_set_param(rid, "chrome_base_map", found->second);
+        server_->material_set_param(rid, "chrome_material_color",
+            godot::Color(settings.color[0], settings.color[1], settings.color[2], settings.color[3]));
+        const auto direction = original_coordinates_
+            ? original_to_godot(scene_settings_.directional_light) : scene_settings_.directional_light;
+        server_->material_set_param(rid, "chrome_light_direction",
+                                    godot::Vector3(direction.x, direction.y, direction.z));
+        server_->material_set_param(rid, "chrome_ambient", scene_settings_.ambient_light);
+        server_->material_set_param(rid, "chrome_fog_color",
+            godot::Vector3(scene_settings_.fog_color.x, scene_settings_.fog_color.y,
+                           scene_settings_.fog_color.z));
+    }
     server_->material_set_param(
         rid, "tint",
         godot::Color(settings.color[0], settings.color[1], settings.color[2], settings.color[3]));
@@ -584,6 +605,8 @@ MaterialHandle ServerRenderer::create_material(TextureHandle texture,
     }
     const auto id = next_handle_++;
     materials_.emplace(id, rid);
+    if (settings.chrome_map.value)
+        chrome_materials_.insert(id);
     if (settings.billboard_y)
         billboard_materials_.insert(id);
     material_textures_.emplace(id, found->second);
@@ -644,6 +667,82 @@ void ServerRenderer::create_billboard_fixture() {
     set_instance_static(instance, true);
     update_instance(instance, {});
 }
+godot::Dictionary ServerRenderer::create_chrome_fixture(float aspect) {
+    SceneSettings scene;
+    scene.near_distance = .1f;
+    scene.far_distance = 5;
+    scene.ambient_light = .25f;
+    scene.directional_light = {0, 0, 1};
+    scene.fog_color = {16.f / 255, 48.f / 255, 80.f / 255};
+    configure_scene(scene);
+    const std::array<std::byte, 4> base_pixels{
+        std::byte{64}, std::byte{32}, std::byte{16}, std::byte{255}};
+    const std::array<std::byte, 16> chrome_pixels{
+        std::byte{64}, std::byte{0}, std::byte{0}, std::byte{0},
+        std::byte{0}, std::byte{96}, std::byte{0}, std::byte{0},
+        std::byte{0}, std::byte{0}, std::byte{128}, std::byte{0},
+        std::byte{32}, std::byte{48}, std::byte{64}, std::byte{0}};
+    const auto base = upload_texture(1, 1, base_pixels);
+    const auto chrome = upload_texture(2, 2, chrome_pixels);
+    const std::array<std::byte, 4> bright_pixels{
+        std::byte{224}, std::byte{208}, std::byte{192}, std::byte{255}};
+    const auto bright = upload_texture(1, 1, bright_pixels);
+    const float half_y = 4.f * std::tan(25.f * .0174532925199433f);
+    const float half_x = half_y * aspect;
+    godot::Array samples;
+    const std::array<Vec3, 4> corners{
+        {{-.5f, .5f, 1}, {.5f, .5f, 1}, {-.5f, -.5f, 1}, {.5f, -.5f, 1}}};
+    const std::array<Vec3, 4> reflection{
+        {{64, 0, 0}, {0, 96, 0}, {0, 0, 128}, {32, 48, 64}}};
+    for (int i = 0; i < 12; ++i) {
+        const float x = (i % 4 + .5f) / 4, y = (i / 4 + .5f) / 3;
+        const float dx = half_x * .17f, dy = half_y * .23f;
+        const std::array<Vec3, 4> positions{
+            {{-dx, -dy, 0}, {dx, -dy, 0}, {dx, dy, 0}, {-dx, dy, 0}}};
+        std::array<Vec3, 4> normals;
+        normals.fill(corners[i < 4 ? i : 0]);
+        Vec3 added = reflection[i < 4 ? i : 0];
+        if (i == 4) { normals.fill({2.5f, .5f, 1}); added = reflection[1]; }
+        if (i == 5) { normals.fill({-.5f, -2.5f, 1}); added = reflection[2]; }
+        if (i == 6) {
+            normals = {{{-.5f, -.5f, 1}, {.5f, -.5f, 1},
+                         {.5f, .5f, 1}, {-.5f, .5f, 1}}};
+            added = {24, 36, 48};
+        }
+        if (i == 7) added = reflection[2];
+        if (i == 8) { normals.fill({0, 0, 1}); added = {24, 36, 48}; }
+        MaterialSettings settings;
+        settings.unshaded = i != 8;
+        settings.fog = i == 9;
+        settings.chrome_map = i == 10 ? TextureHandle{} : chrome;
+        const std::array<std::array<float, 2>, 4> uv{};
+        const std::array<std::uint32_t, 6> indices{0, 2, 1, 0, 3, 2};
+        std::array<std::array<float, 4>, 4> colors;
+        colors.fill({1, 1, 1, 1});
+        const auto material = create_material(i == 11 ? bright : base, settings);
+        const auto mesh = upload_surface(positions, uv, indices, material, normals, colors);
+        const auto instance = create_instance(mesh);
+        Transform pose;
+        pose.origin = {(2 * x - 1) * half_x, (1 - 2 * y) * half_y, -4};
+        if (i == 7) pose.basis = {{{0, 1, 0}, {-1, 0, 0}, {0, 0, 1}}};
+        update_instance(instance, pose);
+        Vec3 expected{64 + added.x, 32 + added.y, 16 + added.z};
+        if (i == 8) expected = {16 + added.x, 8 + added.y, 4 + added.z};
+        if (i == 9) expected = {(expected.x * 2 + 16) / 3,
+                                (expected.y * 2 + 48) / 3, (expected.z * 2 + 80) / 3};
+        if (i == 10) expected = {64, 32, 16};
+        if (i == 11) expected = {255, 208, 192};
+        godot::Dictionary sample;
+        sample["position"] = godot::Vector2(x, y);
+        sample["color"] = godot::Color(expected.x / 255, expected.y / 255, expected.z / 255);
+        sample["label"] = godot::String::num_int64(i);
+        samples.push_back(sample);
+    }
+    update_camera({}, 50);
+    godot::Dictionary result;
+    result["samples"] = samples;
+    return result;
+}
 // RE-STUB: 93b4e4c301a5694b55e16977c2e52f4971bd9089659e3d58617c8af2368436c8:function:004dbeb5
 // Original modern-profile vertex fog only; legacy capability fallback remains outside this adapter.
 void ServerRenderer::configure_scene(const SceneSettings& settings) {
@@ -673,6 +772,15 @@ void ServerRenderer::configure_scene(const SceneSettings& settings) {
         server_->material_set_param(material, "original_fog_color", fog);
         server_->material_set_param(material, "original_fog_start", settings.far_distance * .7f);
         server_->material_set_param(material, "original_fog_end", settings.far_distance);
+        if (chrome_materials_.contains(id)) {
+            const auto direction = original_coordinates_
+                ? original_to_godot(settings.directional_light) : settings.directional_light;
+            server_->material_set_param(material, "chrome_light_direction",
+                                       godot::Vector3(direction.x, direction.y, direction.z));
+            server_->material_set_param(material, "chrome_ambient", settings.ambient_light);
+            server_->material_set_param(material, "chrome_fog_color",
+                godot::Vector3(settings.fog_color.x, settings.fog_color.y, settings.fog_color.z));
+        }
     }
     auto direction = original_coordinates_ ? original_to_godot(settings.directional_light)
                                            : settings.directional_light;
@@ -716,12 +824,23 @@ MeshHandle ServerRenderer::upload_surface(std::span<const Vec3> positions,
     godot::PackedVector3Array vertex_normals;
     godot::PackedColorArray vertex_colors;
     godot::PackedInt32Array triangles;
+    godot::PackedFloat32Array chrome_normals;
+    const bool chrome = chrome_materials_.contains(material.value);
+    if (chrome && normals.size() != positions.size())
+        return {};
+    if (chrome)
+        chrome_normals.resize(static_cast<std::int64_t>(normals.size() * 3));
     for (std::size_t i = 0; i < positions.size(); ++i) {
         const auto p = original_coordinates_ ? original_to_godot(positions[i]) : positions[i];
         vertices.push_back({p.x, p.y, p.z});
         if (i < normals.size()) {
             const auto n = original_coordinates_ ? original_to_godot(normals[i]) : normals[i];
             vertex_normals.push_back({n.x, n.y, n.z});
+            if (chrome) {
+                chrome_normals.set(i * 3, n.x);
+                chrome_normals.set(i * 3 + 1, n.y);
+                chrome_normals.set(i * 3 + 2, n.z);
+            }
         }
         if (i < colors.size()) {
             const auto c = colors[i];
@@ -740,9 +859,16 @@ MeshHandle ServerRenderer::upload_surface(std::span<const Vec3> positions,
     if (!vertex_colors.is_empty())
         arrays[godot::RenderingServer::ARRAY_COLOR] = vertex_colors;
     arrays[godot::RenderingServer::ARRAY_INDEX] = triangles;
+    std::uint64_t format{};
+    if (chrome) {
+        arrays[godot::RenderingServer::ARRAY_CUSTOM0] = chrome_normals;
+        format = static_cast<std::uint64_t>(godot::RenderingServer::ARRAY_CUSTOM_RGB_FLOAT)
+                 << godot::RenderingServer::ARRAY_FORMAT_CUSTOM0_SHIFT;
+    }
     trace_resource(FrameResource::mesh);
     const auto rid = server_->mesh_create();
-    server_->mesh_add_surface_from_arrays(rid, godot::RenderingServer::PRIMITIVE_TRIANGLES, arrays);
+    server_->mesh_add_surface_from_arrays(rid, godot::RenderingServer::PRIMITIVE_TRIANGLES, arrays,
+                                          {}, {}, format);
     server_->mesh_surface_set_material(rid, 0, found->second);
     if (billboard_materials_.contains(material.value)) {
         float radius = 0, minimum_y = positions.front().y, maximum_y = minimum_y;
@@ -994,6 +1120,7 @@ void ServerRenderer::destroy_material(MaterialHandle material) {
         materials_.erase(found);
         material_textures_.erase(material.value);
         billboard_materials_.erase(material.value);
+        chrome_materials_.erase(material.value);
     }
     const auto shader = material_shaders_.find(material.value);
     if (shader != material_shaders_.end()) {

@@ -244,6 +244,8 @@ def main():
     parser.add_argument('--laps', type=positive_laps, help='Number of laps, 1..10 (default: 3 for --race)')
     parser.add_argument('--ai', type=ai_count, help='AI opponents, 0..5 (default: 5 for --race)')
     parser.add_argument('--seed', type=int, help='Diagnostic CRT seed, 0..4294967295 (default: fresh seed per launch)')
+    parser.add_argument('--chrome-mapping', choices=['on', 'off'],
+                        help='Override chrome mapping for this launch (modern default: on)')
     args = parser.parse_intermixed_args()
     if args.action is None:
         args.action = args.preset or 'godot'
@@ -317,6 +319,10 @@ def main():
             if '--' not in command:
                 command.append('--')
             command += ['--debug', '--game-dir=' + str(game_directory())]
+        if args.chrome_mapping:
+            if '--' not in command:
+                command.append('--')
+            command.append('--chrome-mapping=' + args.chrome_mapping)
         run(command)
 
 if __name__ == '__main__':

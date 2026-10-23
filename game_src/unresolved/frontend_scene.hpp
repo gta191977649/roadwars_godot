@@ -40,7 +40,8 @@ class FrontendScene {
         float seconds{};
     };
     Result read_mesh(const std::string& path, MeshObject&, std::string& error);
-    MaterialHandle material(const MeshPart&, const std::string& base, std::uint32_t flags);
+    MaterialHandle material(const MeshPart&, const std::string& base, std::uint32_t flags,
+                            bool chrome = false);
     void upload(const MeshObject&, const std::string& base, Vec3 parent, int vehicle = -1,
                 int turntable = -1, int sky = -1);
     void upload_vehicle(std::string_view name, Vec3 anchor, int index);
@@ -52,6 +53,8 @@ class FrontendScene {
     Renderer& renderer_;
     SceneSettings scene_settings_;
     bool loaded_{}, victory_{}, store_{}, victory_finished_{};
+    bool chrome_enabled_{};
+    TextureHandle chrome_texture_;
     double elapsed_{}, debt_{};
     Vec3 eye_{}, velocity_{}, target_{}, stand_{};
     Vec3 product_anchor_{}, product_angles_{}, product_speeds_{};

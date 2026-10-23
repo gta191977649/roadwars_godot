@@ -255,6 +255,19 @@ Result VehicleCombat::load(ResourceStore& resources, std::string_view car,
             asset.has_flare_mesh = true;
             node->visible = false;
         }
+        // RE-STUB: 93b4e4c301a5694b55e16977c2e52f4971bd9089659e3d58617c8af2368436c8:function:004353f0
+        if (item.kind == Kind::flame) {
+            // 004353f0 hides the serialized fire sprite; the live flame uses particles.
+            std::vector<std::size_t> path;
+            if (!find_node(asset.weapon, "295ULFire", path)) {
+                error = "Original flame fire node unavailable";
+                return Result::unavailable;
+            }
+            auto* node = &asset.weapon;
+            for (const auto index : path)
+                node = &node->children[index];
+            node->visible = false;
+        }
         if (item.kind == Kind::salvo) {
             const unsigned muzzle_count = name == "Machine Gun" ? 2 : name == "Gatling Gun" ? 5 : 1;
             for (unsigned m = 0; m < muzzle_count; ++m) {

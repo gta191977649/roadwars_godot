@@ -78,6 +78,8 @@ void GameHost::_bind_methods() {
                                 &GameHost::seek_race_music_for_test);
     godot::ClassDB::bind_method(godot::D_METHOD("start_billboard_fixture"),
                                 &GameHost::start_billboard_fixture);
+    godot::ClassDB::bind_method(godot::D_METHOD("start_chrome_fixture"),
+                                &GameHost::start_chrome_fixture);
     godot::ClassDB::bind_method(godot::D_METHOD("set_billboard_fixture_camera", "heading", "pitch"),
                                 &GameHost::set_billboard_fixture_camera);
     godot::ClassDB::bind_method(godot::D_METHOD("set_frontend_visible", "visible"),
@@ -256,6 +258,18 @@ void GameHost::set_billboard_fixture_camera(double heading, double pitch) {
         original_camera_frame({forward.x * 8, forward.y * 8, forward.z * 8}, {}, heading, pitch);
     renderer_->update_camera(camera.transform, camera.vertical_fov_degrees);
 }
+godot::Dictionary GameHost::start_chrome_fixture() {
+    try {
+        start_billboard_fixture();
+        renderer_.reset();
+        renderer_ = std::make_unique<ServerRenderer>(get_viewport()->get_viewport_rid(), false);
+        const auto size = get_viewport()->get_visible_rect().size;
+        return renderer_->create_chrome_fixture(size.x / size.y);
+    } catch (const std::exception& error) {
+        godot::UtilityFunctions::push_error(error.what());
+        return {};
+    }
+}
 
 void GameHost::_ready() {
     if (godot::Engine::get_singleton()->is_editor_hint())
@@ -278,6 +292,10 @@ void GameHost::_ready() {
             frame_trace_.enable();
         if (argument == "--no-debug-overlay")
             enable_debug_overlay = false;
+        if (argument == "--chrome-mapping=on")
+            chrome_mapping_override_ = true;
+        if (argument == "--chrome-mapping=off")
+            chrome_mapping_override_ = false;
         if (argument == "--race") {
             competition_requested_ = competition_ = race_mode_ = true;
         }
@@ -335,6 +353,8 @@ void GameHost::_ready() {
 }
 void GameHost::restart_smoke_scene() {
     try {
+        if (renderer_)
+            chrome_mapping_override_ = renderer_->chrome_mapping_options().enabled;
         if (competition_requested_) {
             competition_ = race_mode_ = true;
             if (track_name_.is_empty())
@@ -382,6 +402,8 @@ void GameHost::restart_smoke_scene() {
         renderer_.reset();
         renderer_ = std::make_unique<ServerRenderer>(
             get_viewport()->get_viewport_rid(), race_mode_ || (!diagnostic_ && !original_loop_));
+        if (chrome_mapping_override_)
+            renderer_->set_chrome_mapping_enabled(*chrome_mapping_override_);
         runtime_ = std::make_unique<Runtime>(*renderer_);
         if (diagnostic_ && runtime_->start_smoke_scene() != Result::ok)
             throw std::runtime_error("Smoke scene initialization failed");
@@ -1122,6 +1144,7 @@ Result GameHost::invoke(LoopStage stage, float delta, const InputState& input, L
             }
             if (camera_cut_pending_) { orbit_camera_.reset(); pending_mouse_ = {}; }
             renderer_->begin_simulation_tick();
+            race_->advance_fade(delta);
             race_->update_track_animation(delta);
             if (session_) {
                 std::string error;
@@ -1965,6 +1988,7 @@ bool GameHost::apply_frontend_race_request(double elapsed) {
         throw std::runtime_error("Prepared race entry failed");
     renderer_->reset_interpolation();
     std::vector<FrontendRacer> racers;
+    race_->start_fade_in();
     race_->update_frontend(session_->frontend_frame(racers));
     last_simulation_usec_ = godot::Time::get_singleton()->get_ticks_usec();
     frontend_loading_presented_ = false;

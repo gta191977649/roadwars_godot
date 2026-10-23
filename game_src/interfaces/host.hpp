@@ -4,6 +4,8 @@
 #include <cstddef>
 #include <cstdint>
 #include <span>
+#include <optional>
+#include <string>
 #include <string_view>
 #include <vector>
 
@@ -37,6 +39,12 @@ struct MaterialSettings {
     AlphaMode alpha_mode{AlphaMode::opaque};
     bool unshaded{}, depth_write{true}, depth_test{true}, fog{true}, opaque_alpha_only{};
     bool billboard_y{};
+    TextureHandle chrome_map;
+};
+// Explicit host adaptation, separate from the original configuration/resource names.
+struct ChromeMappingOptions {
+    std::optional<bool> enabled;
+    std::string texture_path{"Textures/cr1.bmp"};
 };
 struct SceneSettings {
     Vec3 fog_color{}, directional_light{};
@@ -81,6 +89,8 @@ class Logger {
 class Renderer {
   public:
     virtual ~Renderer() = default;
+    virtual ChromeMappingOptions chrome_mapping_options() const { return {}; }
+    virtual Result set_chrome_mapping_enabled(bool) { return Result::unavailable; }
     // Logical 640x480 screen coordinates. Empty submission clears the frontend.
     virtual Result draw_hud(std::span<const HudQuad>) { return Result::unavailable; }
     virtual MeshHandle upload_mesh(std::span<const Vec3> vertices,

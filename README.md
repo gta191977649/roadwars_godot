@@ -151,6 +151,16 @@ python scripts/smoke_godot.py --headless
 python scripts/smoke_godot.py
 ```
 
+Vehicle chrome mapping uses the recovered vertex-normal mapping and single-pass
+color addition in the GPU shader. It is enabled by default with the explicitly
+authorized installed `Textures/16cr1.bmp` compatibility asset. The graphics menu's
+CHROME MAPPING row changes it for the current session; launch with
+`.\build.ps1 --run --chrome-mapping off` to disable it. This does not modify the
+original installation settings. See [chrome evidence](docs/agent/evidence/chrome_mapping.md)
+for the original missing filename and driver-alpha limitations. Run
+`python scripts/smoke_chrome.py` for GPU pixel checks and add `--assets` for the
+garage toggle/resource-lifetime checks.
+
 The project under `platform/godot/project` uses Forward+ with an explicit Vulkan driver on Windows. The smoke test first imports the extension, then tests ten scene restarts and RID cleanup; the non-headless run also requires Vulkan Forward+, verifies colored triangle pixels and writes `build/godot_smoke.png`. Headless success alone does not prove pixels rendered. Missing tools or graphics capability are errors, not successful validation. See `docs/agent/evidence/vulkan_migration.md` for the migration checks.
 
 ## Inventory and progress

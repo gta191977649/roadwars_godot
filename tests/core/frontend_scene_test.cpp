@@ -30,6 +30,10 @@ class Files final : public ResourceReader {
 class SceneRenderer final : public Renderer {
   public:
     std::set<std::uint64_t> textures, materials, meshes, instances;
+    std::set<std::uint64_t> chrome_materials;
+    ChromeMappingOptions chrome_mapping_options() const override {
+        return {true, "Textures/16cr1.bmp"};
+    }
     std::map<std::uint64_t, std::uint64_t> instance_mesh;
     std::uint64_t next{1};
     bool fail_upload{};
@@ -86,21 +90,27 @@ class SceneRenderer final : public Renderer {
         textures.insert(next);
         return {next++};
     }
-    MaterialHandle create_material(TextureHandle texture, const MaterialSettings&) override {
+    MaterialHandle create_material(TextureHandle texture, const MaterialSettings& settings) override {
         assert(textures.contains(texture.value));
+        if (settings.chrome_map.value) {
+            assert(textures.contains(settings.chrome_map.value));
+            chrome_materials.insert(next);
+        }
         materials.insert(next);
         return {next++};
     }
     void destroy_material(MaterialHandle handle) override {
         assert(meshes.empty());
         assert(materials.erase(handle.value));
+        chrome_materials.erase(handle.value);
     }
     void destroy_texture(TextureHandle handle) override {
         assert(materials.empty());
         assert(textures.erase(handle.value));
     }
     bool empty() const {
-        return textures.empty() && materials.empty() && meshes.empty() && instances.empty();
+        return textures.empty() && materials.empty() && meshes.empty() && instances.empty() &&
+               chrome_materials.empty();
     }
 };
 void u32(std::vector<std::byte>& bytes, std::uint32_t value) {
@@ -133,6 +143,23 @@ int main(int argc, char** argv) {
         assert(decode_frontend_d3d(bytes, object, error) == Result::invalid_argument);
         SceneRenderer renderer;
         FrontendScene scene(resources, renderer);
+        for (const auto* vehicle :
+             {"Animal", "Avenging Angel", "Bud The Crud", "Daisy", "Electra", "Heartbreaker",
+              "Kitiara", "Niki Roadkill", "Radcliff", "Romulus", "Sarge", "Wainright"}) {
+            if (scene.load("modify_vehicle", vehicle, 0, error) != Result::ok) {
+                std::cerr << vehicle << ": " << error << '\n';
+                return 1;
+            }
+            if (renderer.chrome_materials.empty()) {
+                std::cerr << vehicle << ": no chrome material bound in vehicle preview\n";
+                return 1;
+            }
+            scene.stop();
+            if (!renderer.empty()) {
+                std::cerr << vehicle << ": frontend resources retained after stop\n";
+                return 1;
+            }
+        }
         for (int variant = 0; variant <= 6; ++variant) {
             if (scene.load("modify_vehicle", "ANIMAL", variant, error) != Result::ok) {
                 std::cerr << error << '\n';

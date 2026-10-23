@@ -251,6 +251,11 @@ Result MenuFrontend::enter(std::string_view id, std::string& error) {
             return result;
         if (const auto found = option_values_.find(screen_); found != option_values_.end())
             custom_.rows = found->second;
+        if (id == "graphics")
+            for (auto& row : custom_.rows)
+                if (row.label == "CHROME MAPPING")
+                    if (const auto value = renderer_.chrome_mapping_options().enabled)
+                        row.selected = *value ? 1 : 0;
         if (variant_ == "empty" && (id == "load_season" || id == "select_session"))
             custom_.rows.clear();
     }
@@ -763,6 +768,14 @@ Result MenuFrontend::advance(double elapsed, const FrontendInput& input, std::st
         if (!custom_.rows.empty() && selections_.empty()) {
             selected_ = std::clamp(selected_ + dy, 0, static_cast<int>(custom_.rows.size()) - 1);
             auto& row = custom_.rows[selected_];
+            if (dx && row.available && screen_ == "graphics" && row.label == "CHROME MAPPING") {
+                const auto selected = (row.selected + 1) % 2;
+                if (renderer_.set_chrome_mapping_enabled(selected != 0) == Result::ok) {
+                    row.selected = selected;
+                    previous_ = input;
+                    return draw(error);
+                }
+            }
             if (dx && row.available && !row.values.empty()) {
                 if (screen_ == "graphics" || screen_ == "sound" || screen_ == "game" ||
                     screen_ == "keyboard" || screen_ == "joystick") {

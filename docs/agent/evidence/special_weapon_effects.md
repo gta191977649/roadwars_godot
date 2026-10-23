@@ -33,6 +33,15 @@ separate presentation work; the kernel returns hit/beam/sound commands explicitl
 
 ## Flame Thrower
 
+The retained initializer004353f0 resolves `295ULFire` through004d78ff, stores
+the node at+2f34 and hides it through004d28b0. VehicleCombat::load now preserves
+that visibility before any render submission. The persistent weapon model stays
+visible; actual firing is rendered by the flame particle pool. Previously the
+serialized fire sprite remained visible even while idle or in the race intro.
+The installed-asset vehicle_combat test checks that this node is hidden while
+the weapon root remains visible. This corrects presentation initialization and
+does not establish full native constructor equivalence.
+
 Constructor004352f0 writes vtable005f5460. Activation00435682 requires inactive
 and ready+2f30, calls common activation, clears elapsed+2f2c and ready, configures
 original direction and starts audio. Update0043578f first removes its callback,

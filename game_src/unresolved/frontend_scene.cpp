@@ -1,4 +1,5 @@
 #include "game_src/unresolved/frontend_scene.hpp"
+#include "game_src/unresolved/chrome_mapping.hpp"
 #include "game_src/unresolved/binary_reader.hpp"
 #include "game_src/unresolved/bitmap.hpp"
 #include "game_src/unresolved/contact_orientation.hpp"
@@ -201,6 +202,8 @@ Result decode_frontend_d3d(std::span<const std::byte> bytes, MeshObject& output,
 
 FrontendScene::~FrontendScene() { stop(); }
 void FrontendScene::stop() {
+    chrome_texture_ = {};
+    chrome_enabled_ = false;
     for (const auto& draw : draws_)
         renderer_.destroy_instance(draw.instance);
     draws_.clear();
@@ -245,8 +248,9 @@ Result FrontendScene::read_mesh(const std::string& path, MeshObject& output, std
 }
 
 MaterialHandle FrontendScene::material(const MeshPart& part, const std::string& base,
-                                       std::uint32_t flags) {
+                                       std::uint32_t flags, bool chrome) {
     auto key = ResourceStore::canonical(base + "/" + part.texture) + ":" + std::to_string(flags);
+    key += ":chrome=" + std::to_string(chrome ? chrome_texture_.value : 0);
     for (const auto channel : part.color)
         key += ":" + std::to_string(std::bit_cast<std::uint32_t>(channel));
     if (const auto found = materials_.find(key); found != materials_.end())
@@ -300,6 +304,8 @@ MaterialHandle FrontendScene::material(const MeshPart& part, const std::string& 
     settings.depth_write = (flags & 1) == 0;
     settings.depth_test = (flags & 0x10) == 0;
     settings.fog = false;
+    if (chrome)
+        settings.chrome_map = chrome_texture_;
     settings.opaque_alpha_only = (flags & 0x80) != 0;
     if (flags & 2)
         settings.alpha_mode = AlphaMode::additive;
@@ -329,7 +335,8 @@ void FrontendScene::upload(const MeshObject& object, const std::string& base, Ve
         if (object.name.starts_with("12ULSky2_"))
             sky = 1;
     }
-    for (const auto& part : object.parts) {
+    for (std::size_t part_index = 0; part_index < object.parts.size(); ++part_index) {
+        const auto& part = object.parts[part_index];
         if (part.indices.empty())
             continue;
         std::vector<std::array<float, 2>> uv;
@@ -337,7 +344,10 @@ void FrontendScene::upload(const MeshObject& object, const std::string& base, Ve
             uv.push_back({coordinate.x, coordinate.y});
         const auto mesh =
             renderer_.upload_surface(part.positions, uv, part.indices,
-                                     material(part, base, object.flags), part.normals, part.colors);
+                                     material(part, base, object.flags,
+                                         chrome_mapping_applies(chrome_enabled_, object.flags,
+                                             part_index, vehicle >= 0 && chrome_texture_.value)),
+                                     part.normals, part.colors);
         if (!mesh.value)
             throw std::runtime_error("Frontend scene mesh upload failed");
         meshes_.push_back(mesh);
@@ -449,6 +459,11 @@ Result FrontendScene::load(std::string_view id, std::string_view character, int 
     character_ = character;
     store_variant_ = variant;
     try {
+        if (load_chrome_mapping(resources_, renderer_, chrome_texture_, chrome_enabled_, error) !=
+            Result::ok)
+            throw std::runtime_error(error);
+        if (chrome_texture_.value)
+            textures_.push_back(chrome_texture_);
         MeshObject room;
         const auto base = victory_ ? std::string("VictoryDefeat Room")
                           : store_ ? std::string("ModifyVehicle/Store")
