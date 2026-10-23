@@ -1,5 +1,6 @@
 #pragma once
 #include "game_src/unresolved/mesh_scene.hpp"
+#include "game_src/unresolved/race_loadout.hpp"
 #include "game_src/unresolved/resource_store.hpp"
 #include <map>
 
@@ -20,6 +21,12 @@ class FrontendScene {
     // Empty labels select the first configured item/quality. No purchase or save is performed.
     Result select_store_product(std::string_view item, std::string_view quality,
                                 std::string& error);
+    Result transition_store_product(std::string_view item, std::string_view quality,
+                                    std::string& error);
+    bool store_transition_active() const { return door_closing_; }
+    unsigned drain_store_door_events();
+    std::array<float, 2> store_door_positions() const { return door_y_; }
+    Result set_vehicle_loadout(const RaceLoadout&, std::string& error);
     void stop();
     void set_visible(bool visible);
     bool loaded() const { return loaded_; }
@@ -34,6 +41,7 @@ class FrontendScene {
         int vehicle{-1}, turntable{-1}, sky{-1};
         bool product{};
         bool visible{true};
+        int door{-1};
     };
     struct CameraPose {
         Vec3 eye, target;
@@ -43,8 +51,10 @@ class FrontendScene {
     MaterialHandle material(const MeshPart&, const std::string& base, std::uint32_t flags,
                             bool chrome = false);
     void upload(const MeshObject&, const std::string& base, Vec3 parent, int vehicle = -1,
-                int turntable = -1, int sky = -1);
-    void upload_vehicle(std::string_view name, Vec3 anchor, int index);
+                int turntable = -1, int sky = -1, int door = -1);
+    void upload_vehicle(std::string_view name, Vec3 anchor, int index,
+                        const RaceLoadout* loadout = nullptr);
+    void replace_product(const MeshObject&, Vec3 angles, Vec3 speeds);
     void upload_prizes(std::size_t rank, int money, int points);
     void update_draws();
     void update_camera();
@@ -60,6 +70,13 @@ class FrontendScene {
     Vec3 product_anchor_{}, product_angles_{}, product_speeds_{};
     std::string character_;
     int store_variant_{};
+    std::array<float, 2> door_y_{}, door_open_y_{};
+    float door_limit_{}, door_speed_{};
+    bool door_closing_{}, bottom_closing_{}, staging_product_{};
+    unsigned store_door_events_{};
+    MeshObject pending_product_;
+    Vec3 pending_angles_{}, pending_speeds_{};
+    std::size_t vehicle_draw_begin_{}, vehicle_mesh_begin_{};
     std::size_t product_draw_begin_{}, product_mesh_begin_{};
     std::size_t camera_index_{};
     float camera_seconds_{}, rotation_speed_{};

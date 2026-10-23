@@ -92,9 +92,8 @@ int main(int argc, char** argv) {
     std::string error;
     std::vector<FrontendOptionRow> rows;
     assert(frontend_custom_rows(fixture_store, "graphics", rows, error) == Result::ok);
-    assert(rows.size() == 11 && !rows[0].available);
-    assert(rows[4].selected == 0 && rows[4].values[0] == "NEAR");
-    assert(rows[7].selected == 0 && rows[8].selected == 1);
+    assert(rows.size() == 1 && !rows[0].available);
+    assert(rows[0].id == "unavailable");
     assert(frontend_custom_rows(fixture_store, "sound", rows, error) == Result::ok);
     assert(rows.size() == 6 && rows[1].values[rows[1].selected] == "80%");
     assert(rows[2].values[rows[2].selected] == "90%");

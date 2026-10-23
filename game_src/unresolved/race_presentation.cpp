@@ -210,6 +210,8 @@ Result RacePresentation::replace_player_visual(ResourceStore& resources, std::st
                                                const RaceLoadout& loadout, std::string& error) {
     if (loadout.paint_job < 0 || loadout.paint_job > 6)
         return Result::invalid_argument;
+    for (auto& visual : damage_visuals_)
+        release_damage_visual(visual);
     damage_visuals_.clear();
     for (const auto index : vehicle_instances_) {
         renderer_.destroy_instance(instances_[index].handle);
@@ -997,12 +999,39 @@ Result RacePresentation::update_combat(ResourceStore& resources, const RaceSessi
     }
     return Result::ok;
 }
+void RacePresentation::release_damage_visual(DamageVisual& visual) {
+    for (const auto instance : visual.instances)
+        renderer_.destroy_instance(instance);
+    for (const auto mesh : visual.meshes)
+        renderer_.destroy_mesh(mesh);
+    visual.instances.clear();
+    visual.meshes.clear();
+}
 Result RacePresentation::update_damage_visual(ResourceStore& resources,
                                               const VehicleDamageVisuals& source,
                                               std::span<const std::size_t> indices,
                                               DamageVisual& visual) {
-    if (visual.revision && *visual.revision == source.revision())
+    const auto body_root = std::find_if(indices.begin(), indices.end(), [&](std::size_t index) {
+        return instances_[index].wheel_index < 0 &&
+               instances_[index].node_name == source.body_lods()[0].name;
+    });
+    if (body_root == indices.end())
+        return Result::not_found;
+    const auto& root = instances_[*body_root];
+    std::size_t lod{};
+    if (select_vehicle_body_lod(root.pose.origin, camera_.transform.origin,
+                                renderer_.car_detail(), source.body_lod_count(), lod) != Result::ok)
+        return Result::invalid_argument;
+    const auto update_pose = [&] {
+        for (const auto handle : visual.instances) {
+            renderer_.update_instance(handle, root.pose);
+            renderer_.set_instance_camera_hidden(handle, visual.camera_hidden);
+        }
+    };
+    if (visual.revision && *visual.revision == source.revision() && visual.lod == lod) {
+        update_pose();
         return Result::ok;
+    }
     const auto& paint = source.paint();
     const auto full_texture = ResourceStore::canonical(source.texture_path());
     if (!visual.paint.value) {
@@ -1022,34 +1051,22 @@ Result RacePresentation::update_damage_visual(ResourceStore& resources,
         return Result::unavailable;
     const auto slash = full_texture.find_last_of('/');
     const auto paint_name = full_texture.substr(slash + 1);
-    const auto body_root = std::find_if(indices.begin(), indices.end(), [&](std::size_t index) {
-        return instances_[index].wheel_index < 0 &&
-               instances_[index].node_name == source.body_lods()[0].name;
-    });
-    if (body_root == indices.end())
-        return Result::not_found;
-    const auto root_path = instances_[*body_root].path;
+    // The original draw resolves this object's parts; its original children remain attached.
     for (const auto index : indices) {
-        auto& instance = instances_.at(index);
-        if (instance.wheel_index >= 0 || !instance.handle.value)
+        const auto& instance = instances_[index];
+        if (instance.wheel_index < 0 && instance.path == root.path)
+            renderer_.set_instance_visible(instance.handle, false);
+    }
+    release_damage_visual(visual);
+    const auto* node = &source.body_lod(lod);
+    for (std::size_t part_index = 0; part_index < node->parts.size(); ++part_index) {
+        const auto& part = node->parts[part_index];
+        if (part.indices.empty())
             continue;
-        if (instance.path.size() < root_path.size() ||
-            !std::equal(root_path.begin(), root_path.end(), instance.path.begin()))
-            continue;
-        const auto* node = &source.body_lods()[0];
-        for (std::size_t depth = root_path.size(); depth < instance.path.size(); ++depth) {
-            const auto child = instance.path[depth];
-            if (child >= node->children.size())
-                return Result::invalid_argument;
-            node = &node->children[child];
-        }
-        if (instance.part_index >= node->parts.size())
-            return Result::invalid_argument;
-        const auto& part = node->parts[instance.part_index];
         MaterialHandle surface;
         if (ResourceStore::canonical(part.texture) == paint_name) {
             const bool chrome = chrome_mapping_applies(chrome_enabled_, node->flags,
-                                                       instance.part_index, chrome_texture_.value);
+                                                       part_index, chrome_texture_.value);
             std::string key = std::to_string(node->flags) + ":chrome=" +
                               std::to_string(chrome ? chrome_texture_.value : 0);
             for (const auto color : part.color)
@@ -1077,7 +1094,7 @@ Result RacePresentation::update_damage_visual(ResourceStore& resources,
         } else {
             const auto base = std::string(source.texture_path().substr(0, slash));
             surface = material(resources, base, part, node->flags,
-                chrome_mapping_applies(chrome_enabled_, node->flags, instance.part_index,
+                chrome_mapping_applies(chrome_enabled_, node->flags, part_index,
                                        chrome_texture_.value));
         }
         std::vector<std::array<float, 2>> uv;
@@ -1087,17 +1104,14 @@ Result RacePresentation::update_damage_visual(ResourceStore& resources,
                                                    part.normals, part.colors);
         if (!mesh.value)
             return Result::unavailable;
-        meshes_.push_back(mesh);
-        if (renderer_.set_instance_mesh(instance.handle, mesh) != Result::ok)
+        visual.meshes.push_back(mesh);
+        const auto handle = renderer_.create_instance(mesh);
+        if (!handle.value)
             return Result::unavailable;
-        renderer_.destroy_mesh(instance.mesh);
-        const auto previous = std::find_if(meshes_.begin(), meshes_.end(), [&](MeshHandle handle) {
-            return handle.value == instance.mesh.value;
-        });
-        if (previous != meshes_.end())
-            *previous = {};
-        instance.mesh = mesh;
+        visual.instances.push_back(handle);
     }
+    update_pose();
+    visual.lod = lod;
     visual.revision = source.revision();
     return Result::ok;
 }
@@ -1142,7 +1156,7 @@ void RacePresentation::update_vehicle(const Transform& pose) {
                    multiply(pose.basis[2], v.z));
     };
     for (const auto index : vehicle_instances_) {
-        const auto& instance = instances_[index];
+        auto& instance = instances_[index];
         Transform transform = pose;
         transform.origin =
             instance.vehicle ? add(position, rotate(instance.local)) : instance.local;
@@ -1162,6 +1176,7 @@ void RacePresentation::update_vehicle(const Transform& pose) {
             for (int axis = 0; axis < 3; ++axis)
                 transform.basis[axis] = rotate(wheel.basis[axis]);
         }
+        instance.pose = transform;
         renderer_.update_instance(instance.handle, transform);
     }
 }
@@ -1173,6 +1188,12 @@ void RacePresentation::set_camera_vehicle_hidden(int target, std::size_t player_
     mask(vehicle_instances_, target == static_cast<int>(player_index));
     for (std::size_t i = 0; i < opponents_.size(); ++i)
         mask(opponents_[i].instances, target == static_cast<int>(i));
+    for (std::size_t i = 0; i < damage_visuals_.size(); ++i) {
+        auto& visual = damage_visuals_[i];
+        visual.camera_hidden = target == static_cast<int>(i);
+        for (const auto handle : visual.instances)
+            renderer_.set_instance_camera_hidden(handle, visual.camera_hidden);
+    }
     for (const auto& [key, id] : combat_visual_ids_) {
         const auto kind = static_cast<VehicleCombatVisualKind>(key[2]);
         const bool attached = kind == VehicleCombatVisualKind::mounted ||
@@ -1189,6 +1210,9 @@ void RacePresentation::snap_racer(std::size_t index, std::size_t player_index) {
             renderer_.reset_instance_interpolation(instances_[n].handle);
     };
     snap(index == player_index ? vehicle_instances_ : opponents_.at(index).instances);
+    if (index < damage_visuals_.size())
+        for (const auto handle : damage_visuals_[index].instances)
+            renderer_.reset_instance_interpolation(handle);
     for (const auto& [key, id] : combat_visual_ids_)
         if (key[0] == index + 1)
             snap(combat_visuals_[id].instances);
@@ -1376,6 +1400,8 @@ void RacePresentation::stop() {
             renderer_.destroy_mesh(beam.mesh);
     }
     trap_visuals_.clear();
+    for (auto& visual : damage_visuals_)
+        release_damage_visual(visual);
     damage_visuals_.clear();
     damage_paint_textures_.clear();
     frontend_.stop();

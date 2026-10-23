@@ -62,8 +62,8 @@ Result action_icon(FrontendCanvas& canvas, std::string_view root, std::string_vi
     const int radius = selected ? 72 : 36;
     const HudRect rectangle{x - radius, y - radius, radius * 2, radius * 2};
     FrontendSprite icon;
-    auto result = canvas.asset(
-        std::string(root) + "/" + std::string(label) + "/16SelectionIcon.bmp", icon);
+    auto result =
+        canvas.asset(std::string(root) + "/" + std::string(label) + "/16SelectionIcon.bmp", icon);
     if (result != Result::ok)
         return result;
     canvas.sprite(icon, rectangle);
@@ -88,8 +88,14 @@ Result draw_options(FrontendCanvas& canvas, const FrontendCustomState& state) {
                                                  : uppercase(state.screen);
     title(canvas, name);
     footer(canvas);
-    const int step = canvas.font_height(FrontendFont::body) + 5;
-    const int top = 240 - static_cast<int>(state.rows.size()) * step / 2;
+    const bool modern = state.screen == "graphics" && state.fields.contains("MODERN_GRAPHICS");
+    const float scale = modern ? .7f : 1.f;
+    const int step = modern ? 21 : canvas.font_height(FrontendFont::body) + 5;
+    const int top = modern ? 88 : 240 - static_cast<int>(state.rows.size()) * step / 2;
+    if (modern) {
+        canvas.text(FrontendFont::small, 320, 57, state.fields.at("MODERN_GRAPHICS"), true);
+        canvas.text(FrontendFont::small, 320, 430, state.message, true, .8f);
+    }
     const int right = 610 + canvas.text_width(FrontendFont::body, ">");
     auto result = canvas.sprite(
         "Game Options/Options/16SelectionBackground.bmp",
@@ -102,15 +108,15 @@ Result draw_options(FrontendCanvas& canvas, const FrontendCustomState& state) {
         const auto color = !row.available ? 0xff808080 : selected ? kRed : kWhite;
         const auto bottom = selected && row.available ? kYellow : color;
         const auto y = static_cast<float>(top + static_cast<int>(i) * step);
-        canvas.text(FrontendFont::body, 30, y, row.label, false, 1, color, bottom);
+        canvas.text(FrontendFont::body, 30, y, row.label, false, scale, color, bottom);
         if (!row.values.empty()) {
             if (row.selected >= row.values.size())
                 return Result::invalid_argument;
-            canvas.text(FrontendFont::body, 430, y, row.values[row.selected], true, 1, color,
+            canvas.text(FrontendFont::body, 430, y, row.values[row.selected], true, scale, color,
                         bottom);
             if (row.values.size() > 1) {
-                canvas.text(FrontendFont::body, 310, y, "<", false, 1, color, bottom);
-                canvas.text(FrontendFont::body, 610, y, ">", false, 1, color, bottom);
+                canvas.text(FrontendFont::body, 310, y, "<", false, scale, color, bottom);
+                canvas.text(FrontendFont::body, 610, y, ">", false, scale, color, bottom);
             }
         }
     }
@@ -619,41 +625,10 @@ Result frontend_custom_rows(ResourceStore& resources, std::string_view screen,
             number("DIFFICULTY_LEVEL"));
         add(rows, "CHEAT", {""});
     } else if (screen == "graphics") {
-        // Original DirectDraw enumeration is unavailable to the portable core.
-        // A read-only display description is explicitly not a recovered device list.
-        add(rows, "DISPLAY", {"UNAVAILABLE"});
+        // Runtime rows are supplied by the modern graphics host transaction.
+        add(rows, "GRAPHICS SETTINGS", {"HOST UNAVAILABLE"});
         rows.back().available = false;
-        add(rows, "RESOLUTION",
-            {std::to_string(number("SCREENX", 640)) + " X " +
-             std::to_string(number("SCREENY", 480))});
-        add(rows, "TRIPLE BUFFER", {"OFF", "ON"}, number("BUFFERCOUNT") > 1 ? 1 : 0);
-        add(rows, "3D NOW", {"OFF", "ON"}, number("3DNOW") ? 1 : 0);
-        float distance{};
-        config.number("ROADWARS", "VIEWDISTANCESCALAR", distance);
-        const std::array<float, 4> distances{.4f, .5f, .75f, 1.f};
-        const auto nearest =
-            std::min_element(distances.begin(), distances.end(), [&](float a, float b) {
-                return std::abs(distance - a) < std::abs(distance - b);
-            });
-        add(rows, "VIEW DISTANCE", {"NEAR", "MEDIUM", "FAR", "VERY FAR"},
-            static_cast<int>(nearest - distances.begin()));
-        add(rows, "TEXTURE RESOLUTION", {"HIGHER", "LOWER"}, number("LOWRES"));
-        yes_no("COCKPIT IN HARDWARE", "COCKPIT_IN_HARDWARE");
-        for (const auto& pair : std::array<std::pair<const char*, const char*>, 2>{
-                 {{"SPECIAL EFFECTS", "SPECIAL_EFFECTS_SCALAR"},
-                  {"SKIDMARK DETAIL", "SKIDMARK_SCALAR"}}}) {
-            float value{};
-            config.number("ROADWARS", pair.second, value);
-            const std::array<float, 3> scalars{.33f, .66f, 1.f};
-            const auto closest =
-                std::min_element(scalars.begin(), scalars.end(), [&](float a, float b) {
-                    return std::abs(value - a) < std::abs(value - b);
-                });
-            add(rows, pair.first, {"LOW", "MEDIUM", "HIGH"},
-                static_cast<int>(closest - scalars.begin()));
-        }
-        add(rows, "CHROME MAPPING", {"OFF", "ON"}, number("ENVIRONMENT_MAPPING"));
-        add(rows, "CAR DETAIL", {"LOW", "MEDIUM", "HIGH"}, number("CAR_DETAIL", 2));
+        rows.back().id = "unavailable";
     } else if (screen == "keyboard" || screen == "joystick") {
         const bool joystick = screen == "joystick";
         Configuration inputs;

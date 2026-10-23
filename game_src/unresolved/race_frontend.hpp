@@ -24,7 +24,17 @@ struct FrontendRacer {
     Vec3 position;
     std::size_t character_index{};
     bool hidden_on_map{}, eliminated{}, finished{};
+    std::string name;
+    std::array<float, 10> lap_times{};
+    int completed_laps{};
 };
+// New value interface for the live native time-table calculation at00489fbb.
+struct RaceLapSummary {
+    float best_lap{}, total{};
+    bool best_dnf{}, total_dnf{};
+};
+Result race_lap_summary(const FrontendRacer&, int total_laps, RaceLapSummary&);
+std::string format_race_time(float seconds, std::string_view no_record = "NO RECORD");
 struct FrontendRaceInfo {
     int completed_laps{}, total_laps{}, rank{}, racer_count{};
 };
@@ -54,6 +64,7 @@ class AmmunitionNotices {
 struct FrontendFrame {
     std::span<const AmmunitionNotice> ammunition_notices;
     bool cockpit{};
+    bool time_table_visible{};
     std::array<std::string, 3> cockpit_weapon_names;
     std::size_t cockpit_character{};
     float steering_fraction{}, viewport_aspect{4.f / 3};

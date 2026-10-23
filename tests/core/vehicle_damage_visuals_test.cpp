@@ -45,6 +45,27 @@ class Files final : public ResourceReader {
 };
 } // namespace
 int main(int argc, char** argv) {
+    for (int detail = 0; detail <= 2; ++detail) {
+        std::size_t selected{};
+        const auto choose = [&](float distance, std::size_t expected) {
+            assert(select_vehicle_body_lod({distance, 100000, 0}, {}, detail, 5, selected) ==
+                   Result::ok);
+            assert(selected == expected);
+        };
+        choose(0, static_cast<std::size_t>(2 - detail));
+        for (std::size_t level = static_cast<std::size_t>(3 - detail); level < 5; ++level) {
+            const auto distance = static_cast<float>(static_cast<int>(level) - (2 - detail)) * 40;
+            choose(distance - .01f, level - 1);
+            choose(distance, level);
+            choose(-distance, level);
+        }
+        assert(select_vehicle_body_lod({100, 0, 0}, {100, 500, -40}, detail, 5, selected) ==
+               Result::ok);
+        assert(selected == static_cast<std::size_t>(3 - detail));
+    }
+    std::size_t selected{};
+    assert(select_vehicle_body_lod({}, {}, 3, 5, selected) == Result::invalid_argument);
+    assert(select_vehicle_body_lod({}, {}, 2, 0, selected) == Result::invalid_argument);
     VehicleDamageVisuals visuals;
     std::size_t draws{};
     ParticleRandom random([&] {

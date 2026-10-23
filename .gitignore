@@ -1,17 +1,59 @@
-/build/
+# Local AI instructions, research evidence and generated progress.
+# Keep these on disk; public documentation belongs in README.md and docs/.
+/AGENT.md
+/AGENTS.md
+/docs/agent/
+/docs/Progress.md
+/docs/functions.csv
+/.agents/
+/.claude/
+/.codex/
+/CLAUDE.md
+/GEMINI.md
+
+# Machine-specific configuration and editor state.
 /config.local.json
+/CMakeUserPresets.json
+/.vs/
+/.vscode/
+/.idea/
+.env
+.env.*
+!.env.example
+
+# Builds, downloaded dependencies and Godot caches.
+/build/
+/bin/
 /platform/godot/third_party/godot-cpp/
-/platform/godot/project/.godot/
+/platform/godot/third_party/imgui/
+/platform/godot/third_party/imgui-console/
+.godot/
 /platform/godot/project/bin/*
 !/platform/godot/project/bin/.gitkeep
-__pycache__/
-*.pyc
-/extracted/
-/original/
+CMakeFiles/
+CMakeCache.txt
+compile_commands.json
+*.obj
+*.o
+*.a
+*.lib
+*.pdb
 *.exe
 *.dll
+*.so
+*.dylib
+
+# Original game files and extracted assets.
+/extracted/
+/original/
 *.pak
 *.pkh
 
-/platform/godot/third_party/imgui/
-/platform/godot/third_party/imgui-console/
+# Python caches and temporary files.
+__pycache__/
+*.py[cod]
+.pytest_cache/
+*.log
+*.tmp
+.DS_Store
+Thumbs.db

@@ -1,4 +1,5 @@
 #include "game_src/unresolved/menu_frontend.hpp"
+#include <algorithm>
 #include <cassert>
 #include <cmath>
 #include <filesystem>
@@ -268,6 +269,98 @@ void malformed_config_tests() {
     std::string error;
     assert(menu.start(error, "main_menu") == Result::invalid_argument);
 }
+class GraphicsHost final : public GraphicsSettingsHost {
+  public:
+    GraphicsSettings live{}, saved{};
+    int saves{}, restarts{};
+    GraphicsCapabilities capabilities() const override {
+        return {
+            {{"TEST DISPLAY", 1920, 1080}},
+            {RenderingBackend::automatic, RenderingBackend::vulkan, RenderingBackend::direct3d12},
+            {AntiAliasing::off, AntiAliasing::fxaa},
+            true,
+            true,
+            true};
+    }
+    GraphicsSettings current_settings() const override { return saved; }
+    Result apply_live(const GraphicsSettings& value) override {
+        live = value;
+        return Result::ok;
+    }
+    Result persist(const GraphicsSettings& value) override {
+        saved = value;
+        ++saves;
+        return Result::ok;
+    }
+    RenderingBackend active_backend() const override { return RenderingBackend::vulkan; }
+    bool restart_required() const override { return saved.backend == RenderingBackend::direct3d12; }
+    Result restart() override {
+        ++restarts;
+        return Result::ok;
+    }
+};
+void graphics_menu_tests() {
+    MemoryReader reader;
+    ResourceStore resources(reader);
+    TestRenderer renderer;
+    GraphicsHost host;
+    MenuFrontend menu(resources, renderer, &host);
+    std::string error;
+    assert(menu.start(error, "graphics") == Result::ok);
+    const auto press = [&](std::string_view id, bool right = false) {
+        const auto rows = menu.option_rows();
+        const auto it =
+            std::find_if(rows.begin(), rows.end(), [&](const auto& row) { return row.id == id; });
+        assert(it != rows.end());
+        FrontendInput input;
+        input.pointer_x = 500;
+        input.pointer_y = 89 + static_cast<float>(it - rows.begin()) * 21;
+        input.pointer_moved = true;
+        advance_checked(menu, 0, input);
+        input.pointer_moved = false;
+        input.right = right;
+        input.accept = !right;
+        advance_checked(menu, 0, input);
+        advance_checked(menu, 0);
+    };
+    press("window_mode", true);
+    press("vsync", true);
+    assert(host.live.vsync && host.saves == 0); // Draft edits do not change the host.
+    press("apply");
+    assert(!host.live.vsync && host.saves == 0);
+    assert(menu.option_rows().front().id == "confirm");
+    advance_checked(menu, 16);
+    assert(host.live.vsync && host.saves == 0);
+    press("window_mode", true);
+    press("vsync", true);
+    press("apply");
+    press("confirm");
+    assert(!host.saved.vsync && host.saves == 1);
+    press("page", true);
+    press("chrome_mapping", true);
+    assert(host.saved.chrome_mapping);
+    press("apply");
+    assert(!host.saved.chrome_mapping && host.saves == 2);
+    press("page", true);
+    press("backend", true);
+    press("backend", true);
+    press("apply");
+    assert(host.saved.backend == RenderingBackend::direct3d12);
+    press("restart");
+    assert(host.restarts == 1 && menu.quit_requested());
+    press("defaults");
+    press("back");
+    assert(menu.option_rows().front().id == "discard");
+    press("cancel_discard");
+    assert(menu.option_rows().front().id == "page");
+    press("back");
+    press("discard");
+    assert(menu.screen() == "main_menu");
+    MenuFrontend unavailable(resources, renderer);
+    assert(unavailable.start(error, "graphics") == Result::ok);
+    assert(unavailable.option_rows().front().id == "unavailable");
+    assert(!unavailable.option_rows().front().available);
+}
 void restart_lifetime_test() {
     MemoryReader reader;
     ResourceStore resources(reader);
@@ -288,6 +381,7 @@ int main(int argc, char** argv) {
     input_animation_tests();
     malformed_config_tests();
     restart_lifetime_test();
+    graphics_menu_tests();
     assert((MenuFrontend::icon_center(6, 5) == std::array<int, 2>{530, 348}));
     assert((MenuFrontend::icon_center(4, 2) == std::array<int, 2>{160, 340}));
     MemoryReader reader;

@@ -15,11 +15,17 @@ class ResourceStore {
     Result read(std::string_view path, std::vector<std::byte>& output);
     static std::string canonical(std::string_view path);
     const std::map<std::string, ArchiveEntry>& entries() const { return entries_; }
+    // Modern user settings overlay, applied after decoding the original configuration.
+    Result set_configuration_override(std::string_view path, std::string_view section,
+                                      std::string_view key, std::string value);
+    void clear_configuration_overrides(std::string_view path);
+    const std::map<std::string, std::string>& configuration_overrides(std::string_view path) const;
 
   private:
     ResourceReader& reader_;
     std::map<std::string, ArchiveEntry> entries_;
     std::vector<std::byte> archive_;
+    std::map<std::string, std::map<std::string, std::string>> configuration_overrides_;
 };
 class Configuration {
   public:

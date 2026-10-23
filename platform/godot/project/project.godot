@@ -2,6 +2,7 @@ config_version=5
 
 [application]
 config/name="RoadWars Reconstruction"
+config/project_settings_override="user://graphics.cfg"
 run/main_scene="res://bootstrap.tscn"
 
 [display]
@@ -12,4 +13,7 @@ window/size/viewport_height=540
 renderer/rendering_method="forward_plus"
 renderer/rendering_method.mobile="mobile"
 rendering_device/driver.windows="vulkan"
+rendering_device/driver.macos="metal"
+rendering_device/driver.linuxbsd="vulkan"
+rendering_device/fallback_to_opengl3=false
 environment/defaults/default_clear_color=Color(0.035, 0.045, 0.065, 1)

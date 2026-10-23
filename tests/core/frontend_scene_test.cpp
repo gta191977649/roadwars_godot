@@ -90,7 +90,8 @@ class SceneRenderer final : public Renderer {
         textures.insert(next);
         return {next++};
     }
-    MaterialHandle create_material(TextureHandle texture, const MaterialSettings& settings) override {
+    MaterialHandle create_material(TextureHandle texture,
+                                   const MaterialSettings& settings) override {
         assert(textures.contains(texture.value));
         if (settings.chrome_map.value) {
             assert(textures.contains(settings.chrome_map.value));
@@ -154,6 +155,17 @@ int main(int argc, char** argv) {
                 std::cerr << vehicle << ": no chrome material bound in vehicle preview\n";
                 return 1;
             }
+            RaceLoadout loadout;
+            loadout.paint_job = 2;
+            loadout.tires = {"Street", "Best"};
+            loadout.weapons[0] = "Machine Gun";
+            loadout.weapons[1] = "Gatling Gun";
+            loadout.weapons[2] = "Missile Jammer";
+            if (scene.set_vehicle_loadout(loadout, error) != Result::ok) {
+                std::cerr << vehicle << ": selected loadout: " << error << '\n';
+                return 1;
+            }
+            assert(scene.advance(.1) == Result::ok);
             scene.stop();
             if (!renderer.empty()) {
                 std::cerr << vehicle << ": frontend resources retained after stop\n";
@@ -172,6 +184,29 @@ int main(int argc, char** argv) {
                 assert(renderer.instances.size() == first_product_count);
                 assert(scene.select_store_product("../invalid", {}, error) ==
                        Result::invalid_argument);
+                const auto open = scene.store_door_positions();
+                const auto original_instances = renderer.instances;
+                assert(scene.transition_store_product({}, {}, error) == Result::ok);
+                assert(scene.store_transition_active());
+                assert(scene.drain_store_door_events() == 0);
+                assert(renderer.instances == original_instances);
+                assert(scene.advance(1.0 / 60) == Result::ok);
+                const auto moving = scene.store_door_positions();
+                assert(moving[0] < open[0] && moving[1] > open[1]);
+                for (int tick = 0; scene.store_transition_active() && tick < 600; ++tick)
+                    assert(scene.advance(1.0 / 60) == Result::ok);
+                assert(!scene.store_transition_active());
+                assert(scene.drain_store_door_events() == 1);
+                assert(scene.drain_store_door_events() == 0);
+                assert(renderer.instances != original_instances);
+                assert(scene.advance(4) == Result::ok);
+                assert(scene.store_door_positions() == open);
+                assert(scene.transition_store_product({}, {}, error) == Result::ok);
+                scene.stop();
+                assert(scene.drain_store_door_events() == 0);
+                assert(!scene.store_transition_active());
+                assert(renderer.empty());
+                assert(scene.load("modify_vehicle", "ANIMAL", variant, error) == Result::ok);
             }
             assert(scene.advance(1) == Result::ok);
             assert(scene.advance(-1) == Result::invalid_argument);

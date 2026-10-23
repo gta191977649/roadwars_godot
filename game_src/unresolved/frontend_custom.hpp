@@ -9,6 +9,7 @@ struct FrontendOptionRow {
     std::vector<std::string> values;
     std::size_t selected{};
     bool available{true};
+    std::string id{}; // Stable modern option identifier; independent of display text.
 };
 struct FrontendPreviewRacer {
     std::string character, name;

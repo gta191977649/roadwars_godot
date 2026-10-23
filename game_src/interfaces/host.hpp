@@ -89,6 +89,7 @@ class Logger {
 class Renderer {
   public:
     virtual ~Renderer() = default;
+    virtual int car_detail() const { return 2; }
     virtual ChromeMappingOptions chrome_mapping_options() const { return {}; }
     virtual Result set_chrome_mapping_enabled(bool) { return Result::unavailable; }
     // Logical 640x480 screen coordinates. Empty submission clears the frontend.

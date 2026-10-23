@@ -324,6 +324,9 @@ Result RaceSession::restart(std::string& error) {
     ending_ = RaceEndReason::none;
     idle_return_timer_ = 10;
     idle_return_requested_ = false;
+    time_table_remaining_ = 15;
+    native_camera_mode_ = 4;
+    spectator_target_ = player_index();
     finished_.clear();
     collision_lines_.clear();
     callbacks_.reset();
@@ -494,7 +497,7 @@ Result RaceSession::advance(float dt, const InputState& input, std::string& erro
         return Result::ok;
     if (input.reset_requested)
         return restart(error);
-    if (ending_ != RaceEndReason::none && !idle_return_requested_) {
+    if (ending_ != RaceEndReason::none && !idle_return_requested_ && idle_return_timer_ != 0) {
         if (input.any_key_down)
             idle_return_timer_ = 10;
         idle_return_timer_ -= dt;
@@ -722,9 +725,11 @@ Result RaceSession::advance(float dt, const InputState& input, std::string& erro
     }
     const auto& selected = racers_[player_index()];
     if (ending_ == RaceEndReason::none) {
-        if (selected.progress.finished)
+        if (selected.progress.finished) {
             ending_ = RaceEndReason::completed;
-        else if (selected.vehicle->equipment().dying_timer != 0)
+            native_camera_mode_ = 5;
+            spectator_target_ = player_index();
+        } else if (selected.vehicle->equipment().dying_timer != 0)
             ending_ = RaceEndReason::eliminated;
     }
     if (ending_ != RaceEndReason::none)
@@ -736,6 +741,8 @@ Result RaceSession::advance(float dt, const InputState& input, std::string& erro
     update_ranking();
     if (ending_ != RaceEndReason::none)
         phase_ = RacePhase::finished;
+    if (ending_ != RaceEndReason::none)
+        time_table_remaining_ = std::max(0.f, time_table_remaining_ - dt);
     // 00482339 branches on the pre-subtraction countdown. A step that first
     // clamps the countdown to zero still skips the warning until the next step.
     if (ending_ == RaceEndReason::none && ammunition_notices_.advance(dt) != Result::ok)
@@ -1378,16 +1385,46 @@ void RaceSession::update_ranking() {
     for (std::size_t i = 0; i < ranking_.size(); ++i)
         racers_[ranking_[i]].rank = static_cast<int>(i + 1);
 }
+// RE: 93b4e4c301a5694b55e16977c2e52f4971bd9089659e3d58617c8af2368436c8:function:0040842e
+// RE-STUB: 93b4e4c301a5694b55e16977c2e52f4971bd9089659e3d58617c8af2368436c8:function:004084ab
+// RE-STUB: 93b4e4c301a5694b55e16977c2e52f4971bd9089659e3d58617c8af2368436c8:function:00408501
+// RE-STUB: 93b4e4c301a5694b55e16977c2e52f4971bd9089659e3d58617c8af2368436c8:function:0040860d
+Result RaceSession::select_native_camera(int mode) {
+    if (mode != 2 && mode != 4 && mode != 5)
+        return Result::unavailable;
+    if (racers_.empty() || countdown_ >= 1)
+        return Result::unavailable;
+    const auto& player = racers_[player_index()];
+    if (!player.progress.finished && player.vehicle->equipment().dying_timer == 0)
+        spectator_target_ = player_index();
+    else if (mode == native_camera_mode_)
+        spectator_target_ = (spectator_target_ + 1) % racers_.size();
+    native_camera_mode_ = mode;
+    return Result::ok;
+}
+CameraFrame RaceSession::spectator_camera() const {
+    if (racers_.empty() || countdown_ >= 1)
+        return start_.camera();
+    if (native_camera_mode_ == 5) {
+        CameraFrame result;
+        if (start_.track_camera(racers_[spectator_target_].vehicle->state().position, result) ==
+            Result::ok)
+            return result;
+    }
+    return racers_[spectator_target_].camera;
+}
 FrontendFrame RaceSession::frontend_frame(std::vector<FrontendRacer>& storage) const {
     storage.clear();
     for (std::size_t i = 0; i < racers_.size(); ++i)
         storage.push_back({racers_[i].vehicle->state().position, i, racers_[i].passive_jammer,
                            racers_[i].vehicle->equipment().dying_timer != 0,
-                           racers_[i].progress.finished});
+                           racers_[i].progress.finished, racers_[i].character,
+                           racers_[i].lap_times, racers_[i].progress.completed_laps});
     FrontendFrame frame;
     frame.racers = storage;
     frame.ranking = ranking_;
     frame.player_index = player_index();
+    frame.time_table_visible = ending_ != RaceEndReason::none && time_table_remaining_ != 0;
     const auto& r = racers_[player_index()];
     const auto& v = r.vehicle->state();
     frame.speed = v.cached_speed;

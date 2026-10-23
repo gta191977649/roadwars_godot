@@ -4,6 +4,22 @@
 #include <cmath>
 #include <limits>
 namespace roadwars {
+Result select_vehicle_body_lod(Vec3 object, Vec3 camera, int detail, std::size_t levels,
+                               std::size_t& selected) {
+    if (detail < 0 || detail > 2 || levels < 1 || levels > 5 ||
+        !std::isfinite(object.x) || !std::isfinite(object.z) ||
+        !std::isfinite(camera.x) || !std::isfinite(camera.z))
+        return Result::invalid_argument;
+    const auto x = object.x - camera.x, z = object.z - camera.z;
+    const auto distance_squared = z * z + x * x;
+    selected = 0;
+    for (std::size_t i = 1; i < levels; ++i) {
+        const auto threshold = std::max(0.f, static_cast<float>(static_cast<int>(i) - (2 - detail)) * 40.f);
+        if (threshold * threshold <= distance_squared)
+            selected = i;
+    }
+    return Result::ok;
+}
 namespace {
 bool finite(Vec3 p) { return std::isfinite(p.x) && std::isfinite(p.y) && std::isfinite(p.z); }
 float length(Vec3 p) { return std::sqrt(p.x * p.x + p.y * p.y + p.z * p.z); }
@@ -91,8 +107,19 @@ Result VehicleDamageVisuals::load(ResourceStore& resources, std::string_view veh
         error = "Original paint/damage bitmap unavailable";
         return Result::unavailable;
     }
+    std::optional<MeshObject> terminal;
+    const auto terminal_result = resources.read(base + "/Body/SpatialObject5.msh", bytes);
+    if (terminal_result == Result::ok) {
+        MeshObject mesh;
+        if (decode_msh(bytes, mesh, error) != Result::ok)
+            return Result::unavailable;
+        terminal = std::move(mesh);
+    } else if (terminal_result != Result::not_found)
+        return terminal_result;
     const auto result = configure(std::move(lods), std::move(paint), std::move(damage),
                                   directory + texture, transparency);
+    if (result == Result::ok)
+        terminal_body_ = std::move(terminal);
     if (result != Result::ok)
         error = "Unsupported original body damage resources";
     else
@@ -114,6 +141,7 @@ Result VehicleDamageVisuals::configure(std::array<MeshObject, 4> lods, Bitmap pa
                     return Result::invalid_argument;
         }
     body_ = std::move(lods);
+    terminal_body_.reset();
     paint_ = std::make_shared<PaintState>(PaintState{std::move(paint), 0, transparency});
     damage_ = std::move(damage);
     texture_path_ = std::move(texture);

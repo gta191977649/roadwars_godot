@@ -1,4 +1,5 @@
 #pragma once
+#include "game_src/core/graphics_settings.hpp"
 #include "game_src/unresolved/frontend_canvas.hpp"
 #include "game_src/unresolved/frontend_custom.hpp"
 #include "game_src/unresolved/race_loadout.hpp"
@@ -34,7 +35,7 @@ struct FrontendRaceRequest {
 };
 class MenuFrontend {
   public:
-    MenuFrontend(ResourceStore&, Renderer&);
+    MenuFrontend(ResourceStore&, Renderer&, GraphicsSettingsHost* graphics = nullptr);
     ~MenuFrontend();
     MenuFrontend(const MenuFrontend&) = delete;
     MenuFrontend& operator=(const MenuFrontend&) = delete;
@@ -49,6 +50,7 @@ class MenuFrontend {
     std::string_view action() const { return action_; }
     std::string_view assertion_message() const { return assertion_message_; }
     int selected() const { return selected_; }
+    std::span<const FrontendOptionRow> option_rows() const { return custom_.rows; }
     double screen_time() const { return time_; }
     bool quit_requested() const { return quit_; }
     const FrontendVideoAudio* video_audio() const;
@@ -77,6 +79,13 @@ class MenuFrontend {
   private:
     ResourceStore& resources_;
     Renderer& renderer_;
+    GraphicsSettingsHost* graphics_host_{};
+    std::unique_ptr<GraphicsSettingsTransaction> graphics_;
+    double graphics_time_{};
+    bool graphics_quality_{}, graphics_discard_{};
+    void refresh_graphics_rows();
+    Result advance_graphics(double, const FrontendInput&, std::string&);
+    void edit_graphics(std::string_view id, int direction);
     FrontendCanvas canvas_;
     std::unique_ptr<FrontendVideo> video_;
     std::unique_ptr<FrontendScene> scene_;

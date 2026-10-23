@@ -1,7 +1,9 @@
 #pragma once
 #include "game_src/interfaces/host.hpp"
+#include "game_src/interfaces/graphics_settings.hpp"
 #include "game_src/interfaces/race_debug.hpp"
 #include <godot_cpp/classes/rendering_server.hpp>
+#include <godot_cpp/classes/image.hpp>
 #include <godot_cpp/variant/dictionary.hpp>
 #include <godot_cpp/variant/rid.hpp>
 #include <godot_cpp/variant/transform3d.hpp>
@@ -15,6 +17,8 @@ class ServerRenderer final : public Renderer {
   public:
     explicit ServerRenderer(godot::RID viewport, bool original_coordinates = false);
     ~ServerRenderer() override;
+    Result apply_graphics_quality(const GraphicsSettings& settings);
+    int car_detail() const override { return graphics_settings_.car_detail; }
     ChromeMappingOptions chrome_mapping_options() const override { return chrome_options_; }
     Result set_chrome_mapping_enabled(bool enabled) override {
         chrome_options_.enabled = enabled;
@@ -71,6 +75,7 @@ class ServerRenderer final : public Renderer {
 
     godot::Dictionary presentation_snapshot() const;
     static bool test_interpolation_history();
+    static bool test_graphics_quality();
     void begin_simulation_tick();
     void reset_interpolation();
     void reset_camera_interpolation();
@@ -81,6 +86,13 @@ class ServerRenderer final : public Renderer {
     RaceDebugCamera race_debug_camera(double alpha) const;
 
   private:
+    godot::RID world_texture(TextureHandle texture);
+    void refresh_world_texture(std::uint64_t texture);
+    std::string filtered_surface_code(const std::string& code) const;
+    GraphicsSettings graphics_settings_{};
+    std::unordered_map<std::uint64_t, godot::RID> world_textures_;
+    std::unordered_map<std::uint64_t, godot::Ref<godot::Image>> texture_sources_;
+    std::unordered_map<std::uint64_t, std::string> material_shader_sources_;
     struct PoseHistory {
         godot::Transform3D previous, current, presented;
     };

@@ -74,6 +74,13 @@ class RaceSession {
     RaceEndReason ending() const { return ending_; }
     bool idle_return_requested() const { return idle_return_requested_; }
     float idle_return_remaining() const { return idle_return_timer_; }
+    void acknowledge_idle_menu() { idle_return_requested_ = false; }
+    void toggle_time_table() { time_table_remaining_ = time_table_remaining_ == 0 ? 15.f : 0.f; }
+    float time_table_remaining() const { return time_table_remaining_; }
+    Result select_native_camera(int mode);
+    int native_camera_mode() const { return native_camera_mode_; }
+    std::size_t spectator_target() const { return spectator_target_; }
+    CameraFrame spectator_camera() const;
     double time() const { return race_time_; }
     float countdown() const { return countdown_; }
     RaceStart& start_sequence() { return start_; }
@@ -202,5 +209,8 @@ class RaceSession {
     RaceEndReason ending_{RaceEndReason::none};
     float idle_return_timer_{10};
     bool idle_return_requested_{};
+    float time_table_remaining_{15};
+    int native_camera_mode_{4};
+    std::size_t spectator_target_{};
 };
 } // namespace roadwars

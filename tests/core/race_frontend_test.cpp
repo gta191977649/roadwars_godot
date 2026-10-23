@@ -56,6 +56,31 @@ class Files final : public ResourceReader {
     std::filesystem::path root_;
 };
 int main(int argc, char** argv) {
+    // 00489fbb sums all configured slots, including the active unfinished lap.
+    FrontendRacer timing;
+    timing.lap_times = {31.25f, 30.5f, 2.75f};
+    timing.completed_laps = 2;
+    RaceLapSummary summary;
+    assert(race_lap_summary(timing, 3, summary) == Result::ok);
+    assert(summary.best_lap == 30.5f && summary.total == 64.5f);
+    timing.lap_times[2] += 1;
+    assert(race_lap_summary(timing, 3, summary) == Result::ok && summary.total == 65.5f);
+    timing.eliminated = true;
+    assert(race_lap_summary(timing, 3, summary) == Result::ok && summary.total_dnf &&
+           !summary.best_dnf);
+    timing.completed_laps = 0;
+    assert(race_lap_summary(timing, 3, summary) == Result::ok && summary.best_dnf);
+    timing.finished = true;
+    assert(race_lap_summary(timing, 3, summary) == Result::ok && !summary.total_dnf &&
+           !summary.best_dnf);
+    assert(race_lap_summary(timing, 0, summary) == Result::invalid_argument);
+    timing.lap_times[0] = std::numeric_limits<float>::quiet_NaN();
+    assert(race_lap_summary(timing, 3, summary) == Result::invalid_argument);
+    assert(format_race_time(0) == "NO RECORD");
+    assert(format_race_time(0, "EMPTY") == "EMPTY");
+    assert(format_race_time(64.5f) == "01'04''50");
+    assert(format_race_time(.125f) == "00'00''12");
+    assert(format_race_time(600.75f) == "10'00''75");
     // Hand-derived fixed outputs from 0048adf5..0048aebc, including __ftol truncation.
     FrontendMapSettings map{{100, 0, 200}, 0.5f, 67, 52, 90};
     assert((map.project({100, 0, 200}) == std::array<int, 2>{67, 404}));

@@ -16,6 +16,7 @@
 #include "platform/godot/extension/engine_audio_adapter.hpp"
 #include "platform/godot/extension/frame_trace.hpp"
 #include "platform/godot/extension/game_files.hpp"
+#include "platform/godot/extension/graphics_settings_adapter.hpp"
 #include "platform/godot/extension/loading_task.hpp"
 #include "platform/godot/extension/original_weapon_input.hpp"
 #include "platform/godot/extension/sfx_audio_adapter.hpp"
@@ -86,6 +87,7 @@ class GameHost : public godot::Node, public LoopHooks {
     godot::String get_frontend_action() const;
     bool preview_frontend_screen(godot::String id, double seconds, godot::String variant);
     bool frontend_test_step(double elapsed, godot::String command);
+    bool frontend_test_select_option(godot::String id);
     void start_fog_fixture();
     void start_billboard_fixture();
     godot::Dictionary start_chrome_fixture();
@@ -117,6 +119,9 @@ class GameHost : public godot::Node, public LoopHooks {
     void set_camera_view_for_test(int view);
     godot::Dictionary get_presentation_state() const;
     bool test_interpolation_history() const;
+    bool test_graphics_quality() const;
+    godot::Dictionary get_graphics_state() const;
+    bool graphics_test_apply(godot::Dictionary values, bool save);
     int get_particle_count() const;
     int get_spark_count() const;
     int get_tire_particle_count() const;
@@ -141,6 +146,8 @@ class GameHost : public godot::Node, public LoopHooks {
     FrameTrace frame_trace_;
     std::uint64_t last_simulation_usec_{};
     std::unique_ptr<ServerRenderer> renderer_;
+    std::unique_ptr<GraphicsSettingsAdapter> graphics_;
+    void configure_graphics_resources();
     std::unique_ptr<Runtime> runtime_;
     std::unique_ptr<GameEntry> entry_;
     std::unique_ptr<MenuFrontend> menu_, pause_menu_;
@@ -178,7 +185,7 @@ class GameHost : public godot::Node, public LoopHooks {
     bool apply_race_debug_track_request();
     std::vector<std::string> available_race_tracks_;
     std::uint64_t race_track_generation_{};
-    void show_race_results();
+    void show_race_over_menu();
     godot::String game_directory_, track_name_, vehicle_name_{"Animal"};
     std::unique_ptr<GameFiles> files_;
     std::unique_ptr<ResourceStore> resources_;

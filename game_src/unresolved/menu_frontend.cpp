@@ -51,9 +51,274 @@ const FrontendScreenInfo* find_screen(std::string_view id) {
 }
 } // namespace
 std::span<const FrontendScreenInfo> MenuFrontend::screens() { return kScreens; }
-MenuFrontend::MenuFrontend(ResourceStore& resources, Renderer& renderer)
-    : resources_(resources), renderer_(renderer), canvas_(resources, renderer) {}
+MenuFrontend::MenuFrontend(ResourceStore& resources, Renderer& renderer,
+                           GraphicsSettingsHost* graphics)
+    : resources_(resources), renderer_(renderer), graphics_host_(graphics),
+      canvas_(resources, renderer) {}
 MenuFrontend::~MenuFrontend() { canvas_.release(video_frame_); }
+namespace {
+std::string backend_name(RenderingBackend backend) {
+    switch (backend) {
+    case RenderingBackend::automatic:
+        return "AUTO";
+    case RenderingBackend::vulkan:
+        return "VULKAN";
+    case RenderingBackend::direct3d12:
+        return "DIRECTX 12";
+    case RenderingBackend::metal:
+        return "METAL";
+    }
+    return "UNAVAILABLE";
+}
+template <class T, std::size_t N>
+void cycle_value(T& value, const std::array<T, N>& choices, int dx) {
+    const auto found = std::find(choices.begin(), choices.end(), value);
+    const auto index = found == choices.end() ? 0 : found - choices.begin();
+    value = choices[(index + N + dx) % N];
+}
+template <class T> void cycle_value(T& value, const std::vector<T>& choices, int dx) {
+    if (choices.empty())
+        return;
+    const auto found = std::find(choices.begin(), choices.end(), value);
+    const auto index = found == choices.end() ? 0 : found - choices.begin();
+    value = choices[(index + choices.size() + dx) % choices.size()];
+}
+} // namespace
+void MenuFrontend::refresh_graphics_rows() {
+    custom_.rows.clear();
+    custom_.fields["MODERN_GRAPHICS"] =
+        graphics_host_ ? "CURRENT API: " + backend_name(graphics_host_->active_backend())
+                       : "GRAPHICS HOST UNAVAILABLE";
+    const auto add = [&](std::string id, std::string label, std::string value,
+                         bool enabled = true) {
+        custom_.rows.push_back({std::move(label), {std::move(value)}, 0, enabled, std::move(id)});
+    };
+    if (!graphics_) {
+        add("unavailable", "GRAPHICS SETTINGS", "UNAVAILABLE", false);
+        add("back", "BACK", "");
+        return;
+    }
+    const auto& v = graphics_->draft();
+    const auto caps = graphics_host_->capabilities();
+    if (graphics_->pending_confirmation()) {
+        custom_.message = "KEEP DISPLAY SETTINGS? " +
+                          std::to_string(static_cast<int>(
+                              std::ceil(graphics_->seconds_remaining(graphics_time_)))) +
+                          " SECONDS";
+        add("confirm", "KEEP AND SAVE", "");
+        add("revert", "REVERT", "");
+    } else if (graphics_discard_) {
+        custom_.message = "DISCARD UNSAVED CHANGES?";
+        add("discard", "DISCARD AND GO BACK", "");
+        add("cancel_discard", "CONTINUE EDITING", "");
+    } else {
+        add("page", "PAGE", graphics_quality_ ? "QUALITY" : "DISPLAY");
+        if (!graphics_quality_) {
+            const auto valid_monitor =
+                v.monitor >= 0 && static_cast<std::size_t>(v.monitor) < caps.monitors.size();
+            add("monitor", "MONITOR", valid_monitor ? caps.monitors[v.monitor].name : "UNAVAILABLE",
+                !caps.monitors.empty());
+            add("window_mode", "WINDOW MODE",
+                v.window_mode == WindowMode::windowed     ? "WINDOWED"
+                : v.window_mode == WindowMode::borderless ? "BORDERLESS FULLSCREEN"
+                                                          : "FULLSCREEN");
+            add("resolution", "WINDOW SIZE",
+                std::to_string(v.width) + " X " + std::to_string(v.height),
+                v.window_mode == WindowMode::windowed);
+            add("vsync", "VSYNC", v.vsync ? "ON" : "OFF");
+            add("fps_limit", "FPS LIMIT", v.fps_limit ? std::to_string(v.fps_limit) : "UNLIMITED");
+            add("backend", "RENDERING API", backend_name(v.backend), caps.backends.size() > 1);
+        } else {
+            constexpr std::array<const char*, 5> aa{"OFF", "FXAA", "MSAA 2X", "MSAA 4X", "MSAA 8X"};
+            constexpr std::array<const char*, 5> filter{
+                "LINEAR", "ANISOTROPIC 2X", "ANISOTROPIC 4X", "ANISOTROPIC 8X", "ANISOTROPIC 16X"};
+            constexpr std::array<const char*, 3> quality{"HIGH", "MEDIUM", "LOW"};
+            add("aa", "ANTI ALIASING", aa[static_cast<int>(v.aa)], caps.anti_aliasing.size() > 1);
+            add("render_scale", "RENDER SCALE",
+                std::to_string(static_cast<int>(std::lround(v.render_scale * 100))) + "%");
+            add("texture_quality", "TEXTURE QUALITY", quality[static_cast<int>(v.texture_quality)],
+                caps.texture_quality);
+            add("texture_filtering", "TEXTURE FILTERING",
+                filter[static_cast<int>(v.texture_filtering)], caps.texture_filtering);
+            add("view_distance", "VIEW DISTANCE",
+                std::to_string(static_cast<int>(std::lround(v.view_distance * 100))) + "%");
+            add("effects", "SPECIAL EFFECTS",
+                v.effects < .5f   ? "LOW"
+                : v.effects < .9f ? "MEDIUM"
+                                  : "HIGH");
+            add("skid_marks", "SKIDMARK DETAIL",
+                v.skid_marks < .5f   ? "LOW"
+                : v.skid_marks < .9f ? "MEDIUM"
+                                     : "HIGH");
+            add("car_detail", "CAR DETAIL",
+                v.car_detail == 0   ? "LOW"
+                : v.car_detail == 1 ? "MEDIUM"
+                                    : "HIGH",
+                caps.car_detail);
+            add("chrome_mapping", "CHROME MAPPING", v.chrome_mapping ? "ON" : "OFF");
+        }
+        add("apply", "APPLY AND SAVE", "");
+        add("defaults", "RESTORE DEFAULTS", "");
+        if (graphics_host_->restart_required())
+            add("restart", "RESTART NOW", "API CHANGE SAVED");
+        add("back", "BACK", "");
+        if (custom_.message.empty() && graphics_host_->restart_required())
+            custom_.message = "SAVED RENDERING API WILL APPLY AFTER RESTART";
+    }
+    selected_ = std::clamp(selected_, 0, static_cast<int>(custom_.rows.size()) - 1);
+}
+void MenuFrontend::edit_graphics(std::string_view id, int dx) {
+    if (!graphics_)
+        return;
+    auto& v = graphics_->draft();
+    const auto caps = graphics_host_->capabilities();
+    if (id == "page") {
+        graphics_quality_ = !graphics_quality_;
+        selected_ = 0;
+    } else if (id == "monitor" && !caps.monitors.empty())
+        v.monitor = (v.monitor + static_cast<int>(caps.monitors.size()) + dx) %
+                    static_cast<int>(caps.monitors.size());
+    else if (id == "window_mode")
+        cycle_value(
+            v.window_mode,
+            std::array{WindowMode::windowed, WindowMode::borderless, WindowMode::fullscreen}, dx);
+    else if (id == "resolution") {
+        std::vector<std::pair<int, int>> sizes{{640, 480},   {960, 540},   {1280, 720}, {1600, 900},
+                                               {1920, 1080}, {2560, 1440}, {3840, 2160}};
+        const auto current = std::pair{v.width, v.height};
+        if (std::find(sizes.begin(), sizes.end(), current) == sizes.end())
+            sizes.push_back(current);
+        auto size = current;
+        cycle_value(size, sizes, dx);
+        v.width = size.first;
+        v.height = size.second;
+    } else if (id == "vsync")
+        v.vsync = !v.vsync;
+    else if (id == "fps_limit")
+        cycle_value(v.fps_limit, std::array{0, 30, 60, 90, 120, 144, 165, 240}, dx);
+    else if (id == "backend")
+        cycle_value(v.backend, caps.backends, dx);
+    else if (id == "aa")
+        cycle_value(v.aa, caps.anti_aliasing, dx);
+    else if (id == "render_scale")
+        cycle_value(v.render_scale, std::array{.5f, .67f, .75f, .85f, 1.f}, dx);
+    else if (id == "texture_quality")
+        cycle_value(v.texture_quality,
+                    std::array{TextureQuality::high, TextureQuality::medium, TextureQuality::low},
+                    dx);
+    else if (id == "texture_filtering")
+        cycle_value(v.texture_filtering,
+                    std::array{TextureFiltering::linear, TextureFiltering::anisotropic_2x,
+                               TextureFiltering::anisotropic_4x, TextureFiltering::anisotropic_8x,
+                               TextureFiltering::anisotropic_16x},
+                    dx);
+    else if (id == "view_distance")
+        cycle_value(v.view_distance, std::array{.4f, .5f, .75f, 1.f}, dx);
+    else if (id == "effects")
+        cycle_value(v.effects, std::array{.33f, .66f, 1.f}, dx);
+    else if (id == "skid_marks")
+        cycle_value(v.skid_marks, std::array{.33f, .66f, 1.f}, dx);
+    else if (id == "car_detail")
+        cycle_value(v.car_detail, std::array{0, 1, 2}, dx);
+    else if (id == "chrome_mapping")
+        v.chrome_mapping = !v.chrome_mapping;
+}
+Result MenuFrontend::advance_graphics(double elapsed, const FrontendInput& input,
+                                      std::string& error) {
+    graphics_time_ += elapsed;
+    const auto edge = [](bool now, bool previous) { return now && !previous; };
+    const auto leave = [&]() {
+        auto target = history_.empty() ? std::string("main_menu") : history_.back();
+        if (!history_.empty())
+            history_.pop_back();
+        return enter(target, error);
+    };
+    Result result = Result::ok;
+    if (graphics_) {
+        const bool pending = graphics_->pending_confirmation();
+        result = graphics_->update(graphics_time_);
+        if (pending && !graphics_->pending_confirmation()) {
+            selected_ = 0;
+            custom_.message = "DISPLAY SETTINGS REVERTED";
+        }
+    }
+    if (result != Result::ok) {
+        custom_.message = "GRAPHICS UPDATE FAILED";
+        result = Result::ok;
+    }
+    refresh_graphics_rows();
+    bool hit = false;
+    if (input.pointer_moved || input.pointer_accept) {
+        for (std::size_t i = 0; i < custom_.rows.size(); ++i)
+            if (input.pointer_x >= 20 && input.pointer_x < 630 && input.pointer_y >= 88 + i * 21 &&
+                input.pointer_y < 109 + i * 21) {
+                selected_ = static_cast<int>(i);
+                hit = true;
+                break;
+            }
+    }
+    const int dx = edge(input.right, previous_.right) - edge(input.left, previous_.left);
+    const int dy = edge(input.down, previous_.down) - edge(input.up, previous_.up);
+    selected_ = std::clamp(selected_ + dy, 0, static_cast<int>(custom_.rows.size()) - 1);
+    const auto row = custom_.rows[selected_];
+    const bool back = edge(input.back, previous_.back);
+    const bool accept = edge(input.accept, previous_.accept) ||
+                        (hit && edge(input.pointer_accept, previous_.pointer_accept));
+    if (back || (accept && row.id == "back")) {
+        if (graphics_ && graphics_->pending_confirmation()) {
+            result = graphics_->revert();
+            selected_ = 0;
+        } else if (graphics_discard_)
+            graphics_discard_ = false;
+        else if (graphics_ && graphics_->draft() != graphics_->confirmed()) {
+            graphics_discard_ = true;
+            selected_ = 0;
+        } else {
+            previous_ = input;
+            return leave();
+        }
+    } else if (row.available && (dx || accept)) {
+        if (row.id == "apply" && accept) {
+            result = graphics_->apply(graphics_time_);
+            selected_ = 0;
+            custom_.message = result == Result::ok
+                                  ? "SETTINGS SAVED; RESOURCE QUALITY APPLIES ON NEXT SCENE"
+                                  : "SETTINGS COULD NOT BE APPLIED OR SAVED";
+        } else if (row.id == "confirm" && accept) {
+            result = graphics_->confirm();
+            selected_ = 0;
+            custom_.message =
+                result == Result::ok ? "SETTINGS SAVED" : "SETTINGS COULD NOT BE SAVED";
+        } else if (row.id == "revert" && accept) {
+            result = graphics_->revert();
+            selected_ = 0;
+        } else if (row.id == "defaults" && accept) {
+            graphics_->restore_defaults();
+            custom_.message = "DEFAULTS READY; APPLY TO SAVE";
+        } else if (row.id == "restart" && accept) {
+            result = graphics_host_->restart();
+            if (result == Result::ok)
+                quit_ = true;
+        } else if (row.id == "discard" && accept) {
+            graphics_->discard_draft();
+            previous_ = input;
+            return leave();
+        } else if (row.id == "cancel_discard" && accept) {
+            graphics_discard_ = false;
+            selected_ = 0;
+        } else if (row.id != "apply" && row.id != "defaults" && row.id != "restart" &&
+                   row.id != "confirm" && row.id != "revert") {
+            edit_graphics(row.id, dx ? dx : input.pointer_accept && input.pointer_x < 350 ? -1 : 1);
+            custom_.message.clear();
+        }
+    }
+    if (result != Result::ok)
+        custom_.message = "GRAPHICS OPERATION FAILED; PREVIOUS SETTINGS RETAINED";
+    refresh_graphics_rows();
+    time_ += elapsed;
+    previous_ = input;
+    return draw(error);
+}
 const FrontendVideoAudio* MenuFrontend::video_audio() const {
     return video_ ? &video_->audio() : nullptr;
 }
@@ -251,11 +516,15 @@ Result MenuFrontend::enter(std::string_view id, std::string& error) {
             return result;
         if (const auto found = option_values_.find(screen_); found != option_values_.end())
             custom_.rows = found->second;
-        if (id == "graphics")
-            for (auto& row : custom_.rows)
-                if (row.label == "CHROME MAPPING")
-                    if (const auto value = renderer_.chrome_mapping_options().enabled)
-                        row.selected = *value ? 1 : 0;
+        if (id == "graphics") {
+            graphics_discard_ = false;
+            graphics_quality_ = false;
+            graphics_time_ = 0;
+            graphics_.reset();
+            if (graphics_host_)
+                graphics_ = std::make_unique<GraphicsSettingsTransaction>(*graphics_host_);
+            refresh_graphics_rows();
+        }
         if (variant_ == "empty" && (id == "load_season" || id == "select_session"))
             custom_.rows.clear();
     }
@@ -702,6 +971,8 @@ Result MenuFrontend::show_pause(std::span<const HudQuad> backdrop, std::string& 
 Result MenuFrontend::advance(double elapsed, const FrontendInput& input, std::string& error) {
     if (!std::isfinite(elapsed) || elapsed < 0 || elapsed > 86400)
         return Result::invalid_argument;
+    if (screen_ == "graphics")
+        return advance_graphics(elapsed, input, error);
     if (screen_ == "loading" && custom_.loading_progress >= 1)
         loading_finish_time_ += elapsed;
     if (screen_ == "loading" && live_loading_ && loading_target_ == "garage") {
@@ -768,14 +1039,6 @@ Result MenuFrontend::advance(double elapsed, const FrontendInput& input, std::st
         if (!custom_.rows.empty() && selections_.empty()) {
             selected_ = std::clamp(selected_ + dy, 0, static_cast<int>(custom_.rows.size()) - 1);
             auto& row = custom_.rows[selected_];
-            if (dx && row.available && screen_ == "graphics" && row.label == "CHROME MAPPING") {
-                const auto selected = (row.selected + 1) % 2;
-                if (renderer_.set_chrome_mapping_enabled(selected != 0) == Result::ok) {
-                    row.selected = selected;
-                    previous_ = input;
-                    return draw(error);
-                }
-            }
             if (dx && row.available && !row.values.empty()) {
                 if (screen_ == "graphics" || screen_ == "sound" || screen_ == "game" ||
                     screen_ == "keyboard" || screen_ == "joystick") {

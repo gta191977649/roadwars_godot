@@ -1,16 +1,18 @@
 #include "game_src/unresolved/frontend_scene.hpp"
-#include "game_src/unresolved/chrome_mapping.hpp"
 #include "game_src/unresolved/binary_reader.hpp"
 #include "game_src/unresolved/bitmap.hpp"
+#include "game_src/unresolved/chrome_mapping.hpp"
 #include "game_src/unresolved/contact_orientation.hpp"
 #include "game_src/unresolved/original_camera.hpp"
 #include "game_src/unresolved/track_animation.hpp"
+#include "game_src/unresolved/vehicle_combat.hpp"
 #include "game_src/unresolved/weapon_mounts.hpp"
 #include "game_src/unresolved/wheel_pose.hpp"
 #include <algorithm>
 #include <charconv>
 #include <cmath>
 #include <stdexcept>
+#include <utility>
 
 namespace roadwars {
 namespace {
@@ -231,6 +233,12 @@ void FrontendScene::stop() {
     product_anchor_ = product_angles_ = product_speeds_ = {};
     character_.clear();
     product_draw_begin_ = product_mesh_begin_ = 0;
+    vehicle_draw_begin_ = vehicle_mesh_begin_ = 0;
+    door_y_ = door_open_y_ = {};
+    door_limit_ = door_speed_ = 0;
+    door_closing_ = bottom_closing_ = staging_product_ = false;
+    pending_product_ = {};
+    store_door_events_ = 0;
 }
 Result FrontendScene::read_mesh(const std::string& path, MeshObject& output, std::string& error) {
     std::vector<std::byte> bytes;
@@ -267,6 +275,8 @@ MaterialHandle FrontendScene::material(const MeshPart& part, const std::string& 
             candidates.push_back("Characters/Shared/Garage/" + part.texture);
         if (base.starts_with("Cars/")) {
             candidates.push_back("Cars/Shared/Textures/" + part.texture);
+            if (const auto paint = base.find("/Paint/"); paint != std::string::npos)
+                candidates.push_back(base.substr(0, paint) + "/Body/" + part.texture);
             const auto context = ResourceStore::canonical(base.substr(0, base.find_last_of('/')));
             const auto suffix = "/" + ResourceStore::canonical(part.texture);
             for (const auto& [path, entry] : resources_.entries())
@@ -322,10 +332,16 @@ MaterialHandle FrontendScene::material(const MeshPart& part, const std::string& 
 }
 
 void FrontendScene::upload(const MeshObject& object, const std::string& base, Vec3 parent,
-                           int vehicle, int turntable, int sky) {
+                           int vehicle, int turntable, int sky, int door) {
     if (!object.visible)
         return;
     const auto position = add(parent, object.position);
+    if (store_ && vehicle < 0) {
+        if (object.name == "DoorTop")
+            door = 0;
+        else if (object.name == "DoorBottom")
+            door = 1;
+    }
     if (victory_ && vehicle < 0) {
         for (int index = 0; index < 3; ++index)
             if (object.name.starts_with("Mount" + std::to_string(index + 1) + "_"))
@@ -342,12 +358,12 @@ void FrontendScene::upload(const MeshObject& object, const std::string& base, Ve
         std::vector<std::array<float, 2>> uv;
         for (const auto coordinate : part.uv)
             uv.push_back({coordinate.x, coordinate.y});
-        const auto mesh =
-            renderer_.upload_surface(part.positions, uv, part.indices,
-                                     material(part, base, object.flags,
-                                         chrome_mapping_applies(chrome_enabled_, object.flags,
-                                             part_index, vehicle >= 0 && chrome_texture_.value)),
-                                     part.normals, part.colors);
+        const auto mesh = renderer_.upload_surface(
+            part.positions, uv, part.indices,
+            material(part, base, object.flags,
+                     chrome_mapping_applies(chrome_enabled_, object.flags, part_index,
+                                            vehicle >= 0 && chrome_texture_.value)),
+            part.normals, part.colors);
         if (!mesh.value)
             throw std::runtime_error("Frontend scene mesh upload failed");
         meshes_.push_back(mesh);
@@ -357,22 +373,26 @@ void FrontendScene::upload(const MeshObject& object, const std::string& base, Ve
         Transform local;
         local.origin = position;
         draws_.push_back({instance, local, vehicle, turntable, sky});
-        renderer_.set_instance_static(instance, vehicle < 0 && turntable < 0 && sky < 0);
+        draws_.back().door = door;
+        renderer_.set_instance_static(instance,
+                                      vehicle < 0 && turntable < 0 && sky < 0 && door < 0);
         if (vehicle >= 0 && object.name == "295ULTailL") {
             draws_.back().visible = false;
             renderer_.set_instance_visible(instance, false);
         }
     }
     for (const auto& child : object.children)
-        upload(child, base, position, vehicle, turntable, sky);
+        upload(child, base, position, vehicle, turntable, sky, door);
 }
 
-void FrontendScene::upload_vehicle(std::string_view name, Vec3 anchor, int index) {
+void FrontendScene::upload_vehicle(std::string_view name, Vec3 anchor, int index,
+                                   const RaceLoadout* loadout) {
     MeshObject body, tire;
     std::string error;
     const auto path = "Cars/" + std::string(name);
+    const auto tire_path = path + "/Tires/" + (loadout ? loadout->tires.type : "Street");
     if (read_mesh(path + "/Body/SpatialObject", body, error) != Result::ok ||
-        read_mesh(path + "/Tires/Street/SpatialObject", tire, error) != Result::ok)
+        read_mesh(tire_path + "/SpatialObject", tire, error) != Result::ok)
         throw std::runtime_error(error);
     initialize_stock_weapon_mounts(body);
     Vec3 body_center;
@@ -386,20 +406,52 @@ void FrontendScene::upload_vehicle(std::string_view name, Vec3 anchor, int index
     if (!chassis)
         throw std::runtime_error("Original chassis bounds unavailable");
     vehicle_heights_.push_back(mesh_size(*chassis).y);
-    upload(body, path + "/Body", scale(body_center, -1), index);
+    VehicleCombat weapons;
+    if (loadout && weapons.load(resources_, name, loadout->weapons, error) != Result::ok)
+        throw std::runtime_error(error);
+    if (loadout && !loadout->weapons[1].empty()) {
+        const auto show_mounts = [&](const auto& self, MeshObject& object) -> void {
+            if (object.name.starts_with("ULRORMount"))
+                object.visible = true;
+            for (auto& child : object.children)
+                self(self, child);
+        };
+        show_mounts(show_mounts, body);
+    }
+    const auto paint = loadout && loadout->paint_job > 0
+                           ? path + "/Paint/Paint Job " + std::to_string(loadout->paint_job)
+                           : path + "/Body";
+    upload(body, paint, scale(body_center, -1), index);
     float wheel_scale{};
-    if (load_stock_wheel_scale(resources_, name, wheel_scale, error) != Result::ok)
+    if ((loadout ? load_wheel_scale(resources_, name, loadout->tires, wheel_scale, error)
+                 : load_stock_wheel_scale(resources_, name, wheel_scale, error)) != Result::ok)
         throw std::runtime_error(error);
     tire.position = {};
     for (std::size_t wheel = 0; wheel < 4; ++wheel) {
         const auto tire_anchor =
             subtract(require_anchor(body, "Tire" + std::to_string(wheel + 1)), body_center);
         const auto begin = draws_.size();
-        upload(tire, path + "/Tires/Street", {}, index);
+        upload(tire, tire_path, {}, index);
         const auto pose = original_wheel_transform(wheel, tire_anchor, 0, 0, wheel_scale);
         for (std::size_t draw = begin; draw < draws_.size(); ++draw)
             draws_[draw].local = compose_track_transform(pose, draws_[draw].local);
     }
+    if (loadout)
+        for (const auto& asset : weapons.assets()) {
+            if (!asset.descriptor || !asset.has_weapon_mesh)
+                continue;
+            auto mesh = asset.weapon;
+            mesh.position = {};
+            const auto start = draws_.size();
+            const auto base = "Cars/Shared/Weapons/" +
+                              std::string(weapon_slot_name(asset.descriptor->slot)) + "/" +
+                              std::string(asset.descriptor->name);
+            upload(mesh, base, {}, index);
+            auto mount = original_mesh_node_pose(body, asset.mount_path, {}, {});
+            mount.origin = subtract(mount.origin, body_center);
+            for (auto draw = start; draw < draws_.size(); ++draw)
+                draws_[draw].local = compose_track_transform(mount, draws_[draw].local);
+        }
 }
 
 // RE: 93b4e4c301a5694b55e16977c2e52f4971bd9089659e3d58617c8af2368436c8:function:004c9db0
@@ -538,6 +590,16 @@ Result FrontendScene::load(std::string_view id, std::string_view character, int 
                                     require_anchor(room, "CamStand" + std::to_string(rank)), 0});
             rotation_speed_ = 45;
         } else if (store_) {
+            door_open_y_ = {require_anchor(room, "DoorTop").y,
+                            require_anchor(room, "DoorBottom").y};
+            door_y_ = door_open_y_;
+            door_limit_ = require_anchor(room, "DoorPoint").y;
+            Configuration config;
+            if (config.load(resources_, "ModifyVehicle/Data.ini") != Result::ok)
+                throw std::runtime_error("Original store door configuration missing");
+            door_speed_ = require_number(config, "STORE", "DOORACCELERATION(M_S)");
+            if (door_speed_ <= 0 || door_open_y_[0] < door_limit_ || door_open_y_[1] > door_limit_)
+                throw std::runtime_error("Invalid original store door configuration");
             const auto camera = require_anchor(room, "Camera1");
             cameras_.push_back({camera, require_anchor(room, "Object1"), 0});
             eye_ = require_anchor(room, "CameraStart");
@@ -549,6 +611,8 @@ Result FrontendScene::load(std::string_view id, std::string_view character, int 
                 throw std::runtime_error(error);
         } else {
             stand_ = require_anchor(room, "Stand");
+            vehicle_draw_begin_ = draws_.size();
+            vehicle_mesh_begin_ = meshes_.size();
             upload_vehicle(character, stand_, 0);
             Configuration config;
             if (config.load(resources_, "ModifyVehicle/Data.ini") != Result::ok)
@@ -598,6 +662,10 @@ Result FrontendScene::load(std::string_view id, std::string_view character, int 
 void FrontendScene::update_draws() {
     for (const auto& draw : draws_) {
         auto pose = draw.local;
+        if (draw.door >= 0) {
+            const auto door = static_cast<std::size_t>(draw.door);
+            pose.origin.y += door_y_[door] - door_open_y_[door];
+        }
         if (draw.product) {
             pose = compose_track_transform(
                 original_vehicle_transform(product_anchor_, product_angles_.x, product_angles_.y,
@@ -625,6 +693,7 @@ void FrontendScene::update_camera() {
 }
 
 // RE: 93b4e4c301a5694b55e16977c2e52f4971bd9089659e3d58617c8af2368436c8:function:0044000a
+// RE: 93b4e4c301a5694b55e16977c2e52f4971bd9089659e3d58617c8af2368436c8:function:00443569
 // RE: 93b4e4c301a5694b55e16977c2e52f4971bd9089659e3d58617c8af2368436c8:function:004e553d
 // RE: 93b4e4c301a5694b55e16977c2e52f4971bd9089659e3d58617c8af2368436c8:function:004e433a
 // Position acceleration subset of the menu camera; run on a modern fixed presentation step.
@@ -703,6 +772,30 @@ void FrontendScene::step(float dt) {
         vehicle_angles_[0] += rotation_speed_ * dt;
     if (store_)
         product_angles_ = add(product_angles_, scale(product_speeds_, dt));
+    if (store_) {
+        const auto movement = door_speed_ * dt;
+        if (door_closing_) {
+            door_y_[0] -= movement;
+            if (door_y_[0] < door_limit_) {
+                door_y_[0] = door_limit_;
+                replace_product(pending_product_, pending_angles_, pending_speeds_);
+                pending_product_ = {};
+                door_closing_ = false;
+                ++store_door_events_;
+            }
+        } else {
+            door_y_[0] = std::min(door_open_y_[0], door_y_[0] + movement);
+        }
+        if (bottom_closing_) {
+            door_y_[1] += movement;
+            if (door_y_[1] > door_limit_) {
+                door_y_[1] = door_limit_;
+                bottom_closing_ = false;
+            }
+        } else {
+            door_y_[1] = std::max(door_open_y_[1], door_y_[1] - movement);
+        }
+    }
 }
 void FrontendScene::set_visible(bool visible) {
     for (const auto& draw : draws_)
@@ -724,15 +817,20 @@ Result FrontendScene::advance(double elapsed_seconds) {
     // Preserve excess time; never enlarge dt or discard debt after a long host frame.
     constexpr double kStep = 1.0 / 60.0;
     unsigned ticks{};
-    while (debt_ + 1e-12 >= kStep && ticks < 240) {
-        step(static_cast<float>(kStep));
-        debt_ -= kStep;
-        ++ticks;
+    try {
+        while (debt_ + 1e-12 >= kStep && ticks < 240) {
+            step(static_cast<float>(kStep));
+            debt_ -= kStep;
+            ++ticks;
+        }
+        if (debt_ < 0)
+            debt_ = 0;
+        update_draws();
+        update_camera();
+    } catch (const std::exception&) {
+        stop();
+        return Result::unavailable;
     }
-    if (debt_ < 0)
-        debt_ = 0;
-    update_draws();
-    update_camera();
     return Result::ok;
 }
 
@@ -767,12 +865,12 @@ Result FrontendScene::select_store_product(std::string_view item, std::string_vi
         auto quality_name =
             quality.empty() ? type.value("ORDERING", "ITEM0") : std::string(quality);
         const auto from_quality = require_number(config, "GARAGE3DOBJECT", "GETFROMQUALITY") != 0;
-        product_angles_ = {require_number(config, "GARAGE3DOBJECT", "INITIALOBJECTHEADING(DGS)"),
-                           require_number(config, "GARAGE3DOBJECT", "INITIALOBJECTPITCH(DGS)"),
-                           require_number(config, "GARAGE3DOBJECT", "INITIALOBJECTROLL(DGS)")};
-        product_speeds_ = {require_number(config, "GARAGE3DOBJECT", "HEADINGVELOCITY(DGS_S)"),
-                           require_number(config, "GARAGE3DOBJECT", "PITCHVELOCITY(DGS_S)"),
-                           require_number(config, "GARAGE3DOBJECT", "ROLLVELOCITY(DGS_S)")};
+        const Vec3 angles = {require_number(config, "GARAGE3DOBJECT", "INITIALOBJECTHEADING(DGS)"),
+                             require_number(config, "GARAGE3DOBJECT", "INITIALOBJECTPITCH(DGS)"),
+                             require_number(config, "GARAGE3DOBJECT", "INITIALOBJECTROLL(DGS)")};
+        const Vec3 speeds = {require_number(config, "GARAGE3DOBJECT", "HEADINGVELOCITY(DGS_S)"),
+                             require_number(config, "GARAGE3DOBJECT", "PITCHVELOCITY(DGS_S)"),
+                             require_number(config, "GARAGE3DOBJECT", "ROLLVELOCITY(DGS_S)")};
         auto mesh_root = store_variant_ == 1   ? "Cars/" + character_ + "/Tires"
                          : store_variant_ == 6 ? "Cars/" + character_ + "/Paint"
                                                : config_root;
@@ -788,21 +886,70 @@ Result FrontendScene::select_store_product(std::string_view item, std::string_vi
             throw std::runtime_error(error);
         // Product wrapper is attached at Object1, replacing the exporter's root position.
         product.position = {};
-        for (std::size_t index = product_draw_begin_; index < draws_.size(); ++index)
-            renderer_.destroy_instance(draws_[index].instance);
-        draws_.resize(product_draw_begin_);
-        for (std::size_t index = product_mesh_begin_; index < meshes_.size(); ++index)
-            renderer_.destroy_mesh(meshes_[index]);
-        meshes_.resize(product_mesh_begin_);
-        upload(product, "Cars/Shared/Textures", {});
-        for (std::size_t index = product_draw_begin_; index < draws_.size(); ++index) {
-            draws_[index].product = true;
-            renderer_.set_instance_static(draws_[index].instance, false);
-        }
+        if (staging_product_) {
+            pending_product_ = std::move(product);
+            pending_angles_ = angles;
+            pending_speeds_ = speeds;
+        } else
+            replace_product(product, angles, speeds);
         error.clear();
         return Result::ok;
     } catch (const std::exception& exception) {
         error = exception.what();
+        return Result::unavailable;
+    }
+}
+void FrontendScene::replace_product(const MeshObject& product, Vec3 angles, Vec3 speeds) {
+    product_angles_ = angles;
+    product_speeds_ = speeds;
+    for (std::size_t index = product_draw_begin_; index < draws_.size(); ++index)
+        renderer_.destroy_instance(draws_[index].instance);
+    draws_.resize(product_draw_begin_);
+    for (std::size_t index = product_mesh_begin_; index < meshes_.size(); ++index)
+        renderer_.destroy_mesh(meshes_[index]);
+    meshes_.resize(product_mesh_begin_);
+    upload(product, "Cars/Shared/Textures", {});
+    for (std::size_t index = product_draw_begin_; index < draws_.size(); ++index) {
+        draws_[index].product = true;
+        renderer_.set_instance_static(draws_[index].instance, false);
+    }
+}
+Result FrontendScene::transition_store_product(std::string_view item, std::string_view quality,
+                                               std::string& error) {
+    staging_product_ = true;
+    const auto result = select_store_product(item, quality, error);
+    staging_product_ = false;
+    if (result == Result::ok) {
+        door_closing_ = true;
+        bottom_closing_ = true;
+    }
+    return result;
+}
+unsigned FrontendScene::drain_store_door_events() { return std::exchange(store_door_events_, 0); }
+Result FrontendScene::set_vehicle_loadout(const RaceLoadout& loadout, std::string& error) {
+    if (!loaded_ || victory_ || store_)
+        return Result::unavailable;
+    if (loadout.paint_job < 0 || loadout.paint_job > 6)
+        return Result::invalid_argument;
+    try {
+        for (auto index = vehicle_draw_begin_; index < draws_.size(); ++index)
+            renderer_.destroy_instance(draws_[index].instance);
+        draws_.resize(vehicle_draw_begin_);
+        for (auto index = vehicle_mesh_begin_; index < meshes_.size(); ++index)
+            renderer_.destroy_mesh(meshes_[index]);
+        meshes_.resize(vehicle_mesh_begin_);
+        const auto angle = vehicle_angles_.front();
+        anchors_.clear();
+        vehicle_angles_.clear();
+        vehicle_heights_.clear();
+        upload_vehicle(character_, stand_, 0, &loadout);
+        vehicle_angles_[0] = angle;
+        update_draws();
+        error.clear();
+        return Result::ok;
+    } catch (const std::exception& exception) {
+        error = exception.what();
+        stop();
         return Result::unavailable;
     }
 }

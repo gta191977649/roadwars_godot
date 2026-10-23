@@ -37,6 +37,132 @@ godot::Transform3D convert(const Transform& input) {
     return result;
 }
 } // namespace
+std::string ServerRenderer::filtered_surface_code(const std::string& source) const {
+    auto code = source;
+    const std::string filter = graphics_settings_.texture_filtering == TextureFiltering::linear
+        ? "filter_linear" : "filter_linear_mipmap_anisotropic";
+    // Keep the original chrome lookup linear; filtering applies to world paint/base textures.
+    for (const auto* sampler : {"diffuse_map : source_color, ", "chrome_base_map : "}) {
+        const std::string needle = std::string(sampler) + "filter_linear";
+        const auto offset = code.find(needle);
+        if (offset != std::string::npos)
+            code.replace(offset, needle.size(), std::string(sampler) + filter);
+    }
+    return code;
+}
+bool ServerRenderer::test_graphics_quality() {
+    auto* server = godot::RenderingServer::get_singleton();
+    const auto viewport = server->viewport_create();
+    bool valid = true;
+    {
+        ServerRenderer fixture(viewport);
+        std::vector<std::byte> pixels(16 * 8 * 4, std::byte{127});
+        const auto texture = fixture.upload_texture(16, 8, pixels);
+        MaterialSettings material;
+        material.chrome_map = texture;
+        const auto handle = fixture.create_material(texture, material);
+        const auto world = fixture.world_textures_.at(texture.value);
+        for (const auto quality :
+             {TextureQuality::low, TextureQuality::medium, TextureQuality::high}) {
+            GraphicsSettings settings;
+            settings.texture_quality = quality;
+            settings.texture_filtering = TextureFiltering::anisotropic_8x;
+            settings.aa = AntiAliasing::msaa_4x;
+            settings.render_scale = .75f;
+            valid &= fixture.apply_graphics_quality(settings) == Result::ok;
+            valid &= fixture.world_textures_.at(texture.value) == world;
+            const auto original = fixture.texture_sources_.at(texture.value);
+            valid &= original->get_width() == 16 && original->get_height() == 8;
+            const auto code = fixture.filtered_surface_code(
+                fixture.material_shader_sources_.at(handle.value));
+            valid &= code.find("chrome_base_map : filter_linear_mipmap_anisotropic") !=
+                     std::string::npos;
+            valid &= code.find("chrome_map : filter_linear, repeat_enable") != std::string::npos;
+            if (godot::DisplayServer::get_singleton()->get_name() != "headless") {
+                const auto gpu = server->texture_2d_get(world);
+                const int divisor = quality == TextureQuality::low ? 4
+                    : quality == TextureQuality::medium ? 2 : 1;
+                valid &= gpu.is_valid() && gpu->get_width() == 16 / divisor &&
+                         gpu->get_height() == 8 / divisor && gpu->has_mipmaps();
+            }
+        }
+        valid &= fixture.update_texture(texture, 16, 8, pixels) == Result::ok;
+        fixture.destroy_material(handle);
+        fixture.destroy_texture(texture);
+        valid &= fixture.world_textures_.empty() && fixture.texture_sources_.empty();
+    }
+    server->free_rid(viewport);
+    return valid;
+}
+void ServerRenderer::refresh_world_texture(std::uint64_t texture) {
+    const auto source = textures_.find(texture);
+    const auto target = world_textures_.find(texture);
+    if (source == textures_.end() || target == world_textures_.end())
+        return;
+    // Retain full-resolution canvas textures and regenerate only their world-only counterpart.
+    const auto original = texture_sources_.at(texture);
+    auto image = godot::Image::create_from_data(original->get_width(), original->get_height(),
+        false, godot::Image::FORMAT_RGBA8, original->get_data());
+    if (image.is_null())
+        throw std::runtime_error("Cannot read source texture for graphics quality");
+    const int divisor = graphics_settings_.texture_quality == TextureQuality::low ? 4
+        : graphics_settings_.texture_quality == TextureQuality::medium ? 2 : 1;
+    if (divisor != 1)
+        image->resize(std::max(1, image->get_width() / divisor),
+                      std::max(1, image->get_height() / divisor), godot::Image::INTERPOLATE_LANCZOS);
+    if (image->generate_mipmaps() != godot::OK)
+        throw std::runtime_error("Cannot generate world texture mipmaps");
+    const auto replacement = server_->texture_2d_create(image);
+    server_->texture_replace(target->second, replacement);
+}
+godot::RID ServerRenderer::world_texture(TextureHandle texture) {
+    auto found = world_textures_.find(texture.value);
+    if (found != world_textures_.end())
+        return found->second;
+    const auto image = texture_sources_.at(texture.value);
+    if (image.is_null())
+        throw std::runtime_error("Cannot read world texture source");
+    const auto rid = server_->texture_2d_create(image);
+    world_textures_.emplace(texture.value, rid);
+    refresh_world_texture(texture.value);
+    return rid;
+}
+Result ServerRenderer::apply_graphics_quality(const GraphicsSettings& settings) {
+    if (!std::isfinite(settings.render_scale) || settings.render_scale < .5f ||
+        settings.render_scale > 1.f ||
+        static_cast<unsigned>(settings.aa) > static_cast<unsigned>(AntiAliasing::msaa_8x) ||
+        static_cast<unsigned>(settings.texture_quality) > static_cast<unsigned>(TextureQuality::low) ||
+        static_cast<unsigned>(settings.texture_filtering) >
+            static_cast<unsigned>(TextureFiltering::anisotropic_16x))
+        return Result::invalid_argument;
+    using RS = godot::RenderingServer;
+    auto msaa = RS::VIEWPORT_MSAA_DISABLED;
+    switch (settings.aa) {
+    case AntiAliasing::msaa_2x: msaa = RS::VIEWPORT_MSAA_2X; break;
+    case AntiAliasing::msaa_4x: msaa = RS::VIEWPORT_MSAA_4X; break;
+    case AntiAliasing::msaa_8x: msaa = RS::VIEWPORT_MSAA_8X; break;
+    default: break;
+    }
+    server_->viewport_set_msaa_3d(viewport_, msaa);
+    server_->viewport_set_use_taa(viewport_, false);
+    server_->viewport_set_screen_space_aa(viewport_, settings.aa == AntiAliasing::fxaa
+        ? RS::VIEWPORT_SCREEN_SPACE_AA_FXAA : RS::VIEWPORT_SCREEN_SPACE_AA_DISABLED);
+    server_->viewport_set_scaling_3d_mode(viewport_, RS::VIEWPORT_SCALING_3D_MODE_BILINEAR);
+    server_->viewport_set_scaling_3d_scale(viewport_, settings.render_scale);
+    server_->viewport_set_anisotropic_filtering_level(viewport_,
+        static_cast<RS::ViewportAnisotropicFiltering>(settings.texture_filtering));
+    const bool textures_changed = settings.texture_quality != graphics_settings_.texture_quality;
+    const bool filters_changed = settings.texture_filtering != graphics_settings_.texture_filtering;
+    graphics_settings_ = settings;
+    if (textures_changed)
+        for (const auto& [id, rid] : world_textures_)
+            refresh_world_texture(id);
+    if (filters_changed)
+        for (const auto& [id, code] : material_shader_sources_)
+            server_->shader_set_code(material_shaders_.at(id),
+                                     godot::String(filtered_surface_code(code).c_str()));
+    return Result::ok;
+}
 ServerRenderer::ServerRenderer(godot::RID viewport, bool original_coordinates)
     : server_(godot::RenderingServer::get_singleton()), viewport_(viewport),
       original_coordinates_(original_coordinates) {
@@ -94,6 +220,8 @@ ServerRenderer::~ServerRenderer() {
     for (auto [key, rid] : material_shaders_)
         server_->free_rid(rid);
     for (auto [key, rid] : textures_)
+        server_->free_rid(rid);
+    for (auto [key, rid] : world_textures_)
         server_->free_rid(rid);
     if (light_instance_.is_valid())
         server_->free_rid(light_instance_);
@@ -254,6 +382,9 @@ Result ServerRenderer::update_texture(TextureHandle texture, std::uint32_t width
     const auto image =
         godot::Image::create_from_data(width, height, false, godot::Image::FORMAT_RGBA8, pixels);
     server_->texture_2d_update(target->second, image, 0);
+    texture_sources_[texture.value] = image;
+    if (world_textures_.contains(texture.value))
+        refresh_world_texture(texture.value);
     return Result::ok;
 }
 Result ServerRenderer::set_instance_vertex_color(InstanceHandle instance, std::uint32_t color) {
@@ -515,7 +646,8 @@ RaceDebugCamera ServerRenderer::race_debug_camera(double alpha) const {
             first_person_ ? .1f : scene_settings_.near_distance};
 }
 std::size_t ServerRenderer::live_rids() const {
-    return meshes_.size() + instances_.size() + textures_.size() + materials_.size() +
+    return meshes_.size() + instances_.size() + textures_.size() + world_textures_.size() +
+           materials_.size() +
            material_shaders_.size() + 4 + (environment_.is_valid() ? 1 : 0) +
            (light_.is_valid() ? 1 : 0) + (light_instance_.is_valid() ? 1 : 0) +
            (sky_.is_valid() ? 1 : 0) + (sky_material_.is_valid() ? 1 : 0) +
@@ -536,6 +668,7 @@ TextureHandle ServerRenderer::upload_texture(std::uint32_t width, std::uint32_t 
     const auto rid = server_->texture_2d_create(image);
     const auto id = next_handle_++;
     textures_.emplace(id, rid);
+    texture_sources_.emplace(id, image);
     return {id};
 }
 MaterialHandle ServerRenderer::create_material(TextureHandle texture, std::array<float, 4> color,
@@ -575,12 +708,14 @@ MaterialHandle ServerRenderer::create_material(TextureHandle texture,
                (settings.alpha_mode == AlphaMode::cutout && !settings.opaque_alpha_only),
            "RW_ALPHA");
     code = shaders::shader_variant(shaders::original_surface, code);
-    server_->shader_set_code(shader, godot::String(code.c_str()));
+    const auto source_code = code;
+    server_->shader_set_code(shader, godot::String(filtered_surface_code(code).c_str()));
     server_->material_set_shader(rid, shader);
-    server_->material_set_param(rid, "diffuse_map", found->second);
+    const auto world = world_texture(texture);
+    server_->material_set_param(rid, "diffuse_map", world);
     if (settings.chrome_map.value) {
         server_->material_set_param(rid, "chrome_map", chrome->second);
-        server_->material_set_param(rid, "chrome_base_map", found->second);
+        server_->material_set_param(rid, "chrome_base_map", world);
         server_->material_set_param(rid, "chrome_material_color",
             godot::Color(settings.color[0], settings.color[1], settings.color[2], settings.color[3]));
         const auto direction = original_coordinates_
@@ -609,8 +744,9 @@ MaterialHandle ServerRenderer::create_material(TextureHandle texture,
         chrome_materials_.insert(id);
     if (settings.billboard_y)
         billboard_materials_.insert(id);
-    material_textures_.emplace(id, found->second);
+    material_textures_.emplace(id, world);
     material_shaders_.emplace(id, shader);
+    material_shader_sources_.emplace(id, source_code);
     return {id};
 }
 void ServerRenderer::create_fog_fixture(float aspect) {
@@ -1114,6 +1250,7 @@ void ServerRenderer::destroy_particles(ParticleSystemHandle handle) {
     particle_systems_.erase(found);
 }
 void ServerRenderer::destroy_material(MaterialHandle material) {
+    material_shader_sources_.erase(material.value);
     const auto found = materials_.find(material.value);
     if (found != materials_.end()) {
         server_->free_rid(found->second);
@@ -1129,6 +1266,11 @@ void ServerRenderer::destroy_material(MaterialHandle material) {
     }
 }
 void ServerRenderer::destroy_texture(TextureHandle texture) {
+    texture_sources_.erase(texture.value);
+    if (const auto world = world_textures_.find(texture.value); world != world_textures_.end()) {
+        server_->free_rid(world->second);
+        world_textures_.erase(world);
+    }
     const auto found = textures_.find(texture.value);
     if (found != textures_.end()) {
         server_->free_rid(found->second);

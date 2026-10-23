@@ -49,6 +49,29 @@ Result ResourceStore::open() {
     entries_ = std::move(entries);
     return Result::ok;
 }
+Result ResourceStore::set_configuration_override(std::string_view path, std::string_view section,
+                                                 std::string_view key, std::string value) {
+    const auto canonical_path = canonical(path);
+    if (canonical_path.empty() || canonical_path.front() == '/' ||
+        canonical_path.find(':') != std::string::npos ||
+        canonical_path.find("..") != std::string::npos || section.empty() || key.empty() ||
+        section.find_first_of("/\\\r\n") != std::string_view::npos ||
+        key.find_first_of("/\\\r\n") != std::string_view::npos ||
+        value.find_first_of("\r\n") != std::string::npos)
+        return Result::invalid_argument;
+    configuration_overrides_[canonical_path][canonical(std::string(section) + "/" +
+                                                      std::string(key))] = std::move(value);
+    return Result::ok;
+}
+void ResourceStore::clear_configuration_overrides(std::string_view path) {
+    configuration_overrides_.erase(canonical(path));
+}
+const std::map<std::string, std::string>&
+ResourceStore::configuration_overrides(std::string_view path) const {
+    static const std::map<std::string, std::string> empty;
+    const auto found = configuration_overrides_.find(canonical(path));
+    return found == configuration_overrides_.end() ? empty : found->second;
+}
 // RE-STUB: 93b4e4c301a5694b55e16977c2e52f4971bd9089659e3d58617c8af2368436c8:function:004f0c38
 // Portable archive-first lookup. Legacy handle/cache mechanics are host-independent replacements.
 Result ResourceStore::read(std::string_view path, std::vector<std::byte>& output) {
@@ -113,6 +136,8 @@ Result Configuration::load(ResourceStore& resources, std::string_view path) {
         values_[ResourceStore::canonical(section + "/" + trim(line.substr(0, separator)))] =
             trim(line.substr(separator + 1));
     }
+    for (const auto& [key, value] : resources.configuration_overrides(path))
+        values_[key] = value;
     return Result::ok;
 }
 std::string Configuration::value(std::string_view section, std::string_view key) const {

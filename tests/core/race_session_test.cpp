@@ -314,6 +314,11 @@ void validate_result(const RaceSession& session) {
     std::vector<FrontendRacer> hud_racers;
     const auto hud = session.frontend_frame(hud_racers);
     for (std::size_t i = 0; i < racers.size(); ++i)
+        require(hud.racers[i].lap_times == racers[i].lap_times &&
+                    hud.racers[i].completed_laps == racers[i].progress.completed_laps &&
+                    hud.racers[i].name == racers[i].character,
+                "Live time table does not read the current participant lap arrays");
+    for (std::size_t i = 0; i < racers.size(); ++i)
         require(hud.racers[i].hidden_on_map == racers[i].passive_jammer &&
                     hud.racers[i].eliminated == (racers[i].vehicle->equipment().dying_timer != 0),
                 "HUD map status differs from actual original character/death fields");
@@ -583,6 +588,32 @@ Trace run(ResourceStore& resources, const Scenario& scenario, const RaceOptions&
     require(session.idle_return_requested(),
             "Original finish/death idle menu was not requested within 900 seconds");
     validate_result(session);
+    if (!reference) {
+        const auto player_slot = session.player_index();
+        const auto count = session.racers().size();
+        require(session.select_native_camera(5) == Result::ok, "Track spectator mode unavailable");
+        const auto first_target = session.spectator_target();
+        require(session.select_native_camera(5) == Result::ok &&
+                    session.spectator_target() == (first_target + 1) % count,
+                "Repeated native camera key did not cycle the full participant array");
+        const auto prior_target = session.spectator_target();
+        require(session.select_native_camera(4) == Result::ok &&
+                    session.spectator_target() == prior_target,
+                "Changing camera mode advanced the native target on its first press");
+        require(session.select_native_camera(4) == Result::ok &&
+                    session.spectator_target() == (prior_target + 1) % count &&
+                    session.player_index() == player_slot,
+                "Native spectator cycling changed player ownership or failed wraparound");
+        const auto time = session.time();
+        session.toggle_time_table();
+        require(session.time_table_remaining() == 0, "F11 did not hide the live table");
+        session.toggle_time_table();
+        require(session.time_table_remaining() == 15 && session.time() == time,
+                "F11 did not restore15 seconds without advancing race time");
+        session.acknowledge_idle_menu();
+        require(!session.idle_return_requested() && session.idle_return_remaining() == 0,
+                "Menu acknowledgement retained the synthetic Escape request");
+    }
     if (reference)
         require(compared == reference->size(), "Race finished with a different tick count");
     const auto final_tick = session.ticks();

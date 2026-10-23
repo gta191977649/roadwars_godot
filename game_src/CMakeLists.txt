@@ -1,4 +1,4 @@
-add_library(roadwars_core STATIC core/runtime.cpp unresolved/game_entry.cpp
+add_library(roadwars_core STATIC core/runtime.cpp core/graphics_settings.cpp unresolved/game_entry.cpp
   unresolved/menu_frontend.cpp unresolved/frontend_canvas.cpp unresolved/frontend_custom.cpp
   unresolved/frontend_video.cpp unresolved/frontend_localization.cpp
   unresolved/frontend_scene.cpp unresolved/chrome_mapping.cpp

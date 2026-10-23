@@ -91,6 +91,7 @@ class RacePresentation {
         std::vector<std::size_t> path;
         std::size_t part_index{};
         std::string node_name;
+        Transform pose;
     };
     void upload(ResourceStore&, const MeshObject&, const std::string& base, Vec3 parent,
                 bool vehicle, int wheel_index = -1, int parent_node = -1,
@@ -164,7 +165,12 @@ class RacePresentation {
         std::optional<std::uint64_t> revision;
         TextureHandle paint;
         std::map<std::string, MaterialHandle> materials;
+        std::vector<InstanceHandle> instances;
+        std::vector<MeshHandle> meshes;
+        std::optional<std::size_t> lod;
+        bool camera_hidden{};
     };
+    void release_damage_visual(DamageVisual&);
     std::vector<DamageVisual> damage_visuals_;
     struct DamagePaintTexture {
         TextureHandle handle;

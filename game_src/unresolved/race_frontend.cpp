@@ -2,9 +2,45 @@
 #include "game_src/unresolved/cockpit_frontend.hpp"
 #include <algorithm>
 #include <cmath>
+#include <cctype>
 #include <numbers>
 
 namespace roadwars {
+// RE: 93b4e4c301a5694b55e16977c2e52f4971bd9089659e3d58617c8af2368436c8:function:00461505
+std::string format_race_time(float seconds, std::string_view no_record) {
+    if (!std::isfinite(seconds) || seconds <= 0 || seconds > 100000000)
+        return std::string(no_record);
+    const auto whole = static_cast<int>(seconds);
+    const auto two_digits = [](int value) {
+        return (value < 10 ? "0" : "") + std::to_string(value);
+    };
+    // Native formatting truncates each digit independently, rather than rounding.
+    const double time = seconds;
+    const auto tenths = static_cast<int>(10 * (time - std::floor(time)));
+    const double scaled = seconds * 10.f;
+    const auto hundredths = static_cast<int>(10 * (scaled - std::floor(scaled)));
+    return two_digits(whole / 60) + "'" + two_digits(whole % 60) + "''" +
+           std::to_string(tenths) + std::to_string(hundredths);
+}
+// RE: 93b4e4c301a5694b55e16977c2e52f4971bd9089659e3d58617c8af2368436c8:function:00489fbb
+Result race_lap_summary(const FrontendRacer& racer, int total_laps, RaceLapSummary& output) {
+    if (total_laps < 1 || total_laps > 10 || racer.completed_laps < 0)
+        return Result::invalid_argument;
+    RaceLapSummary result;
+    result.best_lap = racer.lap_times[0];
+    for (int lap = 0; lap < total_laps; ++lap) {
+        const float time = racer.lap_times[lap];
+        if (!std::isfinite(time) || time < 0 || time > 1000000)
+            return Result::invalid_argument;
+        result.total += time;
+        if (lap < racer.completed_laps)
+            result.best_lap = std::min(result.best_lap, time);
+    }
+    result.total_dnf = !racer.finished && racer.eliminated;
+    result.best_dnf = result.total_dnf && racer.completed_laps == 0;
+    output = result;
+    return Result::ok;
+}
 // RE: 93b4e4c301a5694b55e16977c2e52f4971bd9089659e3d58617c8af2368436c8:function:004e14dc
 // RE: 93b4e4c301a5694b55e16977c2e52f4971bd9089659e3d58617c8af2368436c8:function:004e183d
 // RE: 93b4e4c301a5694b55e16977c2e52f4971bd9089659e3d58617c8af2368436c8:function:004e1890
@@ -320,6 +356,34 @@ Result RaceFrontend::update(const FrontendFrame& frame) {
     if (!visible_)
         return submit();
     const bool terminal = player.eliminated || player.finished;
+    if (terminal && frame.time_table_visible && !frame.cockpit && frame.race_info) {
+        const int header_y = 41 + font_.height();
+        text(80, header_y, "NAME");
+        text(320, header_y, "BEST LAP");
+        text(500, header_y, "TOTAL");
+        if (!frame.ranking.empty() && frame.ranking.size() != frame.racers.size())
+            return Result::invalid_argument;
+        for (std::size_t row = 0; row < frame.racers.size(); ++row) {
+            const auto index = frame.ranking.empty() ? row : frame.ranking[row];
+            if (index >= frame.racers.size())
+                return Result::invalid_argument;
+            const auto& racer = frame.racers[index];
+            RaceLapSummary times;
+            if (race_lap_summary(racer, frame.race_info->total_laps, times) != Result::ok)
+                return Result::invalid_argument;
+            const int y = 31 + static_cast<int>(row + 2) * (font_.height() + 10);
+            if (index == frame.player_index)
+                sprite(fade_pixel_, {7, y - 3, 623, font_.height() + 6}, .6f, 0);
+            text(10, y, std::to_string(row + 1));
+            std::string name = racer.name;
+            std::transform(name.begin(), name.end(), name.begin(), [](unsigned char c) {
+                return static_cast<char>(std::toupper(c));
+            });
+            text(80, y, name);
+            text(320, y, times.best_dnf ? "DNF" : format_race_time(times.best_lap));
+            text(500, y, times.total_dnf ? "DNF" : format_race_time(times.total));
+        }
+    }
     if (!terminal && frame.start_countdown && *frame.start_countdown > 0) {
         const float remaining = *frame.start_countdown;
         const int digit = static_cast<int>(remaining);

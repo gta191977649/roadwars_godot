@@ -23,14 +23,15 @@ func toggle_chrome(host: Object) -> bool:
     if not require(host.preview_frontend_screen("graphics", 1.0, ""),
             "Cannot open graphics settings for chrome toggle"):
         return false
-    for row in range(9):
-        if not require(host.frontend_test_step(0.0, "") and
-                host.frontend_test_step(0.0, "down"),
-                "Cannot select chrome graphics row at step %d" % row):
-            return false
-    return require(host.frontend_test_step(0.0, "") and
+    return require(host.frontend_test_select_option("page") and
             host.frontend_test_step(0.0, "right") and
-            host.frontend_test_step(0.0, ""), "Chrome toggle input failed")
+            host.frontend_test_step(0.0, "") and
+            host.frontend_test_select_option("chrome_mapping") and
+            host.frontend_test_step(0.0, "right") and
+            host.frontend_test_step(0.0, "") and
+            host.frontend_test_select_option("apply") and
+            host.frontend_test_step(0.0, "accept") and
+            host.frontend_test_step(0.0, ""), "Chrome toggle/apply input failed")
 
 func capture(name: String) -> bool:
     await process_frame

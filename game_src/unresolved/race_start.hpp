@@ -12,6 +12,9 @@ class RaceStart {
     Result update(float remaining, float dt, const VehicleDynamics&, const TrackCollision&,
                   bool finished = false);
     const CameraFrame& camera() const { return camera_; }
+    Result track_camera(Vec3 target, CameraFrame& output) const {
+        return track_camera_.update(target, output);
+    }
     std::span<const int> sounds() const { return pending_sounds_; }
     void clear_sounds() { pending_sounds_.clear(); }
     const WavePcm& sample(int index) const { return samples_.at(index); }

@@ -1,8 +1,0 @@
-{
-  "reference": "Windows ACM Microsoft ADPCM decoder",
-  "source_sha256": "2fa20d604a292471ba07de6a991a6a9a85ee86850435b1cee7ca63c62c66830c",
-  "pcm_sha256": "bc734e77ccb1e434ed7b53d07fbdf188add77784f55480bdbbbe67d4cac37c60",
-  "decoded_frames": 1857152,
-  "compared_pcm_bytes": 3714304,
-  "exact_match": true
-}
