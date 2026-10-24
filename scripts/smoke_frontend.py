@@ -12,7 +12,7 @@ ROOT = Path(__file__).resolve().parents[1]
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--headless', action='store_true')
-    parser.add_argument('--driver', choices=('vulkan', 'd3d12', 'metal', 'opengl3_angle'))
+    parser.add_argument('--driver', choices=('vulkan', 'metal', 'opengl3'))
     parser.add_argument('--races', action='store_true', help='Check live Single/Quick menu launches, Loading and BGM')
     parser.add_argument('--garage-ui', action='store_true', help='Capture and check actual Garage stores, rows and confirmations at two resolutions')
     parser.add_argument('--attract', action='store_true', help='Check Title idle demo, black transitions and return')
@@ -27,7 +27,7 @@ def main():
                '--script', 'res://' + script + '.gd']
     if args.driver:
         command += ['--rendering-driver', args.driver, '--rendering-method',
-                    'gl_compatibility' if args.driver == 'opengl3_angle' else 'forward_plus']
+                    'gl_compatibility' if args.driver == 'opengl3' else 'forward_plus']
     if args.headless:
         command.append('--headless')
     command += ['--', '--no-debug-overlay', '--capture-dir=' + str(capture_dir)]
@@ -56,9 +56,11 @@ def main():
     (ROOT / 'build' / log_name).write_text(output, encoding='utf-8')
     print(output)
     marker = 'ROADWARS_GARAGE_UI_SMOKE_OK' if args.garage_ui else 'ROADWARS_REPLAY_SMOKE_OK' if args.replay else 'ROADWARS_TITLE_ATTRACT_SMOKE_OK' if args.attract else 'ROADWARS_RACE_MENU_SMOKE_OK' if args.races else 'ROADWARS_MENU_SMOKE_OK'
+    driver_mismatch = (not args.headless and args.driver is not None and
+                       ((args.driver == 'vulkan' and 'Vulkan ' not in output) or
+                        (args.driver == 'opengl3' and ('OpenGL API' not in output or 'ANGLE' in output))))
     if (result.returncode or 'ERROR:' in output or 'leaked' in output.lower() or marker not in output
-            or (args.driver == 'd3d12' and not args.headless and 'D3D12 ' not in output)
-            or (args.driver == 'opengl3_angle' and not args.headless and 'Direct3D11' not in output)):
+            or driver_mismatch):
         return 1
     if not args.headless:
         print('Frontend captures:', capture_dir)

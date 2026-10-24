@@ -39,6 +39,11 @@ struct Host final : GraphicsSettingsHost {
 };
 void transaction_contract() {
     Host host;
+    auto capabilities = host.capabilities();
+    capabilities.backends.push_back(RenderingBackend::direct3d12);
+    auto disabled = host.live;
+    disabled.backend = RenderingBackend::direct3d12;
+    require(validate_graphics_settings(disabled, capabilities, host.live) == Result::unavailable);
     GraphicsSettingsTransaction resized(host);
     resized.observe_window_size(1100, 700);
     require(resized.draft().width == 1100 && resized.confirmed().height == 700);

@@ -26,7 +26,7 @@ def main():
     base = [engine, '--path', str(ROOT / 'platform/godot/project'), '--resolution', '960x540']
     def run(script, driver=None, assets=False):
         command = base + (['--rendering-driver', driver, '--rendering-method',
-                           'gl_compatibility' if driver == 'opengl3_angle' else 'forward_plus'] if driver else []) + ['--script', 'res://' + script, '--', '--no-debug-overlay']
+                           'gl_compatibility' if driver in ('opengl3', 'opengl3_angle') else 'forward_plus'] if driver else []) + ['--script', 'res://' + script, '--', '--no-debug-overlay']
         command += ['--game-dir=' + local['game_dir']] if assets else ['--diagnostic']
         result = subprocess.run(command, cwd=ROOT, capture_output=True, text=True, timeout=120)
         print(result.stdout)
@@ -39,14 +39,16 @@ def main():
         run('graphics_smoke_test.gd', 'vulkan')
         run('graphics_startup_smoke_test.gd')
         if sys.platform == 'win32':
-            run('graphics_quality_smoke_test.gd', 'opengl3_angle')
-            run('graphics_dx11_smoke_test.gd', 'opengl3_angle')
+            run('graphics_quality_smoke_test.gd', 'vulkan')
+            run('graphics_vulkan_smoke_test.gd', 'vulkan')
+            run('graphics_startup_smoke_test.gd')
+            run('graphics_opengl_smoke_test.gd', 'opengl3')
             run('graphics_startup_smoke_test.gd')
         if args.assets:
             # Chrome fixture expects enabled starting preference.
             for name in names:
                 (userdata / name).unlink(missing_ok=True)
-            asset_driver = 'opengl3_angle' if sys.platform == 'win32' else 'vulkan'
+            asset_driver = 'vulkan'
             run('chrome_assets_smoke_test.gd', asset_driver, True)
             run('graphics_menu_smoke_test.gd', asset_driver, True)
     finally:

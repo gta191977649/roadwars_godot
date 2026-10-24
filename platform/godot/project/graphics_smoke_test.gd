@@ -38,7 +38,7 @@ func run_test() -> void:
     check(host.graphics_test_apply({"fps_limit": 90}, true), "Atomic save failed")
     var saved := ConfigFile.new()
     check(saved.load("user://graphics.cfg") == OK and saved.get_value("graphics", "fps_limit") == 90, "Saved settings invalid")
-    var target_backend: int = 4 if 4 in original.backends else 1
+    var target_backend: int = 1
     if target_backend in original.backends:
         check(host.graphics_test_apply({"backend": target_backend}, true), "Backend save/probe failed")
         check(host.get_graphics_state().active_backend == original.active_backend, "Backend changed before restart")

@@ -23,9 +23,9 @@ python scripts/build.py --run
 ```
 
 Normal launch opens the frontend and detects or asks for the original installation.
-Windows defaults to Direct3D 11 through Godot's ANGLE Compatibility driver. The
-official Godot executable is used without engine source changes. Graphics settings
-save both the rendering method and driver when switching APIs; restart to apply.
+Windows/Linux default to Vulkan and also offer native OpenGL. macOS uses Metal.
+Direct3D12 and ANGLE are disabled. The official Godot executable is used without
+engine source changes. Restart after saving a rendering API change.
 To try a race using your configured installation:
 
 ```powershell

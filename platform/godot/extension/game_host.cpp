@@ -339,6 +339,18 @@ void GameHost::_ready() {
     try {
         graphics_ = std::make_unique<GraphicsSettingsAdapter>([this] { return renderer_.get(); }, get_window());
         graphics_->load();
+        const auto backends = graphics_->capabilities().backends;
+        if (godot::DisplayServer::get_singleton()->get_name() != "headless" &&
+            std::find(backends.begin(), backends.end(), graphics_->active_backend()) ==
+                backends.end()) {
+            auto settings = graphics_->current_settings();
+            settings.backend = graphics_->default_settings().backend;
+            if (graphics_->persist(settings) != Result::ok || graphics_->restart() != Result::ok)
+                throw std::runtime_error(
+                    "Active renderer is disabled; cannot restart with the platform default");
+            get_tree()->quit();
+            return;
+        }
     } catch (const std::exception& error) {
         godot::UtilityFunctions::push_error(error.what());
         get_tree()->quit(1);

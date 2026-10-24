@@ -404,7 +404,7 @@ class GraphicsHost final : public GraphicsSettingsHost {
     GraphicsCapabilities capabilities() const override {
         return {
             {{"TEST DISPLAY", 1920, 1080}},
-            {RenderingBackend::automatic, RenderingBackend::vulkan, RenderingBackend::direct3d12},
+            {RenderingBackend::automatic, RenderingBackend::vulkan, RenderingBackend::opengl},
             {AntiAliasing::off, AntiAliasing::fxaa},
             true,
             true,
@@ -421,7 +421,7 @@ class GraphicsHost final : public GraphicsSettingsHost {
         return Result::ok;
     }
     RenderingBackend active_backend() const override { return RenderingBackend::vulkan; }
-    bool restart_required() const override { return saved.backend == RenderingBackend::direct3d12; }
+    bool restart_required() const override { return saved.backend == RenderingBackend::opengl; }
     Result restart() override {
         ++restarts;
         return Result::ok;
@@ -481,7 +481,7 @@ void graphics_menu_tests() {
     press("backend", true);
     press("backend", true);
     press("apply");
-    assert(host.saved.backend == RenderingBackend::direct3d12);
+    assert(host.saved.backend == RenderingBackend::opengl);
     press("restart");
     assert(host.restarts == 1 && menu.quit_requested());
     press("defaults");

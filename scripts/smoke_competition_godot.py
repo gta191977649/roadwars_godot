@@ -10,7 +10,7 @@ from local_config import ROOT, load_config, game_directory, resolve_track, resol
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--headless', action='store_true')
-    parser.add_argument('--driver', choices=('vulkan', 'd3d12', 'metal', 'opengl3_angle'))
+    parser.add_argument('--driver', choices=('vulkan', 'metal', 'opengl3'))
     parser.add_argument('--without-debug', action='store_true', help='Check startup and teardown with no debug UI')
     parser.add_argument('--track', default='Dark Forest')
     parser.add_argument('--car', default='Animal')
@@ -32,7 +32,7 @@ def main():
                '--script', 'res://' + script]
     if args.driver:
         command += ['--rendering-driver', args.driver, '--rendering-method',
-                    'gl_compatibility' if args.driver == 'opengl3_angle' else 'forward_plus']
+                    'gl_compatibility' if args.driver == 'opengl3' else 'forward_plus']
     if args.headless:
         command.append('--headless')
     command += ['--', '--race', '--race-track=' + resolve_track(args.track),
@@ -51,9 +51,11 @@ def main():
     (ROOT / 'build' / log_name).write_text(output, encoding='utf-8')
     print(output)
     marker = 'ROADWARS_COMPETITION_NO_DEBUG_OK' if args.without_debug else 'ROADWARS_COMPETITION_SMOKE_OK'
+    driver_mismatch = (not args.headless and args.driver is not None and
+                       ((args.driver == 'vulkan' and 'Vulkan ' not in output) or
+                        (args.driver == 'opengl3' and ('OpenGL API' not in output or 'ANGLE' in output))))
     if (result.returncode or 'ERROR:' in output or 'leaked' in output.lower() or marker not in output
-            or (args.driver == 'd3d12' and not args.headless and 'D3D12 ' not in output)
-            or (args.driver == 'opengl3_angle' and not args.headless and 'Direct3D11' not in output)):
+            or driver_mismatch):
         return 1
     if not args.headless and not args.without_debug:
         for name in ('countdown', 'race_debug', 'race_debug_wide', 'race_running', 'race_results'):

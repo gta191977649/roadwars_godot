@@ -11,10 +11,11 @@ window/size/viewport_height=540
 
 [rendering]
 renderer/rendering_method="forward_plus"
-renderer/rendering_method.windows="gl_compatibility"
+renderer/rendering_method.windows="forward_plus"
 renderer/rendering_method.mobile="mobile"
 rendering_device/driver.windows="vulkan"
-gl_compatibility/driver.windows="opengl3_angle"
+gl_compatibility/driver.windows="opengl3"
+gl_compatibility/driver.linuxbsd="opengl3"
 rendering_device/driver.macos="metal"
 rendering_device/driver.linuxbsd="vulkan"
 rendering_device/fallback_to_opengl3=false

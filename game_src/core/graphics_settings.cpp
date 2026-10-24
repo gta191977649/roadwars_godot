@@ -15,6 +15,9 @@ bool in_range(float value, float low, float high) {
 
 Result validate_graphics_settings(const GraphicsSettings& s, const GraphicsCapabilities& c,
                                  const GraphicsSettings& current) {
+    // Retain the serialized enum value only to migrate old preferences.
+    if (s.backend == RenderingBackend::direct3d12)
+        return Result::unavailable;
     if (s.monitor < 0 || static_cast<std::size_t>(s.monitor) >= c.monitors.size() ||
         s.width < 1 || s.width > 32768 || s.height < 1 || s.height > 32768 ||
         s.fps_limit < 0 || s.fps_limit > 1000 || !in_range(s.render_scale, .5f, 1.f) ||

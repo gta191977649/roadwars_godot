@@ -5,7 +5,7 @@
 namespace roadwars {
 // Modern host policy; these types do not assert recovered original class ownership.
 enum class WindowMode { windowed, borderless, fullscreen };
-enum class RenderingBackend { automatic, vulkan, direct3d12, metal, direct3d11 };
+enum class RenderingBackend { automatic, vulkan, direct3d12, metal, direct3d11, opengl };
 enum class AntiAliasing { off, fxaa, msaa_2x, msaa_4x, msaa_8x };
 enum class TextureQuality { high, medium, low };
 enum class TextureFiltering {

@@ -70,6 +70,8 @@ std::string backend_name(RenderingBackend backend) {
         return "DIRECTX 11";
     case RenderingBackend::metal:
         return "METAL";
+    case RenderingBackend::opengl:
+        return "OPENGL";
     }
     return "UNAVAILABLE";
 }

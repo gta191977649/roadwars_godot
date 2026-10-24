@@ -27,13 +27,15 @@ const char* driver(RenderingBackend backend) {
         return "opengl3_angle";
     case RenderingBackend::metal:
         return "metal";
+    case RenderingBackend::opengl:
+        return "opengl3";
     default:
-        const auto name = godot::OS::get_singleton()->get_name();
-        return name == "Windows" ? "opengl3_angle" : name == "macOS" ? "metal" : "vulkan";
+        return "vulkan";
     }
 }
 const char* rendering_method(RenderingBackend backend) {
-    return godot::String(driver(backend)) == "opengl3_angle" ? "gl_compatibility" : "forward_plus";
+    const auto target = godot::String(driver(backend));
+    return target == "opengl3" || target == "opengl3_angle" ? "gl_compatibility" : "forward_plus";
 }
 const char* driver_key() {
     const auto name = godot::OS::get_singleton()->get_name();
@@ -65,12 +67,15 @@ void encode(godot::Ref<godot::ConfigFile>& config, const GraphicsSettings& s) {
 #undef SAVE
 #undef SAVE_ENUM
     config->set_value("graphics", "version", 1);
-    if (godot::String(driver(s.backend)) != "opengl3_angle")
-        config->set_value("rendering", driver_key(), driver(s.backend));
+    const auto key =
+        godot::String(rendering_method(s.backend)) == "gl_compatibility"
+            ? godot::String(driver_key()).replace("rendering_device/", "gl_compatibility/")
+            : godot::String(driver_key());
+    config->set_value("rendering", key, driver(s.backend));
     config->set_value("rendering", "renderer/rendering_method", rendering_method(s.backend));
     if (godot::OS::get_singleton()->get_name() == "Windows") {
-        config->set_value("rendering", "renderer/rendering_method.windows", rendering_method(s.backend));
-        config->set_value("rendering", "gl_compatibility/driver.windows", "opengl3_angle");
+        config->set_value("rendering", "renderer/rendering_method.windows",
+                          rendering_method(s.backend));
     }
 }
 GraphicsSettings decode(const godot::Ref<godot::ConfigFile>& config, GraphicsSettings s) {
@@ -139,31 +144,11 @@ GraphicsSettingsAdapter::GraphicsSettingsAdapter(std::function<ServerRenderer*()
                                    AntiAliasing::msaa_4x, AntiAliasing::msaa_8x};
     capabilities_.texture_quality = capabilities_.texture_filtering = true;
     capabilities_.car_detail = true;
-    godot::Array output;
-    auto* os = godot::OS::get_singleton();
-    godot::PackedStringArray args;
-    args.append("--help");
-    if (display->get_name() != "headless" &&
-        os->execute(os->get_executable_path(), args, output, true, false) == 0) {
-        godot::String help;
-        for (int i = 0; i < output.size(); ++i)
-            help += godot::String(output[i]);
-        const auto name = os->get_name();
-        for (auto backend :
-             {RenderingBackend::direct3d11, RenderingBackend::vulkan,
-              RenderingBackend::direct3d12, RenderingBackend::metal}) {
-            if (((backend == RenderingBackend::direct3d12 || backend == RenderingBackend::direct3d11) && name != "Windows") ||
-                (backend == RenderingBackend::metal && name != "macOS"))
-                continue;
-            if (help.contains(godot::String("\"") + driver(backend) + "\""))
-                capabilities_.backends.push_back(backend);
-        }
-    }
-    const auto active = active_backend();
-    if (active != RenderingBackend::automatic &&
-        std::find(capabilities_.backends.begin(), capabilities_.backends.end(), active) ==
-            capabilities_.backends.end())
-        capabilities_.backends.push_back(active);
+    const bool mac = godot::OS::get_singleton()->get_name() == "macOS";
+    capabilities_.backends =
+        mac ? std::vector<RenderingBackend>{RenderingBackend::metal}
+            : std::vector<RenderingBackend>{RenderingBackend::vulkan, RenderingBackend::opengl};
+    settings_.backend = defaults_.backend = mac ? RenderingBackend::metal : RenderingBackend::vulkan;
 }
 void GraphicsSettingsAdapter::initialize_original_defaults(ResourceStore& resources) {
     if (defaults_initialized_)
@@ -196,6 +181,8 @@ RenderingBackend GraphicsSettingsAdapter::active_backend() const {
         return RenderingBackend::direct3d12;
     if (actual == "opengl3_angle")
         return RenderingBackend::direct3d11;
+    if (actual == "opengl3")
+        return RenderingBackend::opengl;
     if (actual == "metal")
         return RenderingBackend::metal;
     return RenderingBackend::automatic;
@@ -240,6 +227,9 @@ void GraphicsSettingsAdapter::load() {
     const auto candidate = decode(config, defaults_);
     // A removed monitor should not prevent loading all other saved preferences.
     auto normalized = candidate;
+    if (std::find(capabilities_.backends.begin(), capabilities_.backends.end(), normalized.backend) ==
+        capabilities_.backends.end())
+        normalized.backend = defaults_.backend;
     if (normalized.monitor < 0 ||
         normalized.monitor >= static_cast<int>(capabilities_.monitors.size()))
         normalized.monitor = 0;
@@ -252,6 +242,8 @@ void GraphicsSettingsAdapter::load() {
     else {
         saved_backend_ = normalized.backend;
         has_saved_backend_ = true;
+        if (candidate.backend != normalized.backend && persist(normalized) != Result::ok)
+            error_ = "Cannot migrate disabled graphics backend settings";
     }
 }
 Result GraphicsSettingsAdapter::apply_live(const GraphicsSettings& settings) {
