@@ -38,6 +38,9 @@ func run_test() -> void:
         fail("Actual vehicle wall contacts produced no crash voice")
         return
     # Isolate decoded original PCM from the engine to verify each native SFX voice.
+    # drive_test_step advances simulation only; present the current camera/listener
+    # before measuring distance-dependent native output at the vehicle's position.
+    host.present_test_frame()
     host.begin_sfx_fixture()
     if host.is_engine_audio_playing():
         fail("SFX PCM fixture retained the engine voice")
@@ -45,7 +48,8 @@ func run_test() -> void:
     host.sfx_fixture_tire(true)
     var tire_peak := -200.0
     for frame in range(40):
-        await process_frame
+        # Godot 3D voice panning/start work runs on native physics frames.
+        await physics_frame
         tire_peak = maxf(tire_peak, AudioServer.get_bus_peak_volume_left_db(0, 0))
     if not host.get_tire_audio_playing() or host.get_tire_audio_playback_position() <= 0 or tire_peak <= -70:
         fail("Original skid PCM loop did not reach the native mixer")
@@ -63,7 +67,7 @@ func run_test() -> void:
         return
     var collision_peak := -200.0
     for frame in range(30):
-        await process_frame
+        await physics_frame
         collision_peak = maxf(collision_peak, AudioServer.get_bus_peak_volume_left_db(0, 0))
     if collision_peak <= -70:
         fail("Original crash/landing PCM did not reach the native mixer")
@@ -86,6 +90,6 @@ func run_test() -> void:
         return
     root.remove_child(host)
     host.free()
-    await process_frame
+    await create_timer(0.2).timeout
     print("ROADWARS_SFX_SMOKE_OK: actual_tire_starts=", actual_tire_starts, "; actual_crashes=", actual_crashes, "; tire_peak=", tire_peak, "; collision_peak=", collision_peak, "; loop stop; overlapping one-shots; completion; reset; teardown")
     quit(0)

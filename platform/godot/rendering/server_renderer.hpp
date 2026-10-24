@@ -74,6 +74,7 @@ class ServerRenderer final : public Renderer {
     void destroy_particles(ParticleSystemHandle) override;
 
     godot::Dictionary presentation_snapshot() const;
+    const godot::Transform3D& presented_camera_transform() const { return camera_pose_.presented; }
     static bool test_interpolation_history();
     static bool test_graphics_quality();
     void begin_simulation_tick();
@@ -115,6 +116,12 @@ class ServerRenderer final : public Renderer {
     SceneSettings scene_settings_{};
     std::uint64_t next_handle_{1};
     std::unordered_map<std::uint64_t, godot::RID> meshes_, instances_;
+    std::unordered_map<std::uint64_t, std::uint64_t> mesh_materials_, instance_meshes_;
+    struct ColorMaterial {
+        godot::RID material;
+        std::uint64_t source{};
+    };
+    std::unordered_map<std::uint64_t, ColorMaterial> instance_color_materials_;
     std::unordered_map<std::uint64_t, godot::RID> textures_, materials_, material_shaders_;
     std::unordered_map<std::uint64_t, godot::RID> material_textures_;
     std::unordered_set<std::uint64_t> billboard_materials_, static_instances_;

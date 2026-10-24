@@ -37,7 +37,7 @@ class Files final : public ResourceReader {
     std::filesystem::path root_;
 };
 using Words = std::vector<std::uint32_t>;
-Words state_words(const RaceSession& session) {
+Words state_words(const RaceSession& session, bool include_random = true) {
     Words result;
     auto integer = [&](auto value) { result.push_back(static_cast<std::uint32_t>(value)); };
     auto number = [&](float value) {
@@ -59,9 +59,17 @@ Words state_words(const RaceSession& session) {
     integer(session.idle_return_requested());
     number(session.idle_return_remaining());
     integer(session.ticks());
-    integer(session.random_state());
+    integer(include_random ? session.random_state() : 0);
     wide(session.time());
     number(session.countdown());
+    number(session.time_table_remaining());
+    integer(session.native_camera_mode());
+    integer(session.look_back());
+    integer(session.spectator_target());
+    const auto spectator = session.spectator_camera();
+    vector(spectator.transform.origin);
+    for (const auto axis : spectator.transform.basis)
+        vector(axis);
     const auto& start = session.start_sequence();
     vector(start.camera().transform.origin);
     for (const auto axis : start.camera().transform.basis)
@@ -313,6 +321,10 @@ void validate_result(const RaceSession& session) {
         require(player.lap_times[index] > 0, "Finished lap has no measured time");
     std::vector<FrontendRacer> hud_racers;
     const auto hud = session.frontend_frame(hud_racers);
+    require(hud.time_records.has_value(), "Terminal time table lacks the record snapshot");
+    if (player.progress.finished)
+        require(hud.time_records->best_lap.seconds > 0 && hud.time_records->best_total.seconds > 0,
+                "Completed race did not produce actual lap/total record candidates");
     for (std::size_t i = 0; i < racers.size(); ++i)
         require(hud.racers[i].lap_times == racers[i].lap_times &&
                     hud.racers[i].completed_laps == racers[i].progress.completed_laps &&
@@ -349,6 +361,176 @@ struct Scenario {
     }
 };
 using Trace = std::vector<Words>;
+Words replay_runtime_words(const RaceSession& session) {
+    Words result;
+    const auto number = [&](float n) { result.push_back(std::bit_cast<std::uint32_t>(n)); };
+    const auto vector = [&](Vec3 p) {
+        number(p.x);
+        number(p.y);
+        number(p.z);
+    };
+    for (const auto& racer : session.racers()) {
+        const auto& car = *racer.vehicle;
+        vector(car.state().position);
+        vector(car.state().velocity);
+        number(car.state().heading_degrees);
+        number(car.state().pitch_degrees);
+        number(car.state().roll_degrees);
+        number(car.equipment().internal_hp);
+        for (auto hp : car.equipment().armor_hp)
+            number(hp);
+        result.push_back(car.equipment().nitrous_ammo);
+        number(car.equipment().nitrous_timer);
+        for (std::size_t i = 0; i < 3; ++i) {
+            const auto slot = car.combat()->slot(static_cast<WeaponSlot>(i));
+            result.push_back(slot.ammunition);
+            result.push_back(slot.active);
+            result.push_back(slot.pending);
+            number(slot.deployment_roll);
+            number(slot.elapsed.value_or(-1));
+            for (const auto& projectile :
+                 car.combat()->standard_projectiles(static_cast<WeaponSlot>(i))) {
+                result.push_back(projectile.active);
+                vector(projectile.position);
+                vector(projectile.velocity);
+            }
+        }
+        for (const auto& visual : car.combat()->visuals()) {
+            result.push_back(static_cast<std::uint32_t>(visual.kind));
+            result.push_back(visual.visible);
+            vector(visual.pose.origin);
+            for (auto axis : visual.pose.basis)
+                vector(axis);
+        }
+        std::uint32_t paint = 2166136261u;
+        for (auto pixel : car.damage_visuals()->paint().rgba)
+            paint = (paint ^ std::to_integer<unsigned>(pixel)) * 16777619u;
+        result.push_back(paint);
+    }
+    for (auto key : session.callback_order())
+        if (key.domain != RaceCallbackKey::Domain::replay) {
+            result.push_back(static_cast<std::uint32_t>(key.domain));
+            result.push_back(key.owner);
+            result.push_back(key.token);
+        }
+    for (const auto& particles : session.vehicle_particles()) {
+        result.push_back(particles.sparks.active_count());
+        result.push_back(particles.damage.draw_order().size());
+        for (const auto& tire : particles.tires)
+            result.push_back(tire.active_count());
+    }
+    for (const auto& trail : session.vehicle_trails())
+        result.push_back(trail.pool.active_count());
+    for (const auto& trail : session.nitrous_trails())
+        result.push_back(trail.active_count());
+    return result;
+}
+void replay_acceptance(ResourceStore& resources, const Scenario& scenario,
+                       const RaceOptions& options) {
+    require(resources.set_configuration_override("Ini/RoadWars.ini", "ROADWARS", "REPLAYSECS",
+                                                 "30") == Result::ok,
+            "Cannot enable actual native replay recorder");
+    std::string error;
+    VehicleDynamics player;
+    require(player.initialize(scenario.parameters, scenario.collision, error) == Result::ok, error);
+    RaceSession session;
+    auto replay_options = options;
+    replay_options.diagnostic_weapon_lock_seconds = 0;
+    replay_options.player_loadout = RaceLoadout{};
+    replay_options.player_loadout->weapons[0] = "Machine Gun";
+    require(session.load(resources, scenario.collision, replay_options, player, error) ==
+                Result::ok,
+            error);
+    require(!session.replay_available(), "One pose was exposed as a complete replay");
+    session.set_player_autopilot(true);
+    InputState input;
+    for (int tick = 0; tick < 1500; ++tick) {
+        input.weapon_requested[0] = tick > 1200 && tick % 30 == 0;
+        input.nitrous_requested = tick == 1300;
+        require(session.advance(1.f / 60, input, error) == Result::ok, error);
+    }
+    require(session.replay_available(), "Actual replay recorder never became ready");
+    session.set_player_autopilot(false);
+    bool projectile = false;
+    for (int tick = 0; tick < 180 && !projectile; ++tick) {
+        InputState fire;
+        fire.throttle = 1;
+        fire.weapon_requested[0] = tick % 20 == 0;
+        require(session.advance(1.f / 60, fire, error) == Result::ok, error);
+        for (const auto& shot : player.combat()->standard_projectiles(WeaponSlot::front))
+            projectile |= shot.active;
+    }
+    if (!projectile) {
+        const auto slot = player.combat()->slot(WeaponSlot::front);
+        std::cerr << "REPLAY_ENTRY_WEAPON ammo=" << slot.ammunition << " active=" << slot.active
+                  << " pending=" << slot.pending << " ready=" << slot.ready
+                  << " phase=" << static_cast<int>(session.phase())
+                  << " hp=" << player.equipment().internal_hp << " time=" << session.time() << "\n";
+    }
+    require(projectile, "Controlled original weapon did not create an in-flight entry projectile");
+    const auto ticks = session.ticks();
+    require(session.begin_replay(error) == Result::ok, error);
+    require(session.replaying() && !session.replay_available(),
+            "Replay did not own real temporary world");
+    require(session.begin_replay(error) == Result::unavailable && session.replaying(),
+            "Rejected duplicate Replay entry must preserve active playback");
+    std::vector<FrontendRacer> storage;
+    require(session.frontend_frame(storage).replay, "Native replay UI frame was not selected");
+    for (int tick = 0; tick < 1450; ++tick)
+        require(session.advance(1.f / 60, {}, error) == Result::ok, error);
+    const auto last_clock_owner = session.replay_clock_owner();
+    const bool actual_cursor =
+        last_clock_owner &&
+        std::abs(session.time() - session.replay_owner_time(*last_clock_owner)) < .001;
+    if (session.ticks() != ticks || !actual_cursor) {
+        std::cerr << "REPLAY_CLOCK ticks=" << session.ticks() << " saved=" << ticks
+                  << " global=" << session.time();
+        for (std::size_t i = 0; i < session.racers().size(); ++i)
+            std::cerr << " owner" << i << "=" << session.replay_owner_time(i);
+        std::cerr << "\n";
+    }
+    require(session.ticks() == ticks && actual_cursor,
+            "Replay clock did not follow an actual recorder cursor");
+    session.select_replay_action(2);
+    require(session.execute_replay_action(error) == Result::ok, error);
+    const auto cursor = session.replay_time();
+    require(session.advance(1, {}, error) == Result::ok && session.replay_time() == cursor,
+            "Paused replay advanced");
+    for (int action : {0, 3, 4, 1, 6, 6, 6, 6, 6}) {
+        session.select_replay_action(action);
+        require(session.execute_replay_action(error) == Result::ok, error);
+    }
+    require(session.native_camera_mode() == 5, "Native five camera cycle did not wrap");
+    session.select_replay_action(4);
+    require(session.execute_replay_action(error) == Result::ok, error);
+    const auto final_time = session.time();
+    const auto native_runtime = replay_runtime_words(session);
+    const auto replay_random = session.random_state();
+    require(session.end_replay(error) == Result::ok, error);
+    require(session.random_state() == replay_random,
+            "Native replay RNG side effect was incorrectly undone");
+    require(session.ticks() == ticks && session.time() == final_time &&
+                replay_runtime_words(session) == native_runtime,
+            "Native Replay exit discarded sampled vehicle/combat/effect/callback state");
+    require(!session.replay_available(), "Replay exit did not restart original recorder");
+    for (int tick = 0; tick < 120; ++tick) {
+        require(session.advance(1.f / 60, {}, error) == Result::ok, error);
+        state_words(session);
+    }
+    require(session.ticks() == ticks + 120, "Restored race did not resume its actual controller");
+    const auto native_mode = session.native_camera_mode();
+    const auto target = session.spectator_target();
+    InputState rear_view;
+    rear_view.look_back = true;
+    require(session.advance(1.f / 60, rear_view, error) == Result::ok && session.look_back() &&
+                session.native_camera_mode() == native_mode && session.spectator_target() == target,
+            "Original held rear view changed selected camera ownership");
+    require(session.advance(1.f / 60, {}, error) == Result::ok && !session.look_back(),
+            "Original rear camera view did not release");
+    resources.set_configuration_override("Ini/RoadWars.ini", "ROADWARS", "REPLAYSECS", "0");
+    std::cout << "RACE_REPLAY_OK actual event owners, seek, pause, cameras, native exit side "
+                 "effects,120 resumed ticks\n";
+}
 Trace run(ResourceStore& resources, const Scenario& scenario, const RaceOptions& options,
           std::span<const double> cadence, const Trace* reference, bool read_debug) {
     std::string error;
@@ -719,17 +901,21 @@ int main(int argc, char** argv) {
             options.car = argv[3];
         if (argc > 4)
             options.ai_count = std::stoi(argv[4]);
-        bool independence = false;
+        bool independence = false, replay_probe = false;
         for (int index = 5; index < argc; ++index) {
             const std::string_view argument(argv[index]);
             if (argument == "--frame-independent")
                 independence = true;
+            else if (argument == "--replay")
+                replay_probe = true;
             else if (argument.starts_with("--laps="))
                 options.laps = std::stoi(std::string(argument.substr(7)));
             else
                 throw std::runtime_error("Unknown race probe argument: " + std::string(argument));
         }
         Scenario scenario(resources, options);
+        if (replay_probe)
+            replay_acceptance(resources, scenario, options);
         const std::array<double, 1> normal{1.0 / 60};
         const auto reference = run(resources, scenario, options, normal, nullptr, false);
         if (independence) {

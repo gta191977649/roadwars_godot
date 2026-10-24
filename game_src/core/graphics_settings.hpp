@@ -22,6 +22,7 @@ class GraphicsSettingsTransaction {
     Result update(double monotonic_seconds);
     double seconds_remaining(double monotonic_seconds) const;
     void discard_draft() { draft_ = confirmed_; }
+    void observe_window_size(int width, int height);
     void restore_defaults() { draft_ = host_.default_settings(); }
 
   private:

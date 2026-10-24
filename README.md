@@ -23,6 +23,9 @@ python scripts/build.py --run
 ```
 
 Normal launch opens the frontend and detects or asks for the original installation.
+Windows defaults to Direct3D 11 through Godot's ANGLE Compatibility driver. The
+official Godot executable is used without engine source changes. Graphics settings
+save both the rendering method and driver when switching APIs; restart to apply.
 To try a race using your configured installation:
 
 ```powershell

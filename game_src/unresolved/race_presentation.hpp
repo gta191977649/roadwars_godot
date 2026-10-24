@@ -32,6 +32,10 @@ class RacePresentation {
     void set_camera_vehicle_hidden(int target, std::size_t player_index);
     void snap_racer(std::size_t index, std::size_t player_index);
     void update_wheels(const VehicleDynamics&, float delta, float brake, bool reset);
+    void begin_replay_presentation();
+    void end_replay_presentation(std::span<const std::array<float, 4>> spins = {});
+    void update_replay_wheels(const VehicleDynamics&, const std::array<float, 4>&);
+    void update_replay_opponent(std::size_t, const VehicleDynamics&, const std::array<float, 4>&);
     void update_lights(const VehicleState&);
     void update_track_animation(float delta);
     Result update_turrets(std::span<const RaceTurretPose>);
@@ -39,6 +43,10 @@ class RacePresentation {
                              std::size_t& id, std::string& error);
     Result update_combat_visual(std::size_t id, const Transform&, bool visible);
     Result update_combat(ResourceStore&, const RaceSession&, std::string& error);
+    Result update_racers(ResourceStore&, const RaceSession&, float delta, bool reset,
+                         std::string& error);
+    float body_alignment_error() const;
+    std::size_t body_visual_count() const { return damage_visuals_.size(); }
     Result prepare_combat(ResourceStore&, const RaceSession&, std::string& error);
     const std::string& combat_render_status() const { return combat_render_status_; }
     void apply_camera(const CameraFrame& frame);
@@ -54,6 +62,8 @@ class RacePresentation {
     Result update_frontend(const FrontendFrame& frame) { return frontend_.update(frame); }
     void start_fade_in() { frontend_.start_fade_in(); }
     void advance_fade(float delta) { frontend_.advance_fade(delta); }
+    void set_attract_presentation(bool active) { frontend_.set_visible(!active); }
+    void set_transition_opacity(float opacity) { frontend_.set_transition_opacity(opacity); }
     Result add_opponent(ResourceStore&, std::string_view vehicle, std::string& error,
                         const TireSelection& tires = {}, int paint_job = 0);
     Result replace_player_visual(ResourceStore&, std::string_view vehicle, const RaceLoadout&,
@@ -92,6 +102,7 @@ class RacePresentation {
         std::size_t part_index{};
         std::string node_name;
         Transform pose;
+        int tire_lod{-1};
     };
     void upload(ResourceStore&, const MeshObject&, const std::string& base, Vec3 parent,
                 bool vehicle, int wheel_index = -1, int parent_node = -1,
@@ -134,6 +145,7 @@ class RacePresentation {
         std::shared_ptr<const MeshObject> hierarchy;
         std::optional<Vec3> vehicle_angles;
         Vec3 body_angles{};
+        std::array<bool, 5> tire_lods{};
     };
     void swap_visual(VehicleVisual&);
     Result load_vehicle_visual(ResourceStore&, std::string_view vehicle, std::string& error,
@@ -141,7 +153,9 @@ class RacePresentation {
     std::shared_ptr<const MeshObject> vehicle_hierarchy_;
     std::optional<Vec3> vehicle_angles_;
     Vec3 body_angles_{};
+    std::array<bool, 5> tire_lods_{};
     std::vector<VehicleVisual> opponents_;
+    std::vector<std::array<float, 4>> saved_replay_spins_;
     std::vector<VehicleVisual> combat_visuals_;
     std::map<std::array<std::size_t, 4>, std::size_t> combat_visual_ids_;
     struct CombatParticleVisual {
@@ -162,11 +176,14 @@ class RacePresentation {
     std::vector<CombatMeshVisual> electron_visuals_;
     std::vector<CombatMeshVisual> trap_visuals_;
     struct DamageVisual {
+        Transform submitted_pose;
+        std::size_t source_instance{};
         std::optional<std::uint64_t> revision;
         TextureHandle paint;
         std::map<std::string, MaterialHandle> materials;
         std::vector<InstanceHandle> instances;
         std::vector<MeshHandle> meshes;
+        std::vector<std::size_t> levels;
         std::optional<std::size_t> lod;
         bool camera_hidden{};
     };

@@ -108,6 +108,28 @@ int main() {
     require(near(frame.transform.origin.z, -6.5f) && near(frame.transform.origin.y, 1.884f));
     require(frame.vertical_fov_degrees == 50 && frame.transform.basis[2].z == -1);
     {
+        // Static reference0040a378:1 degree bias after0.1sec, then4.5dt yaw smoothing.
+        OriginalChaseCamera steering_camera;
+        require(steering_camera.load(resources, "Animal", error) == Result::ok);
+        VehicleState steering_vehicle;
+        steering_vehicle.cached_speed = 2;
+        steering_vehicle.velocity = {0, 0, 2};
+        steering_vehicle.steering_degrees = 10;
+        OriginalCameraView view;
+        view.steering_offset_chase = true;
+        CameraFrame steering_frame;
+        require(steering_camera.update(steering_vehicle, params, nullptr, .1f,
+                                        steering_frame, view) == Result::ok);
+        require(near(steering_frame.heading_degrees, 1));
+        require(steering_camera.update(steering_vehicle, params, nullptr, .1f,
+                                        steering_frame, view) == Result::ok);
+        require(near(steering_frame.heading_degrees, 1.45f));
+        steering_vehicle.steering_degrees = 0;
+        require(steering_camera.update(steering_vehicle, params, nullptr, .1f,
+                                        steering_frame, view) == Result::ok);
+        require(near(steering_frame.heading_degrees, 1.6975f));
+    }
+    {
         const auto& settings = camera.settings();
         require(near(settings.in_car_local_position.x, -.33f) &&
                 near(settings.in_car_local_position.y, .6f) &&

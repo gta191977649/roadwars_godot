@@ -3,7 +3,7 @@
 #include "platform/godot/extension/sfx_audio_adapter.hpp"
 #include <map>
 namespace roadwars {
-// Native PCM output. QMDX attenuation/Doppler remain explicitly unavailable.
+// Native PCM output; spatial commands use Godot distance attenuation and stereo panning.
 class CombatAudioAdapter {
   public:
     CombatAudioAdapter(godot::Node& owner, const CombatAudioResources& resources)

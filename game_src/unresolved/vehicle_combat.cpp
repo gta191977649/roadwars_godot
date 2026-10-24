@@ -434,7 +434,15 @@ bool VehicleCombat::request(WeaponSlot slot, float speed) {
         return false;
     items_[i].missile_offsets_prepared = false;
     register_callback(CallbackKind::mount, i);
+    if (replay_observer_)
+        replay_observer_(slot, items_[i].mount.ammunition() + 1);
     return true;
+}
+Result VehicleCombat::replay_ammunition(WeaponSlot slot, int count) {
+    const auto index = static_cast<std::size_t>(slot);
+    if (index >= items_.size() || !assets_[index].descriptor)
+        return Result::invalid_argument;
+    return items_[index].mount.replay_ammunition(count);
 }
 bool VehicleCombat::request(WeaponSlot slot, float speed, float heading, float pitch,
                             float body_pitch) {
@@ -973,6 +981,7 @@ Result VehicleCombat::advance(float dt, const VehicleCombatFrame& frame,
                                                item.salvo.applies_impact_impulse(),
                                                true,
                                                {}};
+                    damage.projectile_visual = true;
                     if (damage.has_impulse)
                         weapon_projectile_impact_impulse(projectile, asset.parameters, hit.point,
                                                          damage.impulse);

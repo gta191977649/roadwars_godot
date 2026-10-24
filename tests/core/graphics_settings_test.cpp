@@ -39,6 +39,14 @@ struct Host final : GraphicsSettingsHost {
 };
 void transaction_contract() {
     Host host;
+    GraphicsSettingsTransaction resized(host);
+    resized.observe_window_size(1100, 700);
+    require(resized.draft().width == 1100 && resized.confirmed().height == 700);
+    resized.draft().width = 1280;
+    resized.observe_window_size(1200, 800);
+    require(resized.draft().width == 1280 && resized.confirmed().width == 1200);
+    resized.discard_draft();
+    require(resized.draft().width == 1200);
     GraphicsSettingsTransaction tx(host);
     tx.draft().width = 1280;
     tx.draft().chrome_mapping = false;

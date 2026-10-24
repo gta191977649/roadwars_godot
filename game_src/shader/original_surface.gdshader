@@ -29,7 +29,7 @@ render_mode cull_back
 
 uniform sampler2D diffuse_map : source_color, filter_linear, repeat_enable;
 uniform vec4 tint : source_color = vec4(1.0);
-instance uniform vec4 original_vertex_override = vec4(0.0, 0.0, 0.0, -1.0);
+uniform vec4 original_vertex_override = vec4(0.0, 0.0, 0.0, -1.0);
 #ifdef RW_CHROME
 // Raw encoded RGB is intentional: D3D7 ADD operates before gamma conversion.
 uniform sampler2D chrome_map : filter_linear, repeat_enable;

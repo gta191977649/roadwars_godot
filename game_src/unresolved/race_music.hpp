@@ -12,6 +12,7 @@ class RaceMusic {
     Result load_menu(ResourceStore&, std::string& error);
     Result load_character(ResourceStore&, std::string_view character, std::string& error);
     EngineAudioCommand gain(float scale) const;
+    void set_volume(float volume);
     Result start(EngineAudioCommand&);
     EngineAudioCommand stop();
     const WavePcm& sample() const { return sample_; }

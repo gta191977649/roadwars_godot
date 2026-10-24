@@ -23,6 +23,24 @@ bool finite(const VehicleState& state) {
 }
 } // namespace
 int main() {
+    //0042ba96: angular contact motion grows linearly with the complete 3D radius,
+    // including the native XZ intersection's y0 versus an elevated chassis.
+    VehicleState elevated;
+    elevated.position = {10, 15, -20};
+    elevated.velocity = {1, 2, 3};
+    elevated.yaw_rate = 90;
+    const auto contact_a = vehicle_contact_velocity(elevated, {11, 0, -18});
+    const auto contact_b = vehicle_contact_velocity(elevated, {12, -15, -16});
+    const auto magnitude = [](Vec3 v) { return std::sqrt(v.x * v.x + v.y * v.y + v.z * v.z); };
+    const Vec3 delta_a{contact_a.x - 1, contact_a.y - 2, contact_a.z - 3};
+    const Vec3 delta_b{contact_b.x - 1, contact_b.y - 2, contact_b.z - 3};
+    const auto radius = std::sqrt(1.f + 225.f + 4.f);
+    assert(std::abs(magnitude(delta_a) - radius * 90 * .017455555498600006f) < .0001f);
+    assert(std::abs(delta_b.x - 2 * delta_a.x) < .0001f &&
+           std::abs(delta_b.y - 2 * delta_a.y) < .0001f &&
+           std::abs(delta_b.z - 2 * delta_a.z) < .0001f);
+    const auto at_origin = vehicle_contact_velocity(elevated, elevated.position);
+    assert(at_origin.x == 1 && at_origin.y == 2 && at_origin.z == 3);
     const auto p = parameters();
     VehicleState a, b;
     auto corners = vehicle_pair_footprint(p, a);

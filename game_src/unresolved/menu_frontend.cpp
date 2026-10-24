@@ -1,5 +1,6 @@
 #include "game_src/unresolved/menu_frontend.hpp"
 #include "game_src/unresolved/frontend_custom.hpp"
+#include "game_src/unresolved/frontend_dialog.hpp"
 #include "game_src/unresolved/frontend_localization.hpp"
 #include "game_src/unresolved/frontend_scene.hpp"
 #include "game_src/unresolved/frontend_video.hpp"
@@ -65,6 +66,8 @@ std::string backend_name(RenderingBackend backend) {
         return "VULKAN";
     case RenderingBackend::direct3d12:
         return "DIRECTX 12";
+    case RenderingBackend::direct3d11:
+        return "DIRECTX 11";
     case RenderingBackend::metal:
         return "METAL";
     }
@@ -87,7 +90,8 @@ template <class T> void cycle_value(T& value, const std::vector<T>& choices, int
 void MenuFrontend::refresh_graphics_rows() {
     custom_.rows.clear();
     custom_.fields["MODERN_GRAPHICS"] =
-        graphics_host_ ? "CURRENT API: " + backend_name(graphics_host_->active_backend())
+        graphics_host_ ? "CURRENT API: " + backend_name(graphics_host_->active_backend()) +
+                             "  SAVED: " + backend_name(graphics_host_->saved_backend())
                        : "GRAPHICS HOST UNAVAILABLE";
     const auto add = [&](std::string id, std::string label, std::string value,
                          bool enabled = true) {
@@ -107,27 +111,25 @@ void MenuFrontend::refresh_graphics_rows() {
                           " SECONDS";
         add("confirm", "KEEP AND SAVE", "");
         add("revert", "REVERT", "");
-    } else if (graphics_discard_) {
-        custom_.message = "DISCARD UNSAVED CHANGES?";
-        add("discard", "DISCARD AND GO BACK", "");
-        add("cancel_discard", "CONTINUE EDITING", "");
     } else {
-        add("page", "PAGE", graphics_quality_ ? "QUALITY" : "DISPLAY");
+        if (graphics_quality_)
+            add("page", "PAGE", "QUALITY");
         if (!graphics_quality_) {
             const auto valid_monitor =
                 v.monitor >= 0 && static_cast<std::size_t>(v.monitor) < caps.monitors.size();
-            add("monitor", "MONITOR", valid_monitor ? caps.monitors[v.monitor].name : "UNAVAILABLE",
+            add("monitor", "DISPLAY", valid_monitor ? caps.monitors[v.monitor].name : "UNAVAILABLE",
                 !caps.monitors.empty());
+            add("resolution", "RESOLUTION",
+                std::to_string(v.width) + " X " + std::to_string(v.height),
+                v.window_mode == WindowMode::windowed);
             add("window_mode", "WINDOW MODE",
                 v.window_mode == WindowMode::windowed     ? "WINDOWED"
                 : v.window_mode == WindowMode::borderless ? "BORDERLESS FULLSCREEN"
                                                           : "FULLSCREEN");
-            add("resolution", "WINDOW SIZE",
-                std::to_string(v.width) + " X " + std::to_string(v.height),
-                v.window_mode == WindowMode::windowed);
             add("vsync", "VSYNC", v.vsync ? "ON" : "OFF");
             add("fps_limit", "FPS LIMIT", v.fps_limit ? std::to_string(v.fps_limit) : "UNLIMITED");
             add("backend", "RENDERING API", backend_name(v.backend), caps.backends.size() > 1);
+            add("page", "PAGE", "DISPLAY");
         } else {
             constexpr std::array<const char*, 5> aa{"OFF", "FXAA", "MSAA 2X", "MSAA 4X", "MSAA 8X"};
             constexpr std::array<const char*, 5> filter{
@@ -226,6 +228,11 @@ void MenuFrontend::edit_graphics(std::string_view id, int dx) {
 Result MenuFrontend::advance_graphics(double elapsed, const FrontendInput& input,
                                       std::string& error) {
     graphics_time_ += elapsed;
+    if (graphics_ && graphics_host_) {
+        const auto live = graphics_host_->current_settings();
+        if (live.window_mode == WindowMode::windowed)
+            graphics_->observe_window_size(live.width, live.height);
+    }
     const auto edge = [](bool now, bool previous) { return now && !previous; };
     const auto leave = [&]() {
         auto target = history_.empty() ? std::string("main_menu") : history_.back();
@@ -234,10 +241,52 @@ Result MenuFrontend::advance_graphics(double elapsed, const FrontendInput& input
         return enter(target, error);
     };
     Result result = Result::ok;
+    if (graphics_discard_) {
+        if (edge(input.left, previous_.left))
+            graphics_save_yes_ = true;
+        if (edge(input.right, previous_.right))
+            graphics_save_yes_ = false;
+        bool hit = false;
+        if (input.pointer_moved || input.pointer_accept) {
+            FrontendDialogLayout layout;
+            const auto layout_result = frontend_dialog_layout(canvas_, false, layout);
+            if (layout_result != Result::ok)
+                return layout_result;
+            const int button = layout.hit(input.pointer_x, input.pointer_y);
+            if (button >= 0) {
+                graphics_save_yes_ = button == 0;
+                hit = true;
+            }
+        }
+        const bool choose = edge(input.accept, previous_.accept) ||
+                            (hit && edge(input.pointer_accept, previous_.pointer_accept));
+        if (edge(input.back, previous_.back))
+            graphics_discard_ = false;
+        else if (choose) {
+            graphics_discard_ = false;
+            if (!graphics_save_yes_) {
+                graphics_->discard_draft();
+                previous_ = input;
+                return leave();
+            }
+            result = graphics_->apply(graphics_time_);
+            if (result == Result::ok && !graphics_->pending_confirmation()) {
+                previous_ = input;
+                return leave();
+            }
+            graphics_leave_after_save_ = result == Result::ok;
+            custom_.message = result == Result::ok ? "" : "SETTINGS COULD NOT BE SAVED";
+            selected_ = 0;
+        }
+        previous_ = input;
+        refresh_graphics_rows();
+        return draw(error);
+    }
     if (graphics_) {
         const bool pending = graphics_->pending_confirmation();
         result = graphics_->update(graphics_time_);
         if (pending && !graphics_->pending_confirmation()) {
+            graphics_leave_after_save_ = false;
             selected_ = 0;
             custom_.message = "DISPLAY SETTINGS REVERTED";
         }
@@ -249,9 +298,11 @@ Result MenuFrontend::advance_graphics(double elapsed, const FrontendInput& input
     refresh_graphics_rows();
     bool hit = false;
     if (input.pointer_moved || input.pointer_accept) {
+        const int step = canvas_.font_height(FrontendFont::body) + 5;
+        const int top = 240 - static_cast<int>(custom_.rows.size()) * step / 2;
         for (std::size_t i = 0; i < custom_.rows.size(); ++i)
-            if (input.pointer_x >= 20 && input.pointer_x < 630 && input.pointer_y >= 88 + i * 21 &&
-                input.pointer_y < 109 + i * 21) {
+            if (input.pointer_x >= 20 && input.pointer_x < 630 &&
+                input.pointer_y >= top + i * step && input.pointer_y < top + (i + 1) * step) {
                 selected_ = static_cast<int>(i);
                 hit = true;
                 break;
@@ -266,19 +317,21 @@ Result MenuFrontend::advance_graphics(double elapsed, const FrontendInput& input
                         (hit && edge(input.pointer_accept, previous_.pointer_accept));
     if (back || (accept && row.id == "back")) {
         if (graphics_ && graphics_->pending_confirmation()) {
+            graphics_leave_after_save_ = false;
             result = graphics_->revert();
             selected_ = 0;
         } else if (graphics_discard_)
             graphics_discard_ = false;
         else if (graphics_ && graphics_->draft() != graphics_->confirmed()) {
             graphics_discard_ = true;
-            selected_ = 0;
+            graphics_save_yes_ = false;
         } else {
             previous_ = input;
             return leave();
         }
     } else if (row.available && (dx || accept)) {
         if (row.id == "apply" && accept) {
+            graphics_leave_after_save_ = false;
             result = graphics_->apply(graphics_time_);
             selected_ = 0;
             custom_.message = result == Result::ok
@@ -286,10 +339,16 @@ Result MenuFrontend::advance_graphics(double elapsed, const FrontendInput& input
                                   : "SETTINGS COULD NOT BE APPLIED OR SAVED";
         } else if (row.id == "confirm" && accept) {
             result = graphics_->confirm();
+            if (result == Result::ok && graphics_leave_after_save_) {
+                graphics_leave_after_save_ = false;
+                previous_ = input;
+                return leave();
+            }
             selected_ = 0;
             custom_.message =
                 result == Result::ok ? "SETTINGS SAVED" : "SETTINGS COULD NOT BE SAVED";
         } else if (row.id == "revert" && accept) {
+            graphics_leave_after_save_ = false;
             result = graphics_->revert();
             selected_ = 0;
         } else if (row.id == "defaults" && accept) {
@@ -312,8 +371,11 @@ Result MenuFrontend::advance_graphics(double elapsed, const FrontendInput& input
             custom_.message.clear();
         }
     }
-    if (result != Result::ok)
-        custom_.message = "GRAPHICS OPERATION FAILED; PREVIOUS SETTINGS RETAINED";
+    if (result != Result::ok) {
+        custom_.message = graphics_host_->last_error();
+        if (custom_.message.empty())
+            custom_.message = "GRAPHICS OPERATION FAILED";
+    }
     refresh_graphics_rows();
     time_ += elapsed;
     previous_ = input;
@@ -350,6 +412,8 @@ Result MenuFrontend::start(std::string& error, std::string_view initial_screen) 
     float gain{};
     if (config.number("ROADWARS", "SFX", gain) == Result::ok && gain >= 0 && gain <= 1)
         sfx_gain_ = gain;
+    if (config.number("ROADWARS", "MUSIC", gain) == Result::ok && gain >= 0 && gain <= 1)
+        music_gain_ = gain;
     result = canvas_.load(error);
     if (result != Result::ok)
         return result;
@@ -361,6 +425,11 @@ Result MenuFrontend::start(std::string& error, std::string_view initial_screen) 
     previous_ = {};
     preview_ = quit_ = live_results_ = live_pause_ = false;
     garage_prepared_ = false;
+    garage_.reset();
+    garage_pending_selection_.reset();
+    garage_pending_item_.reset();
+    garage_message_.clear();
+    garage_modal_backdrop_.clear();
     for (auto& scene : prepared_garage_)
         scene.reset();
     return enter(initial_screen, error);
@@ -370,6 +439,7 @@ Result MenuFrontend::enter(std::string_view id, std::string& error) {
     if (screen_ == "modify_vehicle" && garage_prepared_)
         prepared_garage_rows_[active_scene_variant_] = custom_.rows;
     if (id == "main_menu") {
+        garage_.reset();
         race_request_.mode = FrontendRaceMode::none;
         race_request_.player_loadout.reset();
         live_loading_ = false;
@@ -398,6 +468,8 @@ Result MenuFrontend::enter(std::string_view id, std::string& error) {
     fade_seconds_ = .3;
     timeout_seconds_ = 0;
     fade_in_ = back_enabled_ = times_out_ = false;
+    loading_black_pending_ = false;
+    loading_fade_origin_ = 0;
     title_.clear();
     video_.reset();
     video_index_ = -1;
@@ -516,7 +588,10 @@ Result MenuFrontend::enter(std::string_view id, std::string& error) {
             return result;
         if (const auto found = option_values_.find(screen_); found != option_values_.end())
             custom_.rows = found->second;
+        if (id == "sound")
+            configure_sound_rows();
         if (id == "graphics") {
+            graphics_leave_after_save_ = false;
             graphics_discard_ = false;
             graphics_quality_ = false;
             graphics_time_ = 0;
@@ -578,6 +653,8 @@ Result MenuFrontend::enter(std::string_view id, std::string& error) {
                             {"TIRES", {world.value("AI", "TIRES")}}};
         }
         if (id == "loading") {
+            fade_in_ = race_request_.mode == FrontendRaceMode::attract;
+            loading_black_pending_ = fade_in_;
             custom_.message =
                 loading_target_ == "garage" ? "STARTING" : "LOADING VEHICLES AND TRACK";
             custom_.loading_progress = 0;
@@ -613,6 +690,22 @@ Result MenuFrontend::enter(std::string_view id, std::string& error) {
             const auto result = scene_->load(id, character_, scene_variant, error);
             if (result != Result::ok)
                 return result;
+        }
+        if (id == "modify_vehicle" && garage_ && !preview_) {
+            garage_pending_item_.reset();
+            garage_pending_selection_.reset();
+            garage_message_.clear();
+            if (refresh_garage(true, error) != Result::ok)
+                return Result::unavailable;
+            if (!variant_.empty()) {
+                scene_->cancel_store_transition();
+                const auto& item =
+                    garage_->items(garage_selection_.category)[garage_selection_.item];
+                if (scene_->select_store_product(item.name,
+                                                 item.products[garage_selection_.product].name,
+                                                 error) != Result::ok)
+                    return Result::unavailable;
+            }
         }
     } else if (scene_ && !modal) {
         scene_->stop();
@@ -680,6 +773,8 @@ Result MenuFrontend::navigate(std::string_view id, std::string& error) {
 // RE: 93b4e4c301a5694b55e16977c2e52f4971bd9089659e3d58617c8af2368436c8:function:004ab60d
 // RE-STUB: 93b4e4c301a5694b55e16977c2e52f4971bd9089659e3d58617c8af2368436c8:function:004aac8f
 Result MenuFrontend::activate(std::string& error) {
+    if (screen_ == "sound")
+        return Result::ok;
     if (screen_ == "race_results" && live_results_)
         return navigate("main_menu", error);
     if (screen_ == "publisher_1")
@@ -719,8 +814,7 @@ Result MenuFrontend::activate(std::string& error) {
             return Result::ok;
         }
         if (live_pause_) {
-            action_ = row.label == "REPLAY" ? "unavailable_business_action:REPLAY"
-                                            : "race_pause:" + row.label;
+            action_ = "race_pause:" + row.label;
             return Result::ok;
         }
         if (row.label == "EXIT TO MAIN MENU")
@@ -895,11 +989,15 @@ Result MenuFrontend::set_loading_progress(float fraction, std::string_view messa
     return draw(error);
 }
 std::string MenuFrontend::music_path() const {
+    if (screen_ == "loading" && race_request_.mode == FrontendRaceMode::attract)
+        return "Sfx/SoundBackgroundMusic.wav";
     if (screen_ == "loading" || screen_ == "modify_vehicle")
         return "Characters/" + character_ + "/ThemeMusic.wav";
     return menu_music_requested() ? "Sfx/SoundBackgroundMusic.wav" : "";
 }
 float MenuFrontend::music_gain_scale() const {
+    if (race_request_.mode == FrontendRaceMode::attract)
+        return 1;
     if (screen_ != "loading" || loading_target_ != "race")
         return 1;
     return static_cast<float>(custom_.loading_progress >= 1
@@ -924,13 +1022,55 @@ Result MenuFrontend::prepare_race(std::string& error) {
     }
     race_request_.laps = static_cast<int>(laps);
     if (race_request_.mode == FrontendRaceMode::single) {
-        RaceLoadout stock;
-        stock.paint_job = 0; // Original body texture, without a repaint operation.
-        stock.armor = {"NONE", "NONE"};
-        race_request_.player_loadout = std::move(stock);
+        if (!garage_ || ResourceStore::canonical(garage_->state().character) !=
+                            ResourceStore::canonical(character_)) {
+            garage_ = std::make_unique<GarageSession>(resources_);
+            if (garage_->start_single(character_, track_, error) != Result::ok)
+                return Result::unavailable;
+        } else if (garage_->restore(garage_->state(), track_, error) != Result::ok)
+            return Result::unavailable;
+        race_request_.player_loadout = garage_->race_loadout();
     } else
         race_request_.player_loadout.reset();
     return Result::ok;
+}
+// RE-STUB: 93b4e4c301a5694b55e16977c2e52f4971bd9089659e3d58617c8af2368436c8:function:00406fc0
+Result MenuFrontend::prepare_attract(std::string& error) {
+    const auto choose = [&](std::string_view path, std::string& output) -> Result {
+        Configuration config;
+        float count{};
+        if (config.load(resources_, path) != Result::ok ||
+            config.number("INFO", "NUMSELECTIONS", count) != Result::ok || !std::isfinite(count) ||
+            count < 1 || count > 64 || std::floor(count) != count)
+            return Result::unavailable;
+        std::vector<std::string> available;
+        for (int i = 0; i < static_cast<int>(count); ++i) {
+            const auto section = "SELECTION" + std::to_string(i);
+            float enabled{};
+            const auto value = config.value(section, "VALUE");
+            if (config.number(section, "ISAVAILABLE", enabled) != Result::ok ||
+                !std::isfinite(enabled) || value.empty() ||
+                value.find_first_of("/\\:\r\n") != std::string::npos)
+                return Result::unavailable;
+            if (enabled != 0)
+                available.push_back(value);
+        }
+        if (available.empty())
+            return Result::unavailable;
+        output = available[original_random(race_request_.seed) % available.size()];
+        return Result::ok;
+    };
+    if (choose("Screens/SelectCharacter/Data.ini", character_) != Result::ok ||
+        choose("Screens/SelectTrack/Data.ini", track_) != Result::ok) {
+        error = "Original attract-mode selection tables unavailable";
+        return Result::unavailable;
+    }
+    race_request_.mode = FrontendRaceMode::attract;
+    if (prepare_race(error) != Result::ok)
+        return Result::unavailable;
+    live_loading_ = true;
+    loading_target_ = "race";
+    return navigate("loading", error);
 }
 Result MenuFrontend::preview(std::string_view id, double seconds, std::string_view variant,
                              std::string& error) {
@@ -958,12 +1098,20 @@ Result MenuFrontend::preview(std::string_view id, double seconds, std::string_vi
     }
     return draw(error);
 }
-Result MenuFrontend::show_pause(std::span<const HudQuad> backdrop, std::string& error) {
+Result MenuFrontend::show_pause(std::span<const HudQuad> backdrop, std::string& error,
+                                bool race_finished, bool replay_available) {
     const std::vector<HudQuad> saved(backdrop.begin(), backdrop.end());
     auto result = start(error, "pause");
     if (result != Result::ok)
         return result;
     live_pause_ = true;
+    pause_race_finished_ = race_finished;
+    variant_ = std::string("Single Race") + (race_finished ? " Over" : "") +
+               (replay_available ? "" : " No Replay");
+    custom_.variant = variant_;
+    result = frontend_custom_rows(resources_, "pause", custom_.rows, error, variant_);
+    if (result != Result::ok)
+        return result;
     fade_in_ = false;
     backdrop_ = saved;
     return draw(error);
@@ -973,6 +1121,8 @@ Result MenuFrontend::advance(double elapsed, const FrontendInput& input, std::st
         return Result::invalid_argument;
     if (screen_ == "graphics")
         return advance_graphics(elapsed, input, error);
+    if (screen_ == "modify_vehicle" && garage_ && !preview_ && exit_time_ < 0)
+        return advance_garage(elapsed, input, error);
     if (screen_ == "loading" && custom_.loading_progress >= 1)
         loading_finish_time_ += elapsed;
     if (screen_ == "loading" && live_loading_ && loading_target_ == "garage") {
@@ -994,6 +1144,24 @@ Result MenuFrontend::advance(double elapsed, const FrontendInput& input, std::st
     }
     if (exit_time_ < 0) {
         bool hit = false;
+        int pointer_direction = 0;
+        if (screen_ == "sound" && custom_.rows.size() == 6 &&
+            (input.pointer_moved || input.pointer_accept)) {
+            const int step = canvas_.font_height(FrontendFont::body) + 5;
+            const int top = 240 - static_cast<int>(custom_.rows.size()) * step / 2;
+            for (int i = 0; i < 6; ++i)
+                if (input.pointer_y >= top + i * step && input.pointer_y < top + (i + 1) * step &&
+                    input.pointer_x >= 20 && input.pointer_x < 640) {
+                    selected_ = i;
+                    if (edge(input.pointer_accept, previous_.pointer_accept)) {
+                        if (input.pointer_x >= 300 && input.pointer_x < 340)
+                            pointer_direction = -1;
+                        else if (input.pointer_x >= 590)
+                            pointer_direction = 1;
+                    }
+                    break;
+                }
+        }
         if ((input.pointer_moved || input.pointer_accept) && !selections_.empty() &&
             (!find_screen(screen_)->custom || screen_ == "start_race_summary")) {
             const int count = static_cast<int>(selections_.size());
@@ -1012,6 +1180,17 @@ Result MenuFrontend::advance(double elapsed, const FrontendInput& input, std::st
                     hit = true;
                     break;
                 }
+            }
+        }
+        if (screen_ == "dialog" && (input.pointer_moved || input.pointer_accept)) {
+            FrontendDialogLayout layout;
+            const auto result = frontend_dialog_layout(canvas_, false, layout);
+            if (result != Result::ok)
+                return result;
+            const int button = layout.hit(input.pointer_x, input.pointer_y);
+            if (button >= 0) {
+                selected_ = button;
+                hit = true;
             }
         }
         if (live_pause_ && (input.pointer_moved || input.pointer_accept)) {
@@ -1034,20 +1213,30 @@ Result MenuFrontend::advance(double elapsed, const FrontendInput& input, std::st
                     break;
                 }
         }
-        const int dx = edge(input.right, previous_.right) - edge(input.left, previous_.left);
+        const int dx = pointer_direction
+                           ? pointer_direction
+                           : edge(input.right, previous_.right) - edge(input.left, previous_.left);
         const int dy = edge(input.down, previous_.down) - edge(input.up, previous_.up);
         if (!custom_.rows.empty() && selections_.empty()) {
             selected_ = std::clamp(selected_ + dy, 0, static_cast<int>(custom_.rows.size()) - 1);
             auto& row = custom_.rows[selected_];
             if (dx && row.available && !row.values.empty()) {
-                if (screen_ == "graphics" || screen_ == "sound" || screen_ == "game" ||
-                    screen_ == "keyboard" || screen_ == "joystick") {
+                if (screen_ == "graphics" || screen_ == "game" || screen_ == "keyboard" ||
+                    screen_ == "joystick") {
                     action_ = "unavailable_business_action:" + screen_ + "/" + row.label;
                     show_unimplemented_action();
                     previous_ = input;
                     return draw(error);
                 }
                 row.selected = (row.selected + row.values.size() + dx) % row.values.size();
+                if (screen_ == "sound") {
+                    sounds_.push_back("Sfx/Sound1.wav");
+                    if (selected_ == 0)
+                        audio_restart_requested_ = true;
+                    custom_.message = custom_.rows[0].selected == 0
+                                          ? "CD AUDIO UNAVAILABLE - USING GAME MUSIC"
+                                          : "";
+                }
                 if (screen_ == "modify_vehicle" && !variant_.empty()) {
                     const auto result = update_store_selection(error);
                     if (result != Result::ok)
@@ -1059,11 +1248,15 @@ Result MenuFrontend::advance(double elapsed, const FrontendInput& input, std::st
         } else
             move(dx, dy);
         if (live_pause_ && edge(input.back, previous_.back)) {
-            action_ = "race_pause:CONTINUE";
+            action_ = pause_race_finished_ ? "race_pause:CANCEL" : "race_pause:CONTINUE";
             previous_ = input;
             return draw(error);
         }
-        if (edge(input.back, previous_.back) && back_enabled_) {
+        if (screen_ != "dialog" && edge(input.back, previous_.back) && back_enabled_) {
+            if (screen_ == "sound" && commit_sound_options(error) != Result::ok) {
+                previous_ = input;
+                return draw(error);
+            }
             const bool store = screen_ == "modify_vehicle" && !variant_.empty();
             auto target = store              ? std::string("modify_vehicle")
                           : history_.empty() ? std::string("main_menu")
@@ -1124,7 +1317,7 @@ Result MenuFrontend::advance(double elapsed, const FrontendInput& input, std::st
             if (result != Result::ok)
                 return result;
         } else if (timed && time_ + 1e-10 >= timeout_seconds_) {
-            auto result = activate(error);
+            auto result = screen_ == "title" ? prepare_attract(error) : activate(error);
             if (result != Result::ok)
                 return result;
             if (video_)
@@ -1145,12 +1338,21 @@ Result MenuFrontend::draw_custom(std::string& error) {
     }
     custom_.elapsed = time_;
     custom_.selected = static_cast<std::size_t>(selected_);
-    const bool live_race_menu = !preview_ && race_request_.mode != FrontendRaceMode::none &&
-                                (screen_ == "start_race_summary" || screen_ == "loading" ||
-                                 (screen_ == "modify_vehicle" && variant_.empty()));
-    custom_.preview_data =
-        !live_race_menu && !live_pause_ && !(screen_ == "race_results" && live_results_);
-    return FrontendCustom::draw(canvas_, custom_, error);
+    const bool live_race_menu =
+        !preview_ && race_request_.mode != FrontendRaceMode::none &&
+        (screen_ == "start_race_summary" || screen_ == "loading" || screen_ == "modify_vehicle");
+    custom_.preview_data = !live_race_menu && !live_pause_ &&
+                           !(screen_ == "race_results" && live_results_) &&
+                           (preview_ || (screen_ != "sound" && screen_ != "graphics"));
+    const auto result = FrontendCustom::draw(canvas_, custom_, error);
+    if (result != Result::ok || screen_ != "graphics" || !graphics_discard_)
+        return result;
+    FrontendCustomState dialog;
+    dialog.screen = "dialog";
+    dialog.preview_data = false;
+    dialog.message = translate("Misc", "SAVE CHANGES?");
+    dialog.selected = graphics_save_yes_ ? 0 : 1;
+    return FrontendCustom::draw(canvas_, dialog, error);
 }
 Result MenuFrontend::show_race_results(std::span<const FrontendPreviewRacer> racers,
                                        std::string_view track, std::string& error) {
@@ -1287,15 +1489,33 @@ Result MenuFrontend::draw(std::string& error) {
                          true, 1, 0x64ffffff, 0x64ffffff);
     }
     if (!video_) {
-        const float fade =
-            exit_time_ >= 0 ? static_cast<float>(fade_seconds_ > 0 ? exit_time_ / fade_seconds_ : 1)
-            : fade_in_ && fade_seconds_ > 0 ? static_cast<float>(1 - time_ / fade_seconds_)
-                                            : 0;
-        if (fade > 0)
-            canvas_.sprite("Screens/16Fade.bmp", {0, 0, 640, 480}, std::clamp(fade, 0.f, .999f));
+        float fade = exit_time_ >= 0
+                         ? static_cast<float>(fade_seconds_ > 0 ? exit_time_ / fade_seconds_ : 1)
+                     : fade_in_ && fade_seconds_ > 0 ? static_cast<float>(1 - time_ / fade_seconds_)
+                                                     : 0;
+        if (screen_ == "loading" && race_request_.mode == FrontendRaceMode::attract &&
+            custom_.loading_progress >= 1)
+            fade = std::max(fade, static_cast<float>(loading_finish_time_ / .3));
+        if (screen_ == "loading" && race_request_.mode == FrontendRaceMode::attract) {
+            const float intro = loading_black_pending_
+                                    ? 1.f
+                                    : static_cast<float>(1 - (time_ - loading_fade_origin_) / .3);
+            fade = std::max(fade, intro);
+        }
+        if (fade > 0) {
+            const float opacity = std::clamp(fade, 0.f, 1.f);
+            // The original bitmap is dark gray; the requested title handoff is black.
+            if (screen_ == "title" || race_request_.mode == FrontendRaceMode::attract)
+                canvas_.rectangle({0, 0, 640, 480}, {0, 0, 0, opacity});
+            else
+                canvas_.sprite("Screens/16Fade.bmp", {0, 0, 640, 480}, opacity);
+        }
     }
     if (preview_)
         canvas_.text(FrontendFont::small, 4, 4, "PREVIEW DATA", false, 1, 0xffffff00, 0xffffff00);
+    if (screen_ == "modify_vehicle" && garage_ && !preview_ &&
+        draw_garage_modal(error) != Result::ok)
+        return Result::unavailable;
     if (!assertion_message_.empty()) {
         // Modern recoverable assertion UI; the rejected business action is not executed.
         canvas_.rectangle({0, 0, 640, 480}, {0, 0, 0, .65f});

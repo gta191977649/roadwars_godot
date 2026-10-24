@@ -4,6 +4,10 @@ static func snapshot(host) -> Array:
     return [host.get_vehicle_position(),host.get_vehicle_heading(),host.get_vehicle_speed(),host.get_crash_sound_count(),host.get_tire_sound_start_count(),host.get_particle_count(),host.get_skid_vertex_count(),host.get_simulation_ticks()]
 
 static func verify_presentation(host, before: Dictionary) -> bool:
+    var geometry: Dictionary = host.get_competition_state()
+    if geometry.get("vehicle_body_alignment_error", 0.0) > 0.00001:
+        push_error("Replacement body and wheel poses belong to different simulation ticks")
+        return false
     var pending: Dictionary = host.get_presentation_state()
     # Simulation may change snapshots, but only presentation may submit transforms.
     for id in before.instances:

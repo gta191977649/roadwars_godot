@@ -6,6 +6,7 @@
 #include "game_src/unresolved/original_camera.hpp"
 #include "game_src/unresolved/track_animation.hpp"
 #include "game_src/unresolved/vehicle_combat.hpp"
+#include "game_src/unresolved/vehicle_damage_visuals.hpp"
 #include "game_src/unresolved/weapon_mounts.hpp"
 #include "game_src/unresolved/wheel_pose.hpp"
 #include <algorithm>
@@ -204,6 +205,8 @@ Result decode_frontend_d3d(std::span<const std::byte> bytes, MeshObject& output,
 
 FrontendScene::~FrontendScene() { stop(); }
 void FrontendScene::stop() {
+    damage_texture_ = {};
+    damage_texture_path_.clear();
     chrome_texture_ = {};
     chrome_enabled_ = false;
     for (const auto& draw : draws_)
@@ -220,6 +223,8 @@ void FrontendScene::stop() {
     textures_.clear();
     cameras_.clear();
     anchors_.clear();
+    body_lod_available_.clear();
+    tire_lod_available_.clear();
     vehicle_angles_.clear();
     vehicle_heights_.clear();
     sky_angles_.clear();
@@ -238,6 +243,8 @@ void FrontendScene::stop() {
     door_limit_ = door_speed_ = 0;
     door_closing_ = bottom_closing_ = staging_product_ = false;
     pending_product_ = {};
+    pending_product_resolver_ = {};
+    pending_texture_base_.clear();
     store_door_events_ = 0;
 }
 Result FrontendScene::read_mesh(const std::string& path, MeshObject& output, std::string& error) {
@@ -257,7 +264,12 @@ Result FrontendScene::read_mesh(const std::string& path, MeshObject& output, std
 
 MaterialHandle FrontendScene::material(const MeshPart& part, const std::string& base,
                                        std::uint32_t flags, bool chrome) {
+    const bool mutable_paint =
+        !damage_texture_path_.empty() &&
+        ResourceStore::canonical(base + "/" + part.texture) == damage_texture_path_;
     auto key = ResourceStore::canonical(base + "/" + part.texture) + ":" + std::to_string(flags);
+    if (mutable_paint)
+        key += ":mutable=" + std::to_string(damage_texture_.value);
     key += ":chrome=" + std::to_string(chrome ? chrome_texture_.value : 0);
     for (const auto channel : part.color)
         key += ":" + std::to_string(std::bit_cast<std::uint32_t>(channel));
@@ -265,7 +277,9 @@ MaterialHandle FrontendScene::material(const MeshPart& part, const std::string& 
         return found->second;
     Bitmap bitmap, alpha;
     TextureTransparency transparency{TextureTransparency::opaque};
-    if (part.texture.empty()) {
+    if (mutable_paint) {
+        transparency = damage_transparency_;
+    } else if (part.texture.empty()) {
         bitmap.width = bitmap.height = 1;
         bitmap.rgba.assign(4, std::byte{255});
     } else {
@@ -302,10 +316,13 @@ MaterialHandle FrontendScene::material(const MeshPart& part, const std::string& 
                                      companion.empty() ? nullptr : &alpha) != Result::ok)
             throw std::runtime_error("Original frontend texture conversion failed: " + resolved);
     }
-    const auto texture = renderer_.upload_texture(bitmap.width, bitmap.height, bitmap.rgba);
+    const auto texture = mutable_paint
+                             ? damage_texture_
+                             : renderer_.upload_texture(bitmap.width, bitmap.height, bitmap.rgba);
     if (!texture.value)
         throw std::runtime_error("Frontend scene texture upload failed");
-    textures_.push_back(texture);
+    if (!mutable_paint)
+        textures_.push_back(texture);
     MaterialSettings settings;
     settings.color =
         part.texture.empty() ? part.color : std::array<float, 4>{1, 1, 1, part.color[3]};
@@ -374,6 +391,8 @@ void FrontendScene::upload(const MeshObject& object, const std::string& base, Ve
         local.origin = position;
         draws_.push_back({instance, local, vehicle, turntable, sky});
         draws_.back().door = door;
+        if (vehicle >= 0 && (object.name == "1024Body" || object.name == "Body"))
+            draws_.back().body_lod = 0;
         renderer_.set_instance_static(instance,
                                       vehicle < 0 && turntable < 0 && sky < 0 && door < 0);
         if (vehicle >= 0 && object.name == "295ULTailL") {
@@ -386,7 +405,8 @@ void FrontendScene::upload(const MeshObject& object, const std::string& base, Ve
 }
 
 void FrontendScene::upload_vehicle(std::string_view name, Vec3 anchor, int index,
-                                   const RaceLoadout* loadout) {
+                                   const RaceLoadout* loadout,
+                                   const VehicleDamageVisualState* visual_state) {
     MeshObject body, tire;
     std::string error;
     const auto path = "Cars/" + std::string(name);
@@ -394,6 +414,33 @@ void FrontendScene::upload_vehicle(std::string_view name, Vec3 anchor, int index
     if (read_mesh(path + "/Body/SpatialObject", body, error) != Result::ok ||
         read_mesh(tire_path + "/SpatialObject", tire, error) != Result::ok)
         throw std::runtime_error(error);
+    VehicleDamageVisuals damage;
+    damage_texture_path_.clear();
+    if (visual_state) {
+        if (!loadout || damage.load(resources_, name, loadout->paint_job, error) != Result::ok ||
+            damage.restore_state(*visual_state) != Result::ok)
+            throw std::runtime_error("Garage vehicle damage snapshot is incompatible: " + error);
+        const auto apply_body = [&](const auto& self, MeshObject& object) -> void {
+            if (object.name == "1024Body" || object.name == "Body")
+                object.parts = damage.body_lod(0).parts;
+            for (auto& child : object.children)
+                self(self, child);
+        };
+        apply_body(apply_body, body);
+        const auto& paint = damage.paint();
+        if (damage_texture_.value) {
+            if (renderer_.update_texture(damage_texture_, paint.width, paint.height, paint.rgba) !=
+                Result::ok)
+                throw std::runtime_error("Garage damage paint update failed");
+        } else {
+            damage_texture_ = renderer_.upload_texture(paint.width, paint.height, paint.rgba);
+            if (!damage_texture_.value)
+                throw std::runtime_error("Garage damage paint upload failed");
+            textures_.push_back(damage_texture_);
+        }
+        damage_texture_path_ = ResourceStore::canonical(damage.texture_path());
+        damage_transparency_ = damage.texture_transparency();
+    }
     initialize_stock_weapon_mounts(body);
     Vec3 body_center;
     if (!locate(body, "1024Body", body_center) && !locate(body, "Body", body_center))
@@ -422,19 +469,61 @@ void FrontendScene::upload_vehicle(std::string_view name, Vec3 anchor, int index
                            ? path + "/Paint/Paint Job " + std::to_string(loadout->paint_job)
                            : path + "/Body";
     upload(body, paint, scale(body_center, -1), index);
+    std::array<bool, 5> available{true, false, false, false, false};
+    for (std::size_t level = 1; level < available.size(); ++level) {
+        MeshObject alternative;
+        const auto loaded =
+            read_mesh(path + "/Body/SpatialObject" + std::to_string(level + 1), alternative, error);
+        if (loaded == Result::not_found)
+            continue;
+        if (loaded != Result::ok)
+            throw std::runtime_error("Invalid vehicle body LOD: " + error);
+        // 004d314d uses the selected object's parts with the original body's transform.
+        alternative.position = {};
+        alternative.children.clear();
+        if (visual_state && level < 4)
+            alternative.parts = damage.body_lod(level).parts;
+        const auto begin = draws_.size();
+        upload(alternative, paint, {}, index);
+        for (auto draw = begin; draw < draws_.size(); ++draw)
+            draws_[draw].body_lod = static_cast<int>(level);
+        available[level] = true;
+    }
+    body_lod_available_.push_back(available);
     float wheel_scale{};
     if ((loadout ? load_wheel_scale(resources_, name, loadout->tires, wheel_scale, error)
                  : load_stock_wheel_scale(resources_, name, wheel_scale, error)) != Result::ok)
         throw std::runtime_error(error);
     tire.position = {};
+    std::array<MeshObject, 5> tire_meshes;
+    tire_meshes[0] = tire;
+    std::array<bool, 5> tires_available{true, false, false, false, false};
+    for (std::size_t level = 1; level < tire_meshes.size(); ++level) {
+        const auto found = read_mesh(tire_path + "/SpatialObject" + std::to_string(level),
+                                     tire_meshes[level], error);
+        if (found == Result::not_found)
+            continue;
+        if (found != Result::ok)
+            throw std::runtime_error("Invalid selected tire LOD: " + error);
+        tire_meshes[level].position = {};
+        tire_meshes[level].children.clear();
+        tires_available[level] = true;
+    }
+    tire_lod_available_.push_back(tires_available);
     for (std::size_t wheel = 0; wheel < 4; ++wheel) {
         const auto tire_anchor =
             subtract(require_anchor(body, "Tire" + std::to_string(wheel + 1)), body_center);
-        const auto begin = draws_.size();
-        upload(tire, tire_path, {}, index);
-        const auto pose = original_wheel_transform(wheel, tire_anchor, 0, 0, wheel_scale);
-        for (std::size_t draw = begin; draw < draws_.size(); ++draw)
-            draws_[draw].local = compose_track_transform(pose, draws_[draw].local);
+        for (std::size_t level = 0; level < tire_meshes.size(); ++level) {
+            if (!tires_available[level])
+                continue;
+            const auto begin = draws_.size();
+            upload(tire_meshes[level], tire_path, {}, index);
+            const auto pose = original_wheel_transform(wheel, tire_anchor, 0, 0, wheel_scale);
+            for (auto draw = begin; draw < draws_.size(); ++draw) {
+                draws_[draw].local = compose_track_transform(pose, draws_[draw].local);
+                draws_[draw].tire_lod = static_cast<int>(level);
+            }
+        }
     }
     if (loadout)
         for (const auto& asset : weapons.assets()) {
@@ -660,6 +749,15 @@ Result FrontendScene::load(std::string_view id, std::string_view character, int 
 }
 
 void FrontendScene::update_draws() {
+    auto& selected = selected_body_lods_;
+    selected.resize(body_lod_available_.size());
+    for (std::size_t i = 0; i < selected.size(); ++i) {
+        if (select_vehicle_body_lod(anchors_[i], eye_, renderer_.car_detail(), 5, selected[i]) !=
+            Result::ok)
+            throw std::runtime_error("Invalid vehicle body LOD settings");
+        while (selected[i] && !body_lod_available_[i][selected[i]])
+            --selected[i];
+    }
     for (const auto& draw : draws_) {
         auto pose = draw.local;
         if (draw.door >= 0) {
@@ -685,6 +783,21 @@ void FrontendScene::update_draws() {
         }
         if (renderer_.update_instance(draw.instance, pose) != Result::ok)
             throw std::runtime_error("Frontend scene instance update failed");
+        if (draw.tire_lod >= 0 && draw.vehicle >= 0) {
+            std::size_t tire_level{};
+            if (select_vehicle_tire_lod(pose.origin, eye_, renderer_.car_detail(), 5, tire_level) !=
+                Result::ok)
+                throw std::runtime_error("Invalid tire LOD settings");
+            while (tire_level && !tire_lod_available_[draw.vehicle][tire_level])
+                --tire_level;
+            renderer_.set_instance_visible(
+                draw.instance,
+                draw.visible && static_cast<std::size_t>(draw.tire_lod) == tire_level);
+        }
+        if (draw.body_lod >= 0 && draw.vehicle >= 0)
+            renderer_.set_instance_visible(
+                draw.instance,
+                draw.visible && static_cast<std::size_t>(draw.body_lod) == selected[draw.vehicle]);
     }
 }
 void FrontendScene::update_camera() {
@@ -778,8 +891,21 @@ void FrontendScene::step(float dt) {
             door_y_[0] -= movement;
             if (door_y_[0] < door_limit_) {
                 door_y_[0] = door_limit_;
-                replace_product(pending_product_, pending_angles_, pending_speeds_);
+                if (pending_product_resolver_) {
+                    std::string item, quality, error;
+                    if (pending_product_resolver_(item, quality, error) != Result::ok)
+                        throw std::runtime_error("Store transition selection failed: " + error);
+                    staging_product_ = true;
+                    const auto result = select_store_product(item, quality, error);
+                    staging_product_ = false;
+                    if (result != Result::ok)
+                        throw std::runtime_error("Store transition product failed: " + error);
+                }
+                replace_product(pending_product_, pending_angles_, pending_speeds_,
+                                pending_texture_base_);
                 pending_product_ = {};
+                pending_product_resolver_ = {};
+                pending_texture_base_.clear();
                 door_closing_ = false;
                 ++store_door_events_;
             }
@@ -864,10 +990,21 @@ Result FrontendScene::select_store_product(std::string_view item, std::string_vi
             throw std::runtime_error("Original store item configuration missing: " + item_name);
         auto quality_name =
             quality.empty() ? type.value("ORDERING", "ITEM0") : std::string(quality);
+        Configuration product_config = type;
+        if (!quality_name.empty() &&
+            product_config.load(resources_, config_root + "/" + item_name + "/" + quality_name +
+                                                "/Data.ini") != Result::ok)
+            throw std::runtime_error("Original store quality configuration missing");
+        float available = 1;
+        if (!product_config.value("PRICE", "ISAVAILABLE").empty() &&
+            product_config.number("PRICE", "ISAVAILABLE", available) != Result::ok)
+            throw std::runtime_error("Invalid original store availability");
         const auto from_quality = require_number(config, "GARAGE3DOBJECT", "GETFROMQUALITY") != 0;
-        const Vec3 angles = {require_number(config, "GARAGE3DOBJECT", "INITIALOBJECTHEADING(DGS)"),
-                             require_number(config, "GARAGE3DOBJECT", "INITIALOBJECTPITCH(DGS)"),
-                             require_number(config, "GARAGE3DOBJECT", "INITIALOBJECTROLL(DGS)")};
+        Vec3 angles = {require_number(config, "GARAGE3DOBJECT", "INITIALOBJECTHEADING(DGS)"),
+                       require_number(config, "GARAGE3DOBJECT", "INITIALOBJECTPITCH(DGS)"),
+                       require_number(config, "GARAGE3DOBJECT", "INITIALOBJECTROLL(DGS)")};
+        if (loaded_ && !staging_product_)
+            angles = product_angles_;
         const Vec3 speeds = {require_number(config, "GARAGE3DOBJECT", "HEADINGVELOCITY(DGS_S)"),
                              require_number(config, "GARAGE3DOBJECT", "PITCHVELOCITY(DGS_S)"),
                              require_number(config, "GARAGE3DOBJECT", "ROLLVELOCITY(DGS_S)")};
@@ -881,8 +1018,13 @@ Result FrontendScene::select_store_product(std::string_view item, std::string_vi
             mesh_root += "/" + quality_name;
         }
         MeshObject product;
-        if (read_mesh(mesh_root + (store_variant_ == 1 ? "/SpatialObject" : "/SpatialObject_Hi"),
-                      product, error) != Result::ok)
+        const auto texture_base = available == 0 ? std::string("Characters/Shared/NA")
+                                                 : std::string("Cars/Shared/Textures");
+        const auto mesh_path =
+            available == 0
+                ? "Characters/Shared/NA/SpatialObject"
+                : mesh_root + (store_variant_ == 1 ? "/SpatialObject" : "/SpatialObject_Hi");
+        if (read_mesh(mesh_path, product, error) != Result::ok)
             throw std::runtime_error(error);
         // Product wrapper is attached at Object1, replacing the exporter's root position.
         product.position = {};
@@ -890,8 +1032,9 @@ Result FrontendScene::select_store_product(std::string_view item, std::string_vi
             pending_product_ = std::move(product);
             pending_angles_ = angles;
             pending_speeds_ = speeds;
+            pending_texture_base_ = texture_base;
         } else
-            replace_product(product, angles, speeds);
+            replace_product(product, angles, speeds, texture_base);
         error.clear();
         return Result::ok;
     } catch (const std::exception& exception) {
@@ -899,7 +1042,8 @@ Result FrontendScene::select_store_product(std::string_view item, std::string_vi
         return Result::unavailable;
     }
 }
-void FrontendScene::replace_product(const MeshObject& product, Vec3 angles, Vec3 speeds) {
+void FrontendScene::replace_product(const MeshObject& product, Vec3 angles, Vec3 speeds,
+                                    const std::string& texture_base) {
     product_angles_ = angles;
     product_speeds_ = speeds;
     for (std::size_t index = product_draw_begin_; index < draws_.size(); ++index)
@@ -908,25 +1052,36 @@ void FrontendScene::replace_product(const MeshObject& product, Vec3 angles, Vec3
     for (std::size_t index = product_mesh_begin_; index < meshes_.size(); ++index)
         renderer_.destroy_mesh(meshes_[index]);
     meshes_.resize(product_mesh_begin_);
-    upload(product, "Cars/Shared/Textures", {});
+    upload(product, texture_base, {});
     for (std::size_t index = product_draw_begin_; index < draws_.size(); ++index) {
         draws_[index].product = true;
         renderer_.set_instance_static(draws_[index].instance, false);
     }
 }
 Result FrontendScene::transition_store_product(std::string_view item, std::string_view quality,
-                                               std::string& error) {
+                                               std::string& error, StoreProductResolver resolver) {
     staging_product_ = true;
     const auto result = select_store_product(item, quality, error);
     staging_product_ = false;
     if (result == Result::ok) {
         door_closing_ = true;
         bottom_closing_ = true;
+        pending_product_resolver_ = std::move(resolver);
     }
     return result;
 }
 unsigned FrontendScene::drain_store_door_events() { return std::exchange(store_door_events_, 0); }
-Result FrontendScene::set_vehicle_loadout(const RaceLoadout& loadout, std::string& error) {
+void FrontendScene::cancel_store_transition() {
+    // 00443569 initializes both store flags to one (opening) on each entry.
+    // Retain the actual door position while discarding a previous selection's pending mesh.
+    door_closing_ = bottom_closing_ = staging_product_ = false;
+    pending_product_ = {};
+    pending_product_resolver_ = {};
+    pending_texture_base_.clear();
+    store_door_events_ = 0;
+}
+Result FrontendScene::set_vehicle_loadout(const RaceLoadout& loadout, std::string& error,
+                                          const VehicleDamageVisualState* visual_state) {
     if (!loaded_ || victory_ || store_)
         return Result::unavailable;
     if (loadout.paint_job < 0 || loadout.paint_job > 6)
@@ -940,9 +1095,11 @@ Result FrontendScene::set_vehicle_loadout(const RaceLoadout& loadout, std::strin
         meshes_.resize(vehicle_mesh_begin_);
         const auto angle = vehicle_angles_.front();
         anchors_.clear();
+        body_lod_available_.clear();
+        tire_lod_available_.clear();
         vehicle_angles_.clear();
         vehicle_heights_.clear();
-        upload_vehicle(character_, stand_, 0, &loadout);
+        upload_vehicle(character_, stand_, 0, &loadout, visual_state);
         vehicle_angles_[0] = angle;
         update_draws();
         error.clear();

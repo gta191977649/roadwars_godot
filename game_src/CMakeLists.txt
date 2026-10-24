@@ -4,8 +4,9 @@ add_library(roadwars_core STATIC core/runtime.cpp core/graphics_settings.cpp unr
   unresolved/frontend_scene.cpp unresolved/chrome_mapping.cpp
   unresolved/race_frontend.cpp unresolved/cockpit_frontend.cpp
   unresolved/race_frontend_equipment.cpp unresolved/skeletal_mesh_runtime.cpp
-  unresolved/race_music.cpp unresolved/race_start.cpp
-  unresolved/race_loadout.cpp
+  unresolved/race_music.cpp unresolved/race_start.cpp unresolved/race_replay.cpp
+  unresolved/race_session_replay.cpp
+  unresolved/race_loadout.cpp unresolved/garage_session.cpp unresolved/menu_garage.cpp
   unresolved/vehicle_equipment_effects.cpp unresolved/race_ai_combat.cpp
   unresolved/weapon_runtime.cpp unresolved/turret_runtime.cpp
   unresolved/race_turrets.cpp unresolved/weapon_projectiles.cpp
@@ -41,3 +42,4 @@ else()
 endif()
 
 target_sources(roadwars_core PRIVATE unresolved/collision_audio.cpp unresolved/tire_audio.cpp)
+target_sources(roadwars_core PRIVATE unresolved/sound_options.cpp unresolved/menu_sound.cpp)

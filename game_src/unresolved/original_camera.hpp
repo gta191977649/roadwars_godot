@@ -22,6 +22,7 @@ Result camera_view_frame(CameraView view, const VehicleState& vehicle,
                          CameraFrame& output);
 struct OriginalCameraView {
     bool look_back{}, follow_vehicle_heading{}, nitrous_active{}, badlands{};
+    bool steering_offset_chase{};
 };
 Result load_original_camera_settings(ResourceStore& resources, std::string_view vehicle,
                                      OriginalCameraSettings& settings, std::string& error);
@@ -50,6 +51,7 @@ class OriginalChaseCamera {
     bool loaded_{}, initialized_{}, look_back_{};
     float follow_heading_{}, follow_pitch_{}, distance_{6.5f}, distance_offset_{}, height_{};
     float obstruction_distance_{};
+    float steering_heading_offset_{};
 };
 
 // Native race-controller mode5 selects nearest track CameraN and camera mode7.

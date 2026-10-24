@@ -31,10 +31,19 @@ class SceneRenderer final : public Renderer {
   public:
     std::set<std::uint64_t> textures, materials, meshes, instances;
     std::set<std::uint64_t> chrome_materials;
+    int detail{2};
+    int car_detail() const override { return detail; }
+    std::map<std::uint64_t, bool> visibility;
+    void set_instance_visible(InstanceHandle handle, bool visible) override {
+        assert(instances.contains(handle.value));
+        visibility[handle.value] = visible;
+    }
     ChromeMappingOptions chrome_mapping_options() const override {
         return {true, "Textures/16cr1.bmp"};
     }
     std::map<std::uint64_t, std::uint64_t> instance_mesh;
+    std::map<std::uint64_t, std::vector<std::byte>> texture_data;
+    std::vector<float> uploaded_positions;
     std::uint64_t next{1};
     bool fail_upload{};
     Transform camera;
@@ -52,6 +61,11 @@ class SceneRenderer final : public Renderer {
         assert(colors.empty() || colors.size() == positions.size());
         for (const auto index : indices)
             assert(index < positions.size());
+        for (const auto position : positions) {
+            uploaded_positions.push_back(position.x);
+            uploaded_positions.push_back(position.y);
+            uploaded_positions.push_back(position.z);
+        }
         if (fail_upload)
             return {};
         meshes.insert(next);
@@ -72,6 +86,7 @@ class SceneRenderer final : public Renderer {
     void destroy_instance(InstanceHandle handle) override {
         assert(instances.erase(handle.value));
         assert(instance_mesh.erase(handle.value));
+        visibility.erase(handle.value);
     }
     void destroy_mesh(MeshHandle handle) override {
         for (const auto& [instance, mesh] : instance_mesh) {
@@ -88,7 +103,15 @@ class SceneRenderer final : public Renderer {
                                  std::span<const std::byte> bytes) override {
         assert(bytes.size() == static_cast<std::size_t>(width) * height * 4);
         textures.insert(next);
+        texture_data[next] = {bytes.begin(), bytes.end()};
         return {next++};
+    }
+    Result update_texture(TextureHandle texture, std::uint32_t width, std::uint32_t height,
+                          std::span<const std::byte> bytes) override {
+        assert(textures.contains(texture.value));
+        assert(bytes.size() == static_cast<std::size_t>(width) * height * 4);
+        texture_data[texture.value] = {bytes.begin(), bytes.end()};
+        return Result::ok;
     }
     MaterialHandle create_material(TextureHandle texture,
                                    const MaterialSettings& settings) override {
@@ -108,6 +131,7 @@ class SceneRenderer final : public Renderer {
     void destroy_texture(TextureHandle handle) override {
         assert(materials.empty());
         assert(textures.erase(handle.value));
+        texture_data.erase(handle.value);
     }
     bool empty() const {
         return textures.empty() && materials.empty() && meshes.empty() && instances.empty() &&
@@ -155,6 +179,20 @@ int main(int argc, char** argv) {
                 std::cerr << vehicle << ": no chrome material bound in vehicle preview\n";
                 return 1;
             }
+            const auto allocated = renderer.next;
+            const auto stable_instances = renderer.instances;
+            renderer.detail = 2;
+            assert(scene.advance(1.0 / 60) == Result::ok);
+            const auto high_visibility = renderer.visibility;
+            renderer.detail = 0;
+            assert(scene.advance(1.0 / 60) == Result::ok);
+            assert(renderer.visibility != high_visibility);
+            for (int change = 0; change < 12; ++change) {
+                renderer.detail = change % 3;
+                assert(scene.advance(1.0 / 60) == Result::ok);
+                assert(renderer.next == allocated && renderer.instances == stable_instances);
+            }
+            renderer.detail = 2;
             RaceLoadout loadout;
             loadout.paint_job = 2;
             loadout.tires = {"Street", "Best"};
@@ -172,6 +210,34 @@ int main(int argc, char** argv) {
                 return 1;
             }
         }
+        assert(scene.load("modify_vehicle", "ANIMAL", 0, error) == Result::ok);
+        VehicleDamageVisuals damage;
+        assert(damage.load(resources, "ANIMAL", 2, error) == Result::ok);
+        const auto fresh_state = damage.capture_state();
+        RaceLoadout damage_loadout;
+        damage_loadout.paint_job = 2;
+        renderer.uploaded_positions.clear();
+        assert(scene.set_vehicle_loadout(damage_loadout, error, &fresh_state) == Result::ok);
+        const auto fresh_positions = renderer.uploaded_positions;
+        auto damaged_state = fresh_state;
+        damaged_state.paint.rgba[0] = std::byte{123};
+        const auto impact = damage.body_lod(0).parts.front().positions.front();
+        damaged_state.deformations.push_back({impact, {.05f, .04f, .03f}});
+        renderer.uploaded_positions.clear();
+        assert(scene.set_vehicle_loadout(damage_loadout, error, &damaged_state) == Result::ok);
+        assert(renderer.uploaded_positions != fresh_positions);
+        bool uploaded_paint{};
+        for (const auto& [handle, pixels] : renderer.texture_data) {
+            (void)handle;
+            uploaded_paint |= pixels == damaged_state.paint.rgba;
+        }
+        assert(uploaded_paint);
+        renderer.uploaded_positions.clear();
+        assert(scene.set_vehicle_loadout(damage_loadout, error, &fresh_state) == Result::ok);
+        assert(renderer.uploaded_positions == fresh_positions);
+        scene.stop();
+        assert(renderer.empty());
+        unsigned unavailable_products{};
         for (int variant = 0; variant <= 6; ++variant) {
             if (scene.load("modify_vehicle", "ANIMAL", variant, error) != Result::ok) {
                 std::cerr << error << '\n';
@@ -188,6 +254,9 @@ int main(int argc, char** argv) {
                 const auto original_instances = renderer.instances;
                 assert(scene.transition_store_product({}, {}, error) == Result::ok);
                 assert(scene.store_transition_active());
+                assert(scene.transition_store_product("../invalid", {}, error) ==
+                       Result::invalid_argument);
+                assert(scene.store_transition_active());
                 assert(scene.drain_store_door_events() == 0);
                 assert(renderer.instances == original_instances);
                 assert(scene.advance(1.0 / 60) == Result::ok);
@@ -202,14 +271,120 @@ int main(int argc, char** argv) {
                 assert(scene.advance(4) == Result::ok);
                 assert(scene.store_door_positions() == open);
                 assert(scene.transition_store_product({}, {}, error) == Result::ok);
+                assert(scene.advance(1.0 / 60) == Result::ok);
+                scene.cancel_store_transition();
+                assert(scene.select_store_product({}, {}, error) == Result::ok);
+                assert(scene.advance(2) == Result::ok);
+                assert(!scene.store_transition_active() && scene.drain_store_door_events() == 0);
+                assert(scene.store_door_positions() == open);
+                assert(scene.transition_store_product({}, {}, error) == Result::ok);
                 scene.stop();
                 assert(scene.drain_store_door_events() == 0);
                 assert(!scene.store_transition_active());
                 assert(renderer.empty());
                 assert(scene.load("modify_vehicle", "ANIMAL", variant, error) == Result::ok);
+                constexpr std::array<std::string_view, 6> categories{
+                    "Tires", "Drive Train", "Weapons", "Armor", "Repair", "Paint Job"};
+                const auto base =
+                    "Cars/Shared/" + std::string(categories[static_cast<std::size_t>(variant - 1)]);
+                Configuration category;
+                assert(category.load(resources, base + "/Data.ini") == Result::ok);
+                for (int item = 0;; ++item) {
+                    const auto name = category.value("ORDERING", "ITEM" + std::to_string(item));
+                    if (name.empty())
+                        break;
+                    Configuration type;
+                    assert(type.load(resources, base + "/" + name + "/Data.ini") == Result::ok);
+                    for (int quality = 0;; ++quality) {
+                        const auto label = type.value("ORDERING", "ITEM" + std::to_string(quality));
+                        if (label.empty() && quality != 0)
+                            break;
+                        Configuration product = type;
+                        if (!label.empty())
+                            assert(product.load(resources, base + "/" + name + "/" + label +
+                                                               "/Data.ini") == Result::ok);
+                        float available{1};
+                        product.number("PRICE", "ISAVAILABLE", available);
+                        if (available == 0)
+                            ++unavailable_products;
+                        if (scene.select_store_product(name, label, error) != Result::ok) {
+                            std::cerr << base << '/' << name << '/' << label << ": " << error
+                                      << '\n';
+                            return 1;
+                        }
+                        if (item == 0 && quality == 0) {
+                            const auto config_path = base + "/" + name +
+                                                     (label.empty() ? "" : "/" + label) +
+                                                     "/Data.ini";
+                            assert(resources.set_configuration_override(
+                                       config_path, "PRICE", "ISAVAILABLE", "0") == Result::ok);
+                            assert(scene.select_store_product(name, label, error) == Result::ok);
+                            ++unavailable_products;
+                            assert(scene.transition_store_product(name, label, error) ==
+                                   Result::ok);
+                            assert(scene.advance(4) == Result::ok);
+                            assert(!scene.store_transition_active());
+                            assert(scene.drain_store_door_events() == 1);
+                            resources.clear_configuration_overrides(config_path);
+                        }
+                        if (label.empty())
+                            break;
+                    }
+                }
             }
             assert(scene.advance(1) == Result::ok);
             assert(scene.advance(-1) == Result::invalid_argument);
+            scene.stop();
+            assert(renderer.empty());
+        }
+        assert(unavailable_products > 0);
+        assert(scene.load("modify_vehicle", "ANIMAL", 3, error) == Result::ok);
+        unsigned obsolete_resolutions{}, current_resolutions{};
+        std::string installed_at_threshold = "Gatling Gun", resolved_product;
+        assert(scene.transition_store_product("Side", "Gatling Gun", error,
+                                              [&](std::string&, std::string&, std::string&) {
+                                                  ++obsolete_resolutions;
+                                                  return Result::unavailable;
+                                              }) == Result::ok);
+        assert(scene.advance(1.0 / 60) == Result::ok);
+        const auto closing_positions = scene.store_door_positions();
+        assert(scene.select_store_product("Front", "20mm Cannon", error) == Result::ok);
+        assert(scene.store_transition_active() &&
+               scene.store_door_positions() == closing_positions &&
+               scene.drain_store_door_events() == 0);
+        assert(scene.transition_store_product(
+                   "Side", "Gatling Gun", error,
+                   [&](std::string& item, std::string& quality, std::string&) {
+                       ++current_resolutions;
+                       item = "Side";
+                       quality = installed_at_threshold;
+                       resolved_product = quality;
+                       return Result::ok;
+                   }) == Result::ok);
+        installed_at_threshold = "Guided Missile";
+        assert(current_resolutions == 0 && obsolete_resolutions == 0);
+        assert(scene.advance(4) == Result::ok);
+        assert(current_resolutions == 1 && obsolete_resolutions == 0 &&
+               resolved_product == "Guided Missile" && scene.drain_store_door_events() == 1);
+        assert(scene.transition_store_product("Side", "Gatling Gun", error,
+                                              [&](std::string&, std::string&, std::string&) {
+                                                  ++obsolete_resolutions;
+                                                  return Result::unavailable;
+                                              }) == Result::ok);
+        scene.cancel_store_transition();
+        assert(scene.advance(4) == Result::ok && obsolete_resolutions == 0);
+        scene.stop();
+        assert(renderer.empty());
+        std::array<float, 2> doors_at_30{};
+        for (const int fps : {30, 144}) {
+            assert(scene.load("modify_vehicle", "ANIMAL", 3, error) == Result::ok);
+            assert(scene.transition_store_product({}, {}, error) == Result::ok);
+            for (int frame = 0; frame < fps / 2; ++frame)
+                assert(scene.advance(1.0 / fps) == Result::ok);
+            if (fps == 30)
+                doors_at_30 = scene.store_door_positions();
+            else
+                assert(doors_at_30 == scene.store_door_positions());
             scene.stop();
             assert(renderer.empty());
         }

@@ -30,8 +30,9 @@ class Files final : public ResourceReader {
         output.resize(static_cast<std::size_t>(size));
         file.seekg(0);
         return file.read(reinterpret_cast<char*>(output.data()), size) ? Result::ok
-                                                                      : Result::unavailable;
+                                                                       : Result::unavailable;
     }
+
   private:
     std::filesystem::path root_;
 };
@@ -195,12 +196,14 @@ int main(int argc, char** argv) {
                 "Unarmed cockpit readout failed");
         require(cockpit.draw_readouts(0, weapons, ammunition, {true, true, true}, armed) ==
                         Result::ok &&
-                    armed.size() > track.size(), "Installed weapon readouts missing");
+                    armed.size() > track.size(),
+                "Installed weapon readouts missing");
         validate_quads(track, renderer);
         validate_quads(armed, renderer);
         require(close(armed.back().colors[0][0], 90.f / 255) &&
                     close(armed.back().colors[0][1], 182.f / 255) &&
-                    close(armed.back().colors[0][2], 1), "Original cockpit font color changed");
+                    close(armed.back().colors[0][2], 1),
+                "Original cockpit font color changed");
         cockpit.stop();
         require(renderer.textures.empty(), "Synthetic cockpit leaked textures");
     }
@@ -247,8 +250,8 @@ int main(int argc, char** argv) {
                     validate_wheel(first.back(), x, y, size, steering);
                     if (steering == 1) {
                         const auto& points = first.back().positions;
-                        const float heading = std::atan2(points[1][1] - points[0][1],
-                                                         points[1][0] - points[0][0]);
+                        const float heading =
+                            std::atan2(points[1][1] - points[0][1], points[1][0] - points[0][0]);
                         require(close(heading, 1.308996939f),
                                 "Full steering does not rotate seventy-five degrees");
                     }
@@ -257,7 +260,8 @@ int main(int argc, char** argv) {
                             "Alternate cockpit draw failed");
                     require(cockpit.draw(i, steering, 4000, 20, 2, false, aspect, repeated) ==
                                     Result::ok &&
-                                equal(first, repeated), "Rendering mutated cockpit state");
+                                equal(first, repeated),
+                            "Rendering mutated cockpit state");
                     require(renderer.textures.size() == loaded_count,
                             "Rendering allocated textures");
                     const auto saved = first;
@@ -269,6 +273,10 @@ int main(int argc, char** argv) {
             }
         }
         std::vector<HudQuad> invalid;
+        require(cockpit.draw(0, 0, 1208410.625f, 7627.038086f, 3, false, 4.f / 3, invalid) ==
+                    Result::ok,
+                "Finite native high-RPM cockpit state was rejected by an arbitrary cap");
+        invalid.clear();
         require(cockpit.draw(cars.size(), 0, 0, 0, 0, false, 4.f / 3, invalid) ==
                     Result::invalid_argument,
                 "Invalid cockpit index accepted");

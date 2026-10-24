@@ -6,6 +6,7 @@
 #include "game_src/unresolved/race_ai_combat.hpp"
 #include "game_src/unresolved/race_callback_registry.hpp"
 #include "game_src/unresolved/race_frontend.hpp"
+#include "game_src/unresolved/race_replay.hpp"
 #include "game_src/unresolved/race_start.hpp"
 #include "game_src/unresolved/scene_electron_traps.hpp"
 #include "game_src/unresolved/scene_turret_combat.hpp"
@@ -13,6 +14,7 @@
 #include "game_src/unresolved/vehicle_damage_particles.hpp"
 #include "game_src/unresolved/vehicle_equipment_effects.hpp"
 #include "game_src/unresolved/weapon_trails.hpp"
+#include <algorithm>
 #include <memory>
 #include <optional>
 
@@ -22,6 +24,7 @@ struct RaceOptions {
     int laps{3}, ai_count{5};
     std::uint32_t seed{1}; // Diagnostic seed, not an original startup default claim.
     std::optional<RaceLoadout> player_loadout;
+    bool attract_demo{};
     int diagnostic_weapon_lock_seconds{
         20}; // Fresh native Single Race default; diagnostic override accepts0 or20.
 };
@@ -58,8 +61,12 @@ class RaceSession {
     Result advance(float delta, const InputState&, std::string& error);
     void set_paused(bool value) { paused_ = value; }
     bool paused() const { return paused_; }
-    std::span<const AmmunitionNotice> ammunition_notices() const { return ammunition_notices_.entries(); }
+    std::span<const AmmunitionNotice> ammunition_notices() const {
+        return ammunition_notices_.entries();
+    }
     void set_player_autopilot(bool value) { player_autopilot_ = value; }
+    int randomize_attract_camera();
+    bool attract_look_back() const { return attract_look_back_; }
     Result restart(std::string& error);
     std::span<const RaceParticipant> racers() const { return racers_; }
     const RaceRoute& route() const { return route_; }
@@ -79,8 +86,27 @@ class RaceSession {
     float time_table_remaining() const { return time_table_remaining_; }
     Result select_native_camera(int mode);
     int native_camera_mode() const { return native_camera_mode_; }
+    bool look_back() const { return look_back_ || attract_look_back_; }
     std::size_t spectator_target() const { return spectator_target_; }
     CameraFrame spectator_camera() const;
+    const RaceTimeRecords& time_records() const { return time_records_; }
+    bool time_records_dirty() const { return time_records_dirty_; }
+    void acknowledge_time_records() { time_records_dirty_ = false; }
+    bool replay_available() const;
+    bool replaying() const { return static_cast<bool>(replay_saved_); }
+    bool replay_paused() const { return replay_paused_; }
+    float replay_time() const { return replaying() ? static_cast<float>(race_time_) : 0; }
+    float replay_owner_time(std::size_t owner) const {
+        return owner < replay_tracks_.size() ? replay_tracks_[owner].time() : 0;
+    }
+    std::optional<std::size_t> replay_clock_owner() const { return replay_clock_owner_; }
+    int replay_selection() const { return replay_selection_; }
+    std::span<const std::array<float, 4>> replay_wheel_spins() const { return replay_wheel_spins_; }
+    void select_replay_action(int selection) { replay_selection_ = std::clamp(selection, 0, 6); }
+    Result begin_replay(std::string& error);
+    Result end_replay(std::string& error);
+    Result seek_replay(float time, std::string& error);
+    Result execute_replay_action(std::string& error);
     double time() const { return race_time_; }
     float countdown() const { return countdown_; }
     RaceStart& start_sequence() { return start_; }
@@ -93,6 +119,7 @@ class RaceSession {
         std::size_t participant;
     };
     std::span<const DispatchEvent> dispatch_trace() const { return dispatch_trace_; }
+    std::vector<RaceCallbackKey> callback_order() const { return callbacks_.snapshot(); }
     FrontendFrame frontend_frame(std::vector<FrontendRacer>& storage) const;
     RaceDebugSnapshot debug_snapshot(bool include_route_geometry = true) const;
     std::vector<std::size_t> ranking() const { return ranking_; }
@@ -156,12 +183,14 @@ class RaceSession {
     void update_ranking();
     Result combat_commands(std::size_t, float, const InputState&, std::string&);
     void activate_nitrous(std::size_t);
-    Result advance_combat(float, std::string&);
+    Result advance_combat(float, std::string&, bool callbacks_only = false);
+    Result update_cameras(float, std::string&);
     Result advance_audio(float, std::string&);
     Result refresh_side_target(std::size_t, std::string&);
     std::vector<RaceAiCombatVehicleView> combat_views() const;
     Result apply_combat_damage(std::size_t, std::size_t, float, bool, bool, bool,
-                               WeaponProjectileImpulse, std::string&);
+                               WeaponProjectileImpulse, std::string&,
+                               bool projectile_visual = false);
     RaceStart start_;
     RaceOptions options_;
     RaceRoute route_;
@@ -204,13 +233,39 @@ class RaceSession {
     std::uint64_t ticks_{};
     std::uint32_t random_state_{};
     std::size_t scanner_{};
-    bool paused_{}, player_autopilot_{};
+    bool paused_{}, player_autopilot_{}, attract_look_back_{};
     RacePhase phase_{RacePhase::countdown};
     RaceEndReason ending_{RaceEndReason::none};
     float idle_return_timer_{10};
     bool idle_return_requested_{};
     float time_table_remaining_{15};
     int native_camera_mode_{4};
+    bool look_back_{};
     std::size_t spectator_target_{};
+    OriginalChaseCamera spectator_chase_;
+    OriginalChaseCamera spectator_steering_chase_;
+    CameraFrame spectator_chase_frame_;
+    RaceTimeRecords time_records_;
+    std::string user_name_;
+    bool time_records_dirty_{};
+    struct ReplaySavedState;
+    struct ReplayRecordedState {
+        float internal_hp{};
+        std::array<float, 4> armor_hp{};
+        std::size_t marks{}, deformations{};
+    };
+    std::shared_ptr<ReplaySavedState> replay_saved_;
+    std::vector<RaceReplayTrack> replay_tracks_;
+    std::vector<ReplayRecordedState> replay_previous_;
+    std::vector<std::array<float, 4>> replay_wheel_spins_;
+    std::vector<bool> replay_nitrous_flags_;
+    std::optional<std::size_t> replay_clock_owner_;
+    float replay_seconds_{};
+    bool replay_initializing_{}, replay_paused_{}, replay_prepared_{};
+    int replay_selection_{2};
+    Result reset_replay_recording(std::string& error, bool preserve_spins = false);
+    Result record_replay(float delta, std::string& error);
+    Result advance_replay(float delta, std::string& error);
+    ReplayTarget replay_target(std::size_t owner);
 };
 } // namespace roadwars

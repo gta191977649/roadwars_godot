@@ -338,8 +338,8 @@ func run_test() -> void:
             if not await pump():
                 return
             root.size = Vector2i(640, 480)
-        if state.get("phase", "") == "results":
-            completed = state.get("completed", false)
+        if state.get("pause_menu", false) and state.get("terminal", false):
+            completed = true
             break
         if frame % 240 == 0:
             print("COMPETITION_PROGRESS ", state)
@@ -386,17 +386,70 @@ func run_test() -> void:
         return
     if not require(completed, "Recovered AI did not finish within 900 simulated seconds"):
         return
-    if not require(host.get_frontend_screen() == "race_results", "Player finish did not show actual results"):
+    if not require(host.get_competition_state().pause_menu and
+                   host.get_competition_state().terminal,
+                   "Terminal idle expiry did not open the live race-over menu"):
         return
-    if not require(host.frontend_test_step(4.0, ""), "Result entry animation failed"):
+    # CANCEL/ESC preserves the terminal race for native keyboard spectating.
+    key_event(KEY_ESCAPE, true)
+    key_event(KEY_ESCAPE, false)
+    if not await pump():
+        return
+    if not require(not host.get_competition_state().paused,
+                   "Race-over cancellation did not resume the live terminal race"):
+        return
+    for selection in [[KEY_F1, 0], [KEY_F2, 4], [KEY_F3, 1], [KEY_F4, 2],
+                      [KEY_F5, 3], [KEY_F6, 5]]:
+        key_event(selection[0], true)
+        key_event(selection[0], false)
+        if not require(host.competition_test_step(1.0 / 60, false), "Native spectator step failed"):
+            return
+        if not require(host.get_competition_state().native_camera_mode == selection[1],
+                       "Native function-key camera mode was not selected"):
+            return
+        await process_frame
+    var spectator_before: int = host.get_competition_state().spectator_target
+    key_event(KEY_F6, true)
+    key_event(KEY_F6, false)
+    if not await pump():
+        return
+    if not require(host.get_competition_state().spectator_target ==
+                   (spectator_before + 1) % host.get_competition_state().participants,
+                   "Repeated native F6 did not cycle the full participant array"):
+        return
+    key_event(KEY_F11, true)
+    key_event(KEY_F11, false)
+    if not require(host.get_competition_state().time_table_remaining == 0,
+                   "F11 did not hide the terminal table"):
+        return
+    key_event(KEY_F11, true)
+    key_event(KEY_F11, false)
+    if not require(host.get_competition_state().time_table_remaining == 15,
+                   "F11 did not restore the terminal table"):
+        return
+    key_event(KEY_ESCAPE, true)
+    key_event(KEY_ESCAPE, false)
+    if not await pump():
         return
     if not await capture("race_results"):
         return
-    if not require(host.frontend_test_step(0.0, "accept"), "Result accept failed"):
+    # CANCEL resumes the live terminal world; the third no-replay row exits.
+    key_event(KEY_DOWN, true)
+    key_event(KEY_DOWN, false)
+    if not await pump():
         return
-    if not require(host.frontend_test_step(0.4, ""), "Result return transition failed"):
+    key_event(KEY_DOWN, true)
+    key_event(KEY_DOWN, false)
+    if not await pump():
         return
-    if not require(host.get_frontend_screen() == "main_menu", "Results did not return to the main menu"):
+    key_event(KEY_ENTER, true)
+    key_event(KEY_ENTER, false)
+    # The exit action releases the race session during this step.
+    if not require(host.competition_test_step(0.0, false), "Race-over exit action failed"):
+        return
+    await process_frame
+    if not require(host.get_frontend_screen() == "main_menu",
+                   "Race-over EXIT TO MAIN MENU did not return to the main menu"):
         return
     for cycle in range(3):
         host.restart_smoke_scene()

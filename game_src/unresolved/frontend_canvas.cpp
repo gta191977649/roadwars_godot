@@ -126,43 +126,53 @@ void FrontendCanvas::rectangle(HudRect r, std::array<float, 4> color) {
     for (auto& c : commands_.back().colors)
         c = color;
 }
-int FrontendCanvas::font_height(FrontendFont font) const {
-    return fonts_[static_cast<std::size_t>(font)].glyphs.height();
+int FrontendCanvas::font_height(FrontendFont font, float scale) const {
+    return static_cast<int>(fonts_[static_cast<std::size_t>(font)].glyphs.height() * scale);
 }
-int FrontendCanvas::text_width(FrontendFont font, std::string_view value) const {
+// RE: 93b4e4c301a5694b55e16977c2e52f4971bd9089659e3d58617c8af2368436c8:function:004e13f7
+int FrontendCanvas::text_width(FrontendFont font, std::string_view value, float scale) const {
     const auto& f = fonts_[static_cast<std::size_t>(font)];
     int width = 0;
     for (unsigned char c : value)
-        width += (c == ' ' ? f.glyphs.space_width() : f.glyphs.glyph(c).width) + f.spacing;
-    return std::max(0, width - f.spacing);
+        width += static_cast<int>(
+            (c == ' ' ? f.glyphs.space_width() : f.glyphs.glyph(c).width + f.spacing) * scale);
+    return width - static_cast<int>(f.spacing * scale);
 }
+// RE: 93b4e4c301a5694b55e16977c2e52f4971bd9089659e3d58617c8af2368436c8:function:004e0a26
 void FrontendCanvas::text(FrontendFont font, float x, float y, std::string_view value,
-                          bool centered, float scale, std::uint32_t top, std::uint32_t bottom) {
+                          bool centered, float scale, std::uint32_t top, std::uint32_t bottom,
+                          FrontendVerticalAlign vertical, float top_offset_x) {
     const auto& f = fonts_[static_cast<std::size_t>(font)];
     if (centered)
-        x -= text_width(font, value) * scale / 2;
+        x -= text_width(font, value, scale) / 2;
+    if (vertical == FrontendVerticalAlign::center)
+        y -= static_cast<int>(f.glyphs.height() * scale / 2);
     const auto color = [](std::uint32_t c) {
         return std::array<float, 4>{((c >> 16) & 255) / 255.f, ((c >> 8) & 255) / 255.f,
                                     (c & 255) / 255.f, (c >> 24) / 255.f};
     };
     for (unsigned char c : value) {
         if (c == ' ') {
-            x += (f.glyphs.space_width() + f.spacing) * scale;
+            x += static_cast<int>(f.glyphs.space_width() * scale);
             continue;
         }
         const auto& g = f.glyphs.glyph(c);
-        if (!g.width)
+        if (!g.width) {
+            x += static_cast<int>(f.spacing * scale);
             continue;
+        }
         sprite(f.sprite, {static_cast<int>(x), static_cast<int>(y),
                           static_cast<int>(g.width * scale), static_cast<int>(g.height * scale)});
         auto& q = commands_.back();
+        q.positions[0][0] += top_offset_x;
+        q.positions[1][0] += top_offset_x;
         const float u = static_cast<float>(g.x) / f.sprite.width;
         const float v = 1 - static_cast<float>(g.y) / f.sprite.height;
         const float right = static_cast<float>(g.x + g.width) / f.sprite.width;
         const float lower = 1 - static_cast<float>(g.y + g.height) / f.sprite.height;
         q.uv = {{{u, v}, {right, v}, {right, lower}, {u, lower}}};
         q.colors = {color(top), color(top), color(bottom), color(bottom)};
-        x += (g.width + f.spacing) * scale;
+        x += static_cast<int>((g.width + f.spacing) * scale);
     }
 }
 } // namespace roadwars

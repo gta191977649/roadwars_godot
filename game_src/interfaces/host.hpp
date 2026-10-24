@@ -74,6 +74,7 @@ struct InputState {
     bool current_weapon_down{}, current_weapon_requested{}, cycle_weapon_down{},
         cycle_weapon_requested{};
     bool any_key_down{};
+    bool look_back{};
 };
 enum class Result { ok, invalid_argument, unavailable, not_found };
 class ResourceReader {

@@ -304,6 +304,7 @@ Result SceneTurretCombat::emit_damage(std::size_t turret, const WeaponProjectile
     event.hitpoints = asset.parameters.hitpoints;
     event.point = hit.point;
     event.has_impulse = asset.rocket || item.salvo.applies_impact_impulse();
+    event.projectile_visual = !asset.rocket;
     if (event.has_impulse) {
         const auto result = asset.rocket
                                 ? weapon_rocket_impact_impulse(item.rocket, asset.parameters,

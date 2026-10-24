@@ -12,6 +12,7 @@ struct VehiclePairContact {
     unsigned rollback_iterations{};
 };
 std::array<Vec3, 4> vehicle_pair_footprint(const VehicleParameters&, const VehicleState&);
+Vec3 vehicle_contact_velocity(const VehicleState&, Vec3 world_point);
 VehiclePairContact
 solve_vehicle_collision(const VehicleParameters& a_parameters, VehicleState& a,
                         const VehicleState& previous_a, const VehicleParameters& b_parameters,

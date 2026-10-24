@@ -1,11 +1,37 @@
 #include "game_src/unresolved/race_frontend.hpp"
 #include "game_src/unresolved/cockpit_frontend.hpp"
 #include <algorithm>
-#include <cmath>
 #include <cctype>
+#include <cmath>
+#include <limits>
 #include <numbers>
 
 namespace roadwars {
+// RE: 93b4e4c301a5694b55e16977c2e52f4971bd9089659e3d58617c8af2368436c8:function:004619ad
+Result load_race_time_records(ResourceStore& resources, std::string_view track,
+                              RaceTimeRecords& output) {
+    Configuration config;
+    const auto loaded = config.load(resources, "Tracks/" + std::string(track) + "/User.txt");
+    if (loaded == Result::not_found) {
+        output = {};
+        return Result::ok;
+    }
+    if (loaded != Result::ok)
+        return loaded;
+    RaceTimeRecords records;
+    for (const auto& [section, record] :
+         {std::pair{"BESTLAP", &records.best_lap}, std::pair{"BESTTIME", &records.best_total}}) {
+        if (config.number(section, "TIME(SECONDS)", record->seconds) != Result::ok ||
+            !std::isfinite(record->seconds) || record->seconds < 0 || record->seconds > 10000000)
+            return Result::invalid_argument;
+        if (record->seconds != 0) {
+            record->user = config.value(section, "USER");
+            record->character = config.value(section, "CHARACTER");
+        }
+    }
+    output = std::move(records);
+    return Result::ok;
+}
 // RE: 93b4e4c301a5694b55e16977c2e52f4971bd9089659e3d58617c8af2368436c8:function:00461505
 std::string format_race_time(float seconds, std::string_view no_record) {
     if (!std::isfinite(seconds) || seconds <= 0 || seconds > 100000000)
@@ -17,10 +43,11 @@ std::string format_race_time(float seconds, std::string_view no_record) {
     // Native formatting truncates each digit independently, rather than rounding.
     const double time = seconds;
     const auto tenths = static_cast<int>(10 * (time - std::floor(time)));
-    const double scaled = seconds * 10.f;
+    // 00461672 stores the x87 product as double, without rounding it back to float.
+    const double scaled = time * 10.0;
     const auto hundredths = static_cast<int>(10 * (scaled - std::floor(scaled)));
-    return two_digits(whole / 60) + "'" + two_digits(whole % 60) + "''" +
-           std::to_string(tenths) + std::to_string(hundredths);
+    return two_digits(whole / 60) + "'" + two_digits(whole % 60) + "''" + std::to_string(tenths) +
+           std::to_string(hundredths);
 }
 // RE: 93b4e4c301a5694b55e16977c2e52f4971bd9089659e3d58617c8af2368436c8:function:00489fbb
 Result race_lap_summary(const FrontendRacer& racer, int total_laps, RaceLapSummary& output) {
@@ -127,6 +154,7 @@ RaceFrontend::RaceFrontend(Renderer& renderer)
 RaceFrontend::~RaceFrontend() { stop(); }
 void RaceFrontend::stop() {
     fade_remaining_ = 0;
+    transition_opacity_ = 0;
     cockpit_->stop();
     equipment_loaded_ = false;
     if (loaded_ || !textures_.empty())
@@ -208,7 +236,7 @@ Result RaceFrontend::load(ResourceStore& resources, std::string_view track, Vec3
     if (!fade_pixel_.texture.value)
         return fail(Result::unavailable, "race fade texture upload failed");
     textures_.push_back(fade_pixel_.texture);
-    const std::array<std::pair<std::string, Sprite*>, 8> assets{
+    const std::array<std::pair<std::string, Sprite*>, 9> assets{
         {{"RaceInterface/xxSpeedOMeter.bmp", &meter_},
          {"RaceInterface/16SpeedOMeterNeedle.bmp", &needle_},
          {"Tracks/" + std::string(track) + "/Map/16Map.bmp", &map_texture_},
@@ -216,7 +244,8 @@ Result RaceFrontend::load(ResourceStore& resources, std::string_view track, Vec3
          {"RaceInterface/16MapEliminated.bmp", &eliminated_},
          {"RaceInterface/16MapFinished.bmp", &finished_},
          {"Fonts/16Font1.bmp", &font_texture_},
-         {"Fonts/16321go.bmp", &countdown_texture_}}};
+         {"Fonts/16321go.bmp", &countdown_texture_},
+         {"Replay/Interface/16Base.bmp", &replay_base_}}};
     Bitmap font_bitmap, countdown_bitmap;
     for (const auto& [path, sprite] : assets) {
         const auto result = load_sprite(resources, path, *sprite,
@@ -317,8 +346,7 @@ Result RaceFrontend::update(const FrontendFrame& frame) {
         return Result::invalid_argument;
     if (frame.racers.empty() || frame.racers.size() > 6 ||
         frame.player_index >= frame.racers.size() || !std::isfinite(frame.speed) ||
-        !std::isfinite(frame.rpm) || std::abs(frame.speed) > 1000000 ||
-        std::abs(frame.rpm) > 1000000 || frame.gear_index < 0 || frame.gear_index > 6)
+        !std::isfinite(frame.rpm) || frame.gear_index < 0 || frame.gear_index > 6)
         return Result::invalid_argument;
     for (const auto& racer : frame.racers)
         if (racer.character_index >= dots_.size() || !std::isfinite(racer.position.x) ||
@@ -328,19 +356,47 @@ Result RaceFrontend::update(const FrontendFrame& frame) {
             std::abs((racer.position.z - map_.start.z) * map_.scale) > 100000000)
             return Result::invalid_argument;
     const auto& player = frame.racers[frame.player_index];
+    if (frame.replay) {
+        // RE: 93b4e4c301a5694b55e16977c2e52f4971bd9089659e3d58617c8af2368436c8:function:0048e9e7
+        const auto region = [&](HudRect destination, int x, int y, int w, int h, float alpha) {
+            sprite(replay_base_, destination, alpha);
+            auto& q = commands_.back();
+            const float l = static_cast<float>(x) / replay_base_.width;
+            const float t = 1 - static_cast<float>(y) / replay_base_.height;
+            const float r = static_cast<float>(x + w) / replay_base_.width;
+            const float b = 1 - static_cast<float>(y + h) / replay_base_.height;
+            q.uv = {{{l, t}, {r, t}, {r, b}, {l, b}}};
+        };
+        region({192, 430, 256, 39}, 0, 0, 128, 19, .3f);
+        for (int i = 0; i < 7; ++i) {
+            int row = 0;
+            if (i == 2)
+                row = frame.replay_paused ? 0 : 1;
+            if (i == 6)
+                row = frame.replay_camera_mode == 4   ? 0
+                      : frame.replay_camera_mode == 1 ? 1
+                      : frame.replay_camera_mode == 2 ? 2
+                      : frame.replay_camera_mode == 3 ? 3
+                                                      : 4;
+            region({202 + i * 34, 438, 34, 28}, i * 17, 21 + row * 14, 17, 14,
+                   frame.replay_selection == i ? .9f : .3f);
+        }
+        return submit();
+    }
     if (frame.cockpit && visible_) {
-        const auto result = cockpit_->draw(frame.cockpit_character, frame.steering_fraction,
-                                           frame.rpm, frame.speed, frame.gear_index, frame.reverse,
-                                           frame.viewport_aspect, commands_,
-                                           !frame.equipment || frame.equipment->selected_item == 0);
+        const auto result =
+            cockpit_->draw(frame.cockpit_character, frame.steering_fraction, frame.rpm, frame.speed,
+                           frame.gear_index, frame.reverse, frame.viewport_aspect, commands_,
+                           !frame.equipment || frame.equipment->selected_item == 0);
         if (result != Result::ok)
             return result;
         const auto equipment = frame.equipment.value_or(FrontendEquipmentFrame{});
         if (cockpit_->draw_readouts(frame.cockpit_character, frame.cockpit_weapon_names,
-                                    equipment.ammunition, equipment.present, commands_) != Result::ok)
+                                    equipment.ammunition, equipment.present,
+                                    commands_) != Result::ok)
             return Result::unavailable;
     }
-    if (frame.weapon_lock_warning && !player.eliminated) {
+    if (visible_ && frame.weapon_lock_warning && !player.eliminated) {
         // 004823af..00482446: original English localization key006196e4.
         // The native anchor is300 (0x12c), rather than the other HUD labels'320.
         constexpr std::string_view label = "WEAPONS LOCKED";
@@ -357,6 +413,23 @@ Result RaceFrontend::update(const FrontendFrame& frame) {
         return submit();
     const bool terminal = player.eliminated || player.finished;
     if (terminal && frame.time_table_visible && !frame.cockpit && frame.race_info) {
+        const auto uppercase = [](std::string value) {
+            std::transform(value.begin(), value.end(), value.begin(),
+                           [](unsigned char c) { return static_cast<char>(std::toupper(c)); });
+            return value;
+        };
+        sprite(fade_pixel_, {7, 5, 626, font_.height() + 31}, .6f, 0);
+        text(10, 10, uppercase(frame.track_name));
+        if (frame.time_records) {
+            for (const auto& [x, record] : {std::pair{320, &frame.time_records->best_lap},
+                                            std::pair{500, &frame.time_records->best_total}}) {
+                text(x, 10, format_race_time(record->seconds));
+                if (record->seconds != 0) {
+                    text(x, 23 + font_.height(), uppercase(record->character));
+                    text(x, 21 + (font_.height() + 2) * 2, uppercase(record->user));
+                }
+            }
+        }
         const int header_y = 41 + font_.height();
         text(80, header_y, "NAME");
         text(320, header_y, "BEST LAP");
@@ -376,9 +449,8 @@ Result RaceFrontend::update(const FrontendFrame& frame) {
                 sprite(fade_pixel_, {7, y - 3, 623, font_.height() + 6}, .6f, 0);
             text(10, y, std::to_string(row + 1));
             std::string name = racer.name;
-            std::transform(name.begin(), name.end(), name.begin(), [](unsigned char c) {
-                return static_cast<char>(std::toupper(c));
-            });
+            std::transform(name.begin(), name.end(), name.begin(),
+                           [](unsigned char c) { return static_cast<char>(std::toupper(c)); });
             text(80, y, name);
             text(320, y, times.best_dnf ? "DNF" : format_race_time(times.best_lap));
             text(500, y, times.total_dnf ? "DNF" : format_race_time(times.total));
@@ -412,8 +484,12 @@ Result RaceFrontend::update(const FrontendFrame& frame) {
             return submit();
     }
     if (!terminal && speedometer_ && !frame.cockpit) {
+        const auto mph = frame.speed * 2.236997365951538f;
+        if (!std::isfinite(mph) || static_cast<double>(mph) > std::numeric_limits<int>::max() ||
+            static_cast<double>(mph) < std::numeric_limits<int>::min())
+            return Result::invalid_argument;
         sprite(meter_, {512, 352, meter_.width, meter_.height});
-        text(583, 425, std::to_string(static_cast<int>(frame.speed * 2.236997365951538f)));
+        text(583, 425, std::to_string(static_cast<int>(mph)));
         sprite(needle_, {546, 398, needle_.width, needle_.height}, 1, 1,
                (frame.rpm / 8000.0f) * 165.0f + 60.0f, {577, 418});
         constexpr std::array<std::string_view, 7> gears{"1ST", "2ND", "3RD", "4TH",
@@ -475,23 +551,23 @@ Result RaceFrontend::update(const FrontendFrame& frame) {
                 sprite(border_, rect);
         }
         if (!frame.cockpit)
-        for (std::size_t slot = 0; slot < frame.racers.size(); ++slot) {
-            if (!frame.ranking.empty() && frame.ranking.size() != frame.racers.size())
-                return Result::invalid_argument;
-            const auto i = frame.ranking.empty() ? slot : frame.ranking[slot];
-            if (i >= frame.racers.size())
-                return Result::invalid_argument;
-            const auto& racer = frame.racers[i];
-            const auto tint = i == frame.player_index ? 1.0f : 100.0f / 255;
-            const HudRect rect{4, 360 + static_cast<int>(slot) * 20, 17, 17};
-            sprite(portraits_[racer.character_index], rect, 1, tint);
-            if (racer.eliminated)
-                sprite(eliminated_, rect, 1, tint);
-            else if (racer.finished)
-                sprite(finished_, rect, 1, tint);
-        }
+            for (std::size_t slot = 0; slot < frame.racers.size(); ++slot) {
+                if (!frame.ranking.empty() && frame.ranking.size() != frame.racers.size())
+                    return Result::invalid_argument;
+                const auto i = frame.ranking.empty() ? slot : frame.ranking[slot];
+                if (i >= frame.racers.size())
+                    return Result::invalid_argument;
+                const auto& racer = frame.racers[i];
+                const auto tint = i == frame.player_index ? 1.0f : 100.0f / 255;
+                const HudRect rect{4, 360 + static_cast<int>(slot) * 20, 17, 17};
+                sprite(portraits_[racer.character_index], rect, 1, tint);
+                if (racer.eliminated)
+                    sprite(eliminated_, rect, 1, tint);
+                else if (racer.finished)
+                    sprite(finished_, rect, 1, tint);
+            }
     }
-    if (player.eliminated) {
+    if (player.eliminated && frame.spectator_is_player) {
         constexpr std::string_view label = "CAR ELIMINATED";
         int width = -2;
         for (unsigned char character : label)
@@ -521,6 +597,8 @@ Result RaceFrontend::submit() {
     // User-requested transition covers the world and HUD, including hidden-HUD intros.
     if (fade_remaining_ > 0)
         sprite(fade_pixel_, {0, 0, 640, 480}, fade_remaining_ / .5f);
+    if (transition_opacity_ > 0)
+        sprite(fade_pixel_, {0, 0, 640, 480}, std::clamp(transition_opacity_, 0.f, 1.f));
     return renderer_.draw_hud(commands_);
 }
 } // namespace roadwars

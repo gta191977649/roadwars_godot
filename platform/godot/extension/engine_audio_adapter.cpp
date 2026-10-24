@@ -1,5 +1,6 @@
-#include "platform/godot/extension/frame_trace.hpp"
 #include "platform/godot/extension/engine_audio_adapter.hpp"
+#include "platform/godot/extension/frame_trace.hpp"
+#include <cmath>
 #include <cstring>
 #include <godot_cpp/core/memory.hpp>
 #include <godot_cpp/variant/packed_byte_array.hpp>
@@ -7,7 +8,7 @@
 
 namespace roadwars {
 EngineAudioAdapter::EngineAudioAdapter(godot::Node& owner, const WavePcm& sample, bool loop,
-                                       std::string_view voice_name)
+                                       std::string_view voice_name, bool spatial)
     : owner_(owner) {
     if (!sample.sample_rate || !sample.frame_count() ||
         (sample.bits_per_sample != 8 && sample.bits_per_sample != 16) ||
@@ -32,43 +33,98 @@ EngineAudioAdapter::EngineAudioAdapter(godot::Node& owner, const WavePcm& sample
     stream_->set_loop_begin(0);
     stream_->set_loop_end(static_cast<int>(sample.frame_count()));
     sample_frames_ = sample.frame_count();
-    player_ = memnew(godot::AudioStreamPlayer);
-    player_->set_name(godot::String::utf8(std::string(voice_name).c_str()));
-    player_->set_stream(stream_);
-    player_->set_max_polyphony(1);
-    player_->set_process_mode(godot::Node::PROCESS_MODE_PAUSABLE);
-    owner_.add_child(player_);
+    if (spatial) {
+        spatial_player_ = memnew(godot::AudioStreamPlayer3D);
+        spatial_player_->set_name(godot::String::utf8(std::string(voice_name).c_str()));
+        spatial_player_->set_stream(stream_);
+        spatial_player_->set_max_polyphony(1);
+        spatial_player_->set_attenuation_model(
+            godot::AudioStreamPlayer3D::ATTENUATION_INVERSE_DISTANCE);
+        spatial_player_->set_unit_size(15);
+        spatial_player_->set_max_distance(125);
+        spatial_player_->set_max_db(0);
+        spatial_player_->set_doppler_tracking(
+            godot::AudioStreamPlayer3D::DOPPLER_TRACKING_DISABLED);
+        spatial_player_->set_process_mode(godot::Node::PROCESS_MODE_PAUSABLE);
+        owner_.add_child(spatial_player_);
+    } else {
+        player_ = memnew(godot::AudioStreamPlayer);
+        player_->set_name(godot::String::utf8(std::string(voice_name).c_str()));
+        player_->set_stream(stream_);
+        player_->set_max_polyphony(1);
+        player_->set_process_mode(godot::Node::PROCESS_MODE_PAUSABLE);
+        owner_.add_child(player_);
+    }
 }
 EngineAudioAdapter::~EngineAudioAdapter() {
-    if (!player_)
-        return;
-    player_->stop();
-    player_->set_stream(godot::Ref<godot::AudioStream>());
-    owner_.remove_child(player_);
-    memdelete(player_);
+    if (spatial_player_) {
+        spatial_player_->stop();
+        spatial_player_->set_stream(godot::Ref<godot::AudioStream>());
+        owner_.remove_child(spatial_player_);
+        memdelete(spatial_player_);
+    }
+    if (player_) {
+        player_->stop();
+        player_->set_stream(godot::Ref<godot::AudioStream>());
+        owner_.remove_child(player_);
+        memdelete(player_);
+    }
 }
 void EngineAudioAdapter::submit(const EngineAudioCommand& command) {
     if (command.action == EngineVoiceAction::stop) {
-        player_->stop();
+        if (player_)
+            player_->stop();
+        else
+            spatial_player_->stop();
         return;
     }
     if (command.action == EngineVoiceAction::none)
         return;
+    if (spatial_player_)
+        spatial_player_->set_global_position(
+            {command.position.x, command.position.y, -command.position.z});
     if (command.set_frequency) {
-        player_->set_pitch_scale(command.pitch_scale);
+        if (player_)
+            player_->set_pitch_scale(command.pitch_scale);
+        else
+            spatial_player_->set_pitch_scale(command.pitch_scale);
         frequency_hz_ = command.frequency_hz;
     }
     if (command.set_volume) {
-        player_->set_volume_linear(command.linear_gain);
+        if (player_)
+            player_->set_volume_linear(command.linear_gain);
+        else {
+            spatial_player_->set_volume_linear(command.linear_gain);
+            // Inverse-distance gain must not amplify nearby sounds above their
+            // portable source gain, including the user's SFX volume setting.
+            spatial_player_->set_max_db(
+                command.linear_gain > 0 ? 20.f * std::log10(command.linear_gain) : -160.f);
+        }
         linear_gain_ = command.linear_gain;
     }
-    if (command.action == EngineVoiceAction::start)
-        player_->play();
+    if (command.action == EngineVoiceAction::start) {
+        if (player_)
+            player_->play();
+        else
+            spatial_player_->play();
+    }
 }
-bool EngineAudioAdapter::playing() const { return player_ && player_->is_playing(); }
+bool EngineAudioAdapter::playing() const {
+    return player_ ? player_->is_playing() : spatial_player_ && spatial_player_->is_playing();
+}
 double EngineAudioAdapter::playback_position() const {
-    return player_ ? player_->get_playback_position() : 0;
+    return player_ ? player_->get_playback_position() : spatial_player_->get_playback_position();
 }
-void EngineAudioAdapter::set_paused(bool paused) { player_->set_stream_paused(paused); }
-void EngineAudioAdapter::seek(double seconds) { player_->seek(seconds); }
+void EngineAudioAdapter::set_paused(bool paused) {
+    if (player_)
+        player_->set_stream_paused(paused);
+    else
+        spatial_player_->set_stream_paused(paused);
+}
+void EngineAudioAdapter::seek(double seconds) {
+    if (player_)
+        player_->seek(seconds);
+    else
+        spatial_player_->seek(seconds);
+}
 } // namespace roadwars

@@ -12,6 +12,10 @@ func check(value: bool, message: String) -> bool:
     return value
 
 func run_test() -> void:
+    if not ClassDB.class_exists("GameHost"):
+        push_error("GameHost extension is unavailable")
+        quit(1)
+        return
     host = ClassDB.instantiate("GameHost")
     root.add_child(host)
     host.set_process(false)
@@ -23,15 +27,18 @@ func run_test() -> void:
     check(not host.graphics_test_apply({"render_scale": 0.1}, false), "Invalid scale accepted")
     check(host.graphics_test_apply({"window_mode": 1}, false), "Borderless failed")
     await process_frame
-    check(DisplayServer.window_get_flag(DisplayServer.WINDOW_FLAG_BORDERLESS), "Borderless flag absent")
+    check(DisplayServer.window_get_mode() == DisplayServer.WINDOW_MODE_FULLSCREEN, "Borderless fullscreen mode absent")
     check(host.graphics_test_apply({"window_mode": 2}, false), "Fullscreen failed")
     await process_frame
     check(DisplayServer.window_get_mode() in [DisplayServer.WINDOW_MODE_FULLSCREEN, DisplayServer.WINDOW_MODE_EXCLUSIVE_FULLSCREEN], "Fullscreen mode absent")
     check(host.graphics_test_apply(original, false), "Restore live settings failed")
+    for frame in range(3):
+        await process_frame
+    check(DisplayServer.window_get_mode() == DisplayServer.WINDOW_MODE_WINDOWED, "Window restore did not reach the actual display")
     check(host.graphics_test_apply({"fps_limit": 90}, true), "Atomic save failed")
     var saved := ConfigFile.new()
     check(saved.load("user://graphics.cfg") == OK and saved.get_value("graphics", "fps_limit") == 90, "Saved settings invalid")
-    var target_backend: int = 2 if 2 in original.backends else 1
+    var target_backend: int = 4 if 4 in original.backends else 1
     if target_backend in original.backends:
         check(host.graphics_test_apply({"backend": target_backend}, true), "Backend save/probe failed")
         check(host.get_graphics_state().active_backend == original.active_backend, "Backend changed before restart")

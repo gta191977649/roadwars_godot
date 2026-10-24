@@ -4,6 +4,10 @@ func _initialize() -> void:
     call_deferred("run_test")
 
 func run_test() -> void:
+    if not ClassDB.class_exists("GameHost"):
+        push_error("GameHost extension is unavailable")
+        quit(1)
+        return
     # No scene startup or installation assets are required by the renderer fixture.
     var host = ClassDB.instantiate("GameHost")
     var valid: bool = host.test_graphics_quality()

@@ -103,6 +103,26 @@ class VehicleDynamics {
     // Borrowed only by the portable race's recovered pair-collision phase.
     VehicleState& collision_state() { return state_; }
     void refresh_after_pair_collision() { cache_wheels(); }
+    // Replay reuses the native vehicle's current dynamic/presentation baseline.
+    void seed_replay_state(const VehicleDynamics& source) {
+        state_ = source.state_;
+        body_ = source.body_;
+        contacts_ = source.contacts_;
+        wheel_points_ = source.wheel_points_;
+        local_wheel_heights_ = source.local_wheel_heights_;
+        tire_particle_sources_ = source.tire_particle_sources_;
+        tire_audio_input_ = source.tire_audio_input_;
+        oil_contacts_ = source.oil_contacts_;
+        disabled_contact_1c_ = source.disabled_contact_1c_;
+    }
+    void commit_replay_state(VehicleDynamics& source) {
+        seed_replay_state(source);
+        equipment_ = source.equipment_;
+        combat_ = std::move(source.combat_);
+        damage_visuals_ = std::move(source.damage_visuals_);
+        collision_audio_ = std::move(source.collision_audio_);
+        particle_impacts_ = std::move(source.particle_impacts_);
+    }
     void append_pair_collision_event(float strength, Vec3 position) {
         collision_audio_.vehicle_contact(strength, position);
     }
@@ -164,6 +184,7 @@ class VehicleDynamics {
     std::span<const CollisionAudioEvent> collision_audio_events() const {
         return collision_audio_.events();
     }
+    Result advance_replay_collision_audio(float delta) { return collision_audio_.advance(delta); }
     const std::array<TireParticleSource, 4>& tire_particle_sources() const {
         return tire_particle_sources_;
     }

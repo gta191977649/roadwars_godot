@@ -180,6 +180,10 @@ EngineAudioCommand RaceMusic::gain(float scale) const {
     command.linear_gain = static_cast<float>(command.qmdx_volume) / 32767;
     return command;
 }
+void RaceMusic::set_volume(float volume) {
+    if (std::isfinite(volume) && volume >= 0 && volume <= 1)
+        volume_ = volume;
+}
 Result RaceMusic::load_track(ResourceStore& resources, std::string_view path,
                              std::string_view volume_key, std::string& error) {
     playing_ = false;

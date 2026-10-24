@@ -50,7 +50,8 @@ Result RacePresentation::configure_frontend(ResourceStore& resources, std::strin
     return update_frontend(initial);
 }
 Result RacePresentation::update_frontend(const VehicleState& state) {
-    const std::array<FrontendRacer, 1> racers{{{state.position, 0}}};
+    std::array<FrontendRacer, 1> racers{};
+    racers[0].position = state.position;
     FrontendFrame frame;
     frame.developer_build = developer_build_;
     frame.racers = racers;
@@ -155,13 +156,37 @@ Result RacePresentation::load_vehicle_visual(ResourceStore& resources, std::stri
         throw std::runtime_error(error);
     wheel_spins_ = {};
     tire.position = {}; // 00412834 -> 004d2ea1 clears the loaded child transform on attach.
+    std::array<MeshObject, 5> tire_meshes;
+    tire_meshes[0] = tire;
+    tire_lods_ = {true, false, false, false, false};
+    for (std::size_t level = 1; level < tire_meshes.size(); ++level) {
+        const auto found = resources.read(tires_path + "/SpatialObject" + std::to_string(level) +
+                                          ".msh", bytes);
+        if (found == Result::not_found)
+            continue;
+        if (found != Result::ok || decode_msh(bytes, tire_meshes[level], error) != Result::ok)
+            throw std::runtime_error("Invalid selected tire LOD");
+        tire_meshes[level].position = {};
+        tire_meshes[level].children.clear();
+        tire_lods_[level] = true;
+    }
     const auto attach = [&](const auto& self, const MeshObject& node, Vec3 parent) -> void {
         const auto position = add(parent, node.position);
         if (node.name == "Tire1" || node.name == "Tire2" || node.name == "Tire3" ||
             node.name == "Tire4") {
             const auto index = static_cast<std::size_t>(node.name.back() - '1');
             wheel_poses_[index] = original_wheel_transform(index, position, 0, 0, wheel_scale_x_);
-            upload(resources, tire, tires_path, {}, true, static_cast<int>(index));
+            for (std::size_t level = 0; level < tire_meshes.size(); ++level) {
+                if (!tire_lods_[level])
+                    continue;
+                const auto begin = vehicle_instances_.size();
+                upload(resources, tire_meshes[level], tires_path, {}, true, static_cast<int>(index));
+                for (auto n = begin; n < vehicle_instances_.size(); ++n) {
+                    auto& draw = instances_[vehicle_instances_[n]];
+                    if (draw.path.empty())
+                        draw.tire_lod = static_cast<int>(level);
+                }
+            }
         }
         for (const auto& child : node.children)
             self(self, child, position);
@@ -179,6 +204,7 @@ void RacePresentation::swap_visual(VehicleVisual& value) {
     vehicle_hierarchy_.swap(value.hierarchy);
     vehicle_angles_.swap(value.vehicle_angles);
     std::swap(body_angles_, value.body_angles);
+    tire_lods_.swap(value.tire_lods);
 }
 Result RacePresentation::add_opponent(ResourceStore& resources, std::string_view vehicle,
                                       std::string& error, const TireSelection& tires,
@@ -231,6 +257,72 @@ void RacePresentation::update_opponent(std::size_t index, const VehicleDynamics&
     auto& visual = opponents_.at(index);
     swap_visual(visual);
     update_wheels(vehicle, delta, vehicle.state().brake_amount, reset);
+    update_vehicle(vehicle.transform());
+    swap_visual(visual);
+}
+Result RacePresentation::update_racers(ResourceStore& resources, const RaceSession& session,
+                                       float delta, bool reset, std::string& error) {
+    if (session.racers().empty() || opponents_.size() != session.player_index())
+        return Result::invalid_argument;
+    for (std::size_t i = 0; i < session.player_index(); ++i) {
+        const auto& car = *session.racers()[i].vehicle;
+        if (session.replaying())
+            update_replay_opponent(i, car, session.replay_wheel_spins()[i]);
+        else
+            update_opponent(i, car, delta, reset);
+    }
+    const auto& player = *session.racers()[session.player_index()].vehicle;
+    if (session.replaying())
+        update_replay_wheels(player, session.replay_wheel_spins()[session.player_index()]);
+    else
+        update_wheels(player, delta, player.state().brake_amount, reset);
+    update_vehicle(player.transform());
+    // Replacement body LODs resolve their source node's current pose. Submit them
+    // only after every chassis and wheel has advanced to this simulation tick.
+    return update_combat(resources, session, error);
+}
+float RacePresentation::body_alignment_error() const {
+    float error = 0;
+    const auto compare = [&](Vec3 a, Vec3 b) {
+        error = std::max({error, std::abs(a.x - b.x), std::abs(a.y - b.y), std::abs(a.z - b.z)});
+    };
+    for (const auto& visual : damage_visuals_) {
+        if (visual.instances.empty())
+            continue;
+        const auto& expected = instances_.at(visual.source_instance).pose;
+        compare(visual.submitted_pose.origin, expected.origin);
+        for (int i = 0; i < 3; ++i)
+            compare(visual.submitted_pose.basis[i], expected.basis[i]);
+    }
+    return error;
+}
+void RacePresentation::begin_replay_presentation() {
+    saved_replay_spins_.clear();
+    saved_replay_spins_.push_back(wheel_spins_);
+    for (const auto& visual : opponents_) saved_replay_spins_.push_back(visual.spins);
+    for (auto& visual : damage_visuals_) visual.revision.reset();
+}
+void RacePresentation::end_replay_presentation(std::span<const std::array<float,4>> spins) {
+    if(spins.size()==opponents_.size()+1) {
+        wheel_spins_=spins.back();
+        for(std::size_t i=0;i<opponents_.size();++i) opponents_[i].spins=spins[i];
+    } else if (saved_replay_spins_.size() == opponents_.size()+1) {
+        wheel_spins_ = saved_replay_spins_[0];
+        for (std::size_t i=0;i<opponents_.size();++i) opponents_[i].spins=saved_replay_spins_[i+1];
+    }
+    saved_replay_spins_.clear();
+    for (auto& visual : damage_visuals_) visual.revision.reset();
+}
+void RacePresentation::update_replay_wheels(const VehicleDynamics& vehicle,
+                                            const std::array<float,4>& spins) {
+    wheel_spins_ = spins;
+    update_wheels(vehicle,0,vehicle.state().brake_amount,false);
+}
+void RacePresentation::update_replay_opponent(std::size_t index,const VehicleDynamics& vehicle,
+                                              const std::array<float,4>& spins) {
+    auto& visual=opponents_.at(index);
+    swap_visual(visual);
+    update_replay_wheels(vehicle,spins);
     update_vehicle(vehicle.transform());
     swap_visual(visual);
 }
@@ -382,7 +474,7 @@ void RacePresentation::upload(ResourceStore& resources, const MeshObject& object
         else if (world_nodes_[world_node].animated)
             animated_instances_.push_back(instances_.size());
         instances_.push_back({instance, position, vehicle, object.flags, wheel_index, world_node,
-                              mesh, node_path, part_index, object.name});
+                              mesh, node_path, part_index, object.name, {}, -1});
         Transform transform;
         transform.origin = position;
         renderer_.update_instance(instance, transform);
@@ -1006,6 +1098,7 @@ void RacePresentation::release_damage_visual(DamageVisual& visual) {
         renderer_.destroy_mesh(mesh);
     visual.instances.clear();
     visual.meshes.clear();
+    visual.levels.clear();
 }
 Result RacePresentation::update_damage_visual(ResourceStore& resources,
                                               const VehicleDamageVisuals& source,
@@ -1018,17 +1111,28 @@ Result RacePresentation::update_damage_visual(ResourceStore& resources,
     if (body_root == indices.end())
         return Result::not_found;
     const auto& root = instances_[*body_root];
+    visual.source_instance = *body_root;
     std::size_t lod{};
     if (select_vehicle_body_lod(root.pose.origin, camera_.transform.origin,
                                 renderer_.car_detail(), source.body_lod_count(), lod) != Result::ok)
         return Result::invalid_argument;
     const auto update_pose = [&] {
-        for (const auto handle : visual.instances) {
-            renderer_.update_instance(handle, root.pose);
-            renderer_.set_instance_camera_hidden(handle, visual.camera_hidden);
+        visual.submitted_pose = root.pose;
+        const bool changed = visual.lod != lod;
+        for (std::size_t i = 0; i < visual.instances.size(); ++i) {
+            const auto handle = visual.instances[i];
+            const bool selected = visual.levels[i] == lod;
+            if (selected) {
+                renderer_.update_instance(handle, root.pose);
+                if (changed)
+                    renderer_.reset_instance_interpolation(handle);
+            }
+            if (changed)
+                renderer_.set_instance_visible(handle, selected);
         }
+        visual.lod = lod;
     };
-    if (visual.revision && *visual.revision == source.revision() && visual.lod == lod) {
+    if (visual.revision && *visual.revision == source.revision()) {
         update_pose();
         return Result::ok;
     }
@@ -1057,58 +1161,83 @@ Result RacePresentation::update_damage_visual(ResourceStore& resources,
         if (instance.wheel_index < 0 && instance.path == root.path)
             renderer_.set_instance_visible(instance.handle, false);
     }
-    release_damage_visual(visual);
-    const auto* node = &source.body_lod(lod);
-    for (std::size_t part_index = 0; part_index < node->parts.size(); ++part_index) {
-        const auto& part = node->parts[part_index];
-        if (part.indices.empty())
-            continue;
-        MaterialHandle surface;
-        if (ResourceStore::canonical(part.texture) == paint_name) {
-            const bool chrome = chrome_mapping_applies(chrome_enabled_, node->flags,
-                                                       part_index, chrome_texture_.value);
-            std::string key = std::to_string(node->flags) + ":chrome=" +
-                              std::to_string(chrome ? chrome_texture_.value : 0);
-            for (const auto color : part.color)
-                key += ":" + std::to_string(std::bit_cast<std::uint32_t>(color));
-            const auto cached = visual.materials.find(key);
-            if (cached != visual.materials.end())
-                surface = cached->second;
-            else {
-                const auto global_key = "damage:" + std::to_string(visual.paint.value) + ":" + key;
-                const auto shared = materials_.find(global_key);
-                if (shared != materials_.end())
-                    surface = shared->second;
+    std::size_t slot{};
+    for (std::size_t level = 0; level < source.body_lod_count(); ++level) {
+        const auto* node = &source.body_lod(level);
+        for (std::size_t part_index = 0; part_index < node->parts.size(); ++part_index) {
+            const auto& part = node->parts[part_index];
+            if (part.indices.empty())
+                continue;
+            MaterialHandle surface;
+            if (ResourceStore::canonical(part.texture) == paint_name) {
+                const bool chrome = chrome_mapping_applies(chrome_enabled_, node->flags,
+                                                           part_index, chrome_texture_.value);
+                std::string key = std::to_string(node->flags) + ":chrome=" +
+                                  std::to_string(chrome ? chrome_texture_.value : 0);
+                for (const auto color : part.color)
+                    key += ":" + std::to_string(std::bit_cast<std::uint32_t>(color));
+                const auto cached = visual.materials.find(key);
+                if (cached != visual.materials.end())
+                    surface = cached->second;
                 else {
-                    auto settings =
-                        surface_settings(part, node->flags, source.texture_transparency());
-                    if (chrome)
-                        settings.chrome_map = chrome_texture_;
-                    surface = renderer_.create_material(visual.paint, settings);
-                    if (!surface.value)
-                        return Result::unavailable;
-                    materials_.emplace(global_key, surface);
+                    const auto global_key = "damage:" + std::to_string(visual.paint.value) + ":" + key;
+                    const auto shared = materials_.find(global_key);
+                    if (shared != materials_.end())
+                        surface = shared->second;
+                    else {
+                        auto settings =
+                            surface_settings(part, node->flags, source.texture_transparency());
+                        if (chrome)
+                            settings.chrome_map = chrome_texture_;
+                        surface = renderer_.create_material(visual.paint, settings);
+                        if (!surface.value)
+                            return Result::unavailable;
+                        materials_.emplace(global_key, surface);
+                    }
+                    visual.materials.emplace(key, surface);
                 }
-                visual.materials.emplace(key, surface);
+            } else {
+                const auto base = std::string(source.texture_path().substr(0, slash));
+                surface = material(resources, base, part, node->flags,
+                    chrome_mapping_applies(chrome_enabled_, node->flags, part_index,
+                                           chrome_texture_.value));
             }
-        } else {
-            const auto base = std::string(source.texture_path().substr(0, slash));
-            surface = material(resources, base, part, node->flags,
-                chrome_mapping_applies(chrome_enabled_, node->flags, part_index,
-                                       chrome_texture_.value));
+            std::vector<std::array<float, 2>> uv;
+            for (const auto coordinate : part.uv)
+                uv.push_back({coordinate.x, coordinate.y});
+            const auto mesh = renderer_.upload_surface(part.positions, uv, part.indices, surface,
+                                                       part.normals, part.colors);
+            if (!mesh.value)
+                return Result::unavailable;
+            if (slot < visual.instances.size()) {
+                if (renderer_.set_instance_mesh(visual.instances[slot], mesh) != Result::ok) {
+                    renderer_.destroy_mesh(mesh);
+                    return Result::unavailable;
+                }
+                renderer_.destroy_mesh(visual.meshes[slot]);
+                visual.meshes[slot] = mesh;
+                visual.levels[slot] = level;
+            } else {
+                const auto handle = renderer_.create_instance(mesh);
+                if (!handle.value) {
+                    renderer_.destroy_mesh(mesh);
+                    return Result::unavailable;
+                }
+                visual.meshes.push_back(mesh);
+                visual.instances.push_back(handle);
+                visual.levels.push_back(level);
+                renderer_.set_instance_visible(handle, level == lod);
+                renderer_.set_instance_camera_hidden(handle, visual.camera_hidden);
+            }
+            ++slot;
         }
-        std::vector<std::array<float, 2>> uv;
-        for (const auto coordinate : part.uv)
-            uv.push_back({coordinate.x, coordinate.y});
-        const auto mesh = renderer_.upload_surface(part.positions, uv, part.indices, surface,
-                                                   part.normals, part.colors);
-        if (!mesh.value)
-            return Result::unavailable;
-        visual.meshes.push_back(mesh);
-        const auto handle = renderer_.create_instance(mesh);
-        if (!handle.value)
-            return Result::unavailable;
-        visual.instances.push_back(handle);
+    }
+    while (visual.instances.size() > slot) {
+        renderer_.destroy_instance(visual.instances.back());
+        renderer_.destroy_mesh(visual.meshes.back());
+        visual.instances.pop_back();
+        visual.meshes.pop_back();
+        visual.levels.pop_back();
     }
     update_pose();
     visual.lod = lod;
@@ -1177,6 +1306,17 @@ void RacePresentation::update_vehicle(const Transform& pose) {
                 transform.basis[axis] = rotate(wheel.basis[axis]);
         }
         instance.pose = transform;
+        if (instance.tire_lod >= 0) {
+            std::size_t selected{};
+            const auto& wheel = wheel_poses_[instance.wheel_index];
+            if (select_vehicle_tire_lod(add(position, rotate(wheel.origin)), camera_.transform.origin,
+                                       renderer_.car_detail(), 5, selected) == Result::ok) {
+                while (selected && !tire_lods_[selected])
+                    --selected;
+                renderer_.set_instance_visible(instance.handle,
+                    static_cast<std::size_t>(instance.tire_lod) == selected);
+            }
+        }
         renderer_.update_instance(instance.handle, transform);
     }
 }

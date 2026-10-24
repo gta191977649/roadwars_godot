@@ -43,6 +43,7 @@ target_sources(roadwars_godot PRIVATE extension/debug_overlay.cpp extension/star
 target_sources(roadwars_godot PRIVATE extension/original_weapon_input.cpp)
 target_sources(roadwars_godot PRIVATE extension/combat_audio_adapter.cpp)
 target_sources(roadwars_godot PRIVATE extension/frontend_video_audio.cpp)
+target_sources(roadwars_godot PRIVATE extension/sound_options_adapter.cpp)
 if(WIN32)
   target_link_libraries(roadwars_godot PRIVATE msacm32)
 endif()

@@ -6,26 +6,33 @@
 namespace roadwars {
 namespace {
 // Original Font10Imp glyph order at 00613a6c, including localized slots.
-constexpr std::array<unsigned char, 136> kFontAlphabet{{
-    0x41, 0x42, 0x43, 0x44, 0x45, 0x46, 0x47, 0x48, 0x49, 0x4a, 0x4b, 0x4c, 0x4d, 0x4e, 0x4f, 0x50,
-    0x51, 0x52, 0x53, 0x54, 0x55, 0x56, 0x57, 0x58, 0x59, 0x5a, 0x61, 0x62, 0x63, 0x64, 0x65, 0x66,
-    0x67, 0x68, 0x69, 0x6a, 0x6b, 0x6c, 0x6d, 0x6e, 0x6f, 0x70, 0x71, 0x72, 0x73, 0x74, 0x75, 0x76,
-    0x77, 0x78, 0x79, 0x7a, 0x2e, 0x2c, 0x2f, 0x25, 0x24, 0x21, 0x40, 0x23, 0x5b, 0x5d, 0x2b, 0x3d,
-    0x3f, 0x3b, 0x3a, 0x27, 0x27, 0x30, 0x31, 0x32, 0x33, 0x34, 0x35, 0x36, 0x37, 0x38, 0x39, 0xc4,
-    0xcb, 0xd6, 0xdc, 0xdf, 0xe4, 0xeb, 0xf6, 0xfc, 0xd4, 0xd3, 0xd2, 0xca, 0xc9, 0xc8, 0xc2, 0xc1,
-    0xc0, 0xdb, 0xda, 0xd9, 0xce, 0xcd, 0xcc, 0xdd, 0xc7, 0xc3, 0xd5, 0x9c, 0xd1, 0x9c, 0x9c, 0xf4,
-    0xf3, 0xf2, 0xea, 0xe9, 0xe8, 0xe2, 0xe1, 0xe0, 0xfb, 0xfa, 0xf9, 0xee, 0xed, 0xec, 0xfd, 0xe7,
-    0xe3, 0xf5, 0x9c, 0xf1, 0x9c, 0x9c, 0x2d, 0xbf
-}};
-constexpr std::array<HudRect, 8> kTileDestinations{{
-    {0, 224, 256, 256}, {256, 224, 256, 256}, {512, 224, 128, 128},
-    {0, 0, 256, 224}, {256, 0, 256, 224}, {512, 0, 128, 95},
-    {512, 352, 128, 128}, {512, 95, 128, 223}}};
-constexpr std::array<HudRect, 8> kTileSources{{
-    {0, 0, 256, 256}, {0, 0, 256, 256}, {0, 0, 128, 128},
-    {0, 33, 256, 223}, {0, 33, 256, 223}, {0, 33, 128, 95},
-    {0, 0, 128, 128}, {0, 0, 128, 223}}};
-}
+constexpr std::array<unsigned char, 136> kFontAlphabet{
+    {0x41, 0x42, 0x43, 0x44, 0x45, 0x46, 0x47, 0x48, 0x49, 0x4a, 0x4b, 0x4c, 0x4d, 0x4e, 0x4f, 0x50,
+     0x51, 0x52, 0x53, 0x54, 0x55, 0x56, 0x57, 0x58, 0x59, 0x5a, 0x61, 0x62, 0x63, 0x64, 0x65, 0x66,
+     0x67, 0x68, 0x69, 0x6a, 0x6b, 0x6c, 0x6d, 0x6e, 0x6f, 0x70, 0x71, 0x72, 0x73, 0x74, 0x75, 0x76,
+     0x77, 0x78, 0x79, 0x7a, 0x2e, 0x2c, 0x2f, 0x25, 0x24, 0x21, 0x40, 0x23, 0x5b, 0x5d, 0x2b, 0x3d,
+     0x3f, 0x3b, 0x3a, 0x27, 0x27, 0x30, 0x31, 0x32, 0x33, 0x34, 0x35, 0x36, 0x37, 0x38, 0x39, 0xc4,
+     0xcb, 0xd6, 0xdc, 0xdf, 0xe4, 0xeb, 0xf6, 0xfc, 0xd4, 0xd3, 0xd2, 0xca, 0xc9, 0xc8, 0xc2, 0xc1,
+     0xc0, 0xdb, 0xda, 0xd9, 0xce, 0xcd, 0xcc, 0xdd, 0xc7, 0xc3, 0xd5, 0x9c, 0xd1, 0x9c, 0x9c, 0xf4,
+     0xf3, 0xf2, 0xea, 0xe9, 0xe8, 0xe2, 0xe1, 0xe0, 0xfb, 0xfa, 0xf9, 0xee, 0xed, 0xec, 0xfd, 0xe7,
+     0xe3, 0xf5, 0x9c, 0xf1, 0x9c, 0x9c, 0x2d, 0xbf}};
+constexpr std::array<HudRect, 8> kTileDestinations{{{0, 224, 256, 256},
+                                                    {256, 224, 256, 256},
+                                                    {512, 224, 128, 128},
+                                                    {0, 0, 256, 224},
+                                                    {256, 0, 256, 224},
+                                                    {512, 0, 128, 95},
+                                                    {512, 352, 128, 128},
+                                                    {512, 95, 128, 223}}};
+constexpr std::array<HudRect, 8> kTileSources{{{0, 0, 256, 256},
+                                               {0, 0, 256, 256},
+                                               {0, 0, 128, 128},
+                                               {0, 33, 256, 223},
+                                               {0, 33, 256, 223},
+                                               {0, 33, 128, 95},
+                                               {0, 0, 128, 128},
+                                               {0, 0, 128, 223}}};
+} // namespace
 CockpitFrontend::~CockpitFrontend() { stop(); }
 void CockpitFrontend::stop() {
     for (auto texture : textures_)
@@ -85,22 +92,20 @@ Result CockpitFrontend::load(ResourceStore& resources, std::string_view track,
             value = static_cast<int>(raw);
             return true;
         };
-        if (!integer("WHEEL", "SIZE", car.wheel_size) || car.wheel_size <= 0 || car.wheel_size > 4096 ||
-            !integer("WHEEL", "CENTERX", car.wheel_x) ||
+        if (!integer("WHEEL", "SIZE", car.wheel_size) || car.wheel_size <= 0 ||
+            car.wheel_size > 4096 || !integer("WHEEL", "CENTERX", car.wheel_x) ||
             !integer("WHEEL", "CENTERY", car.wheel_y) ||
             !number("TACKOMETER", "MAXRPM", car.max_rpm) || car.max_rpm <= 0 ||
             !number("TACKOMETER", "BASEROTATION", car.tach_base) ||
             !number("TACKOMETER", "ROTATIONDEGREES", car.tach_range) ||
-            !integer("TACKOMETER", "X", car.tach_x) ||
-            !integer("TACKOMETER", "Y", car.tach_y) ||
+            !integer("TACKOMETER", "X", car.tach_x) || !integer("TACKOMETER", "Y", car.tach_y) ||
             !integer("TACKOMETER", "PIVOTOFFSETX", car.pivot_x) ||
             !integer("TACKOMETER", "PIVOTOFFSETY", car.pivot_y) ||
             !number("SPEEDOMETER", "MAXMPH", car.max_mph) || car.max_mph <= 0 ||
             !number("SPEEDOMETER", "BASEROTATION", car.speed_base) ||
             !number("SPEEDOMETER", "ROTATIONDEGREES", car.speed_range) ||
             !integer("SPEEDOMETER", "X", car.speed_x) ||
-            !integer("SPEEDOMETER", "Y", car.speed_y) ||
-            !integer("MAP", "MAPOFFSETX", car.map_x) ||
+            !integer("SPEEDOMETER", "Y", car.speed_y) || !integer("MAP", "MAPOFFSETX", car.map_x) ||
             !integer("MAP", "MAPOFFSETY", car.map_y))
             return fail(Result::invalid_argument, prefix + "Data.ini cockpit fields");
         for (std::size_t slot = 0; slot < 3; ++slot) {
@@ -118,9 +123,8 @@ Result CockpitFrontend::load(ResourceStore& resources, std::string_view track,
             if (result != Result::ok)
                 return fail(result, path);
         }
-        for (const auto& [path, sprite] :
-             std::array<std::pair<const char*, Sprite*>, 2>{{
-                 {"16Steer.bmp", &car.steering}, {"16TackOMeterNeedle.bmp", &car.needle}}}) {
+        for (const auto& [path, sprite] : std::array<std::pair<const char*, Sprite*>, 2>{
+                 {{"16Steer.bmp", &car.steering}, {"16TackOMeterNeedle.bmp", &car.needle}}}) {
             const auto result = load_sprite(resources, prefix + path, *sprite);
             if (result != Result::ok)
                 return fail(result, prefix + path);
@@ -147,7 +151,8 @@ Result CockpitFrontend::load(ResourceStore& resources, std::string_view track,
                     bool ink = false;
                     std::array<std::byte, 3> color;
                     for (int channel = 0; channel < 3; ++channel) {
-                        const unsigned value = std::to_integer<unsigned>(image.rgba[from + channel]);
+                        const unsigned value =
+                            std::to_integer<unsigned>(image.rgba[from + channel]);
                         color[channel] = std::byte((value >> 3) * 255 / 31);
                         ink |= value >= 8;
                     }
@@ -187,7 +192,8 @@ void CockpitFrontend::quad(std::vector<HudQuad>& output, const Sprite& sprite, H
     q.texture = sprite.texture;
     q.preserve_aspect = true;
     const float x = static_cast<float>(dst.x), y = static_cast<float>(dst.y);
-    q.positions = {{{x, y}, {x + dst.width, y}, {x + dst.width, y + dst.height}, {x, y + dst.height}}};
+    q.positions = {
+        {{x, y}, {x + dst.width, y}, {x + dst.width, y + dst.height}, {x, y + dst.height}}};
     const float u0 = static_cast<float>(src.x) / sprite.width;
     const float u1 = static_cast<float>(src.x + src.width) / sprite.width;
     const float v0 = 1 - static_cast<float>(src.y) / sprite.height;
@@ -213,9 +219,14 @@ Result CockpitFrontend::draw(std::size_t index, float steering_fraction, float r
     (void)reverse;
     if (index >= cars_.size() || !std::isfinite(steering_fraction) || !std::isfinite(rpm) ||
         !std::isfinite(speed) || !std::isfinite(aspect) || aspect <= 0 || aspect > 32 ||
-        std::abs(steering_fraction) > 1000 || std::abs(rpm) > 1000000 || std::abs(speed) > 1000000)
+        std::abs(steering_fraction) > 1000)
         return Result::invalid_argument;
     const auto& car = cars_[index];
+    const auto tach_angle = rpm / car.max_rpm * car.tach_range + car.tach_base;
+    const auto speed_angle =
+        speed * 2.236997365951538f / car.max_mph * car.speed_range + car.speed_base;
+    if (!std::isfinite(tach_angle) || !std::isfinite(speed_angle))
+        return Result::invalid_argument;
     const int extension = static_cast<int>(std::ceil(std::max(0.f, aspect * 480 - 640) / 2));
     if (extension) {
         quad(output, car.left_edge, {-extension, 0, extension, 480});
@@ -227,14 +238,14 @@ Result CockpitFrontend::draw(std::size_t index, float steering_fraction, float r
         quad(output, car.needle, {x, y, car.needle.width, car.needle.height}, {}, degrees,
              {static_cast<float>(x + car.pivot_x), static_cast<float>(y + car.pivot_y)});
     };
-    draw_needle(car.tach_x, car.tach_y, rpm / car.max_rpm * car.tach_range + car.tach_base);
-    draw_needle(car.speed_x, car.speed_y,
-                speed * 2.236997365951538f / car.max_mph * car.speed_range + car.speed_base);
+    draw_needle(car.tach_x, car.tach_y, tach_angle);
+    draw_needle(car.speed_x, car.speed_y, speed_angle);
     if (show_map)
         quad(output, map_, {car.map_x, car.map_y, map_.width, map_.height});
     quad(output, car.steering,
-         {car.wheel_x - car.wheel_size / 2, car.wheel_y - car.wheel_size / 2,
-          car.wheel_size, car.wheel_size}, {}, steering_fraction * 75,
+         {car.wheel_x - car.wheel_size / 2, car.wheel_y - car.wheel_size / 2, car.wheel_size,
+          car.wheel_size},
+         {}, steering_fraction * 75,
          {static_cast<float>(car.wheel_x), static_cast<float>(car.wheel_y)});
     return Result::ok;
 }

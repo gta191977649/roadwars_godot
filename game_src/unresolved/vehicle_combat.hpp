@@ -39,6 +39,7 @@ struct VehicleCombatDamage {
     Vec3 point{};
     bool internal_damage{}, has_impulse{}, apply_yaw{};
     WeaponProjectileImpulse impulse;
+    bool projectile_visual{};
 };
 enum class VehicleCombatEffectKind { projectile_trail, guided_trail, electron_impact, smoke };
 struct VehicleCombatEffectKey {
@@ -129,6 +130,10 @@ class VehicleCombat {
     Result load(ResourceStore&, std::string_view car, const std::array<std::string, 3>& weapons,
                 std::string& error);
     bool request(WeaponSlot, float cached_speed);
+    void observe_replay_requests(std::function<void(WeaponSlot, int)> observer) {
+        replay_observer_ = std::move(observer);
+    }
+    Result replay_ammunition(WeaponSlot, int);
     bool request(WeaponSlot, float cached_speed, float owner_heading, float owner_pitch,
                  float body_pitch = 0);
     Result advance(float delta, const VehicleCombatFrame&, const TrackCollision&, const RaceRoute*,
@@ -145,6 +150,11 @@ class VehicleCombat {
     std::span<const VehicleCombatAsset> assets() const { return assets_; }
     std::span<const VehicleCombatVisual> visuals() const { return visuals_; }
     std::size_t projectile_capacity(WeaponSlot) const;
+    std::span<const WeaponProjectile> standard_projectiles(WeaponSlot slot) const {
+        const auto index = static_cast<std::size_t>(slot);
+        return index < items_.size() ? std::span<const WeaponProjectile>(items_[index].projectiles)
+                                     : std::span<const WeaponProjectile>{};
+    }
     std::vector<CombatAudioEvent> drain_audio_events();
     std::span<const GuidedMissileState> guided_missiles() const;
     const ContactWeaponRuntime* contact_weapon() const;
@@ -227,6 +237,7 @@ class VehicleCombat {
     std::vector<VehicleCombatVisual> visuals_;
     std::vector<CombatAudioEvent> audio_events_;
     std::function<void(CallbackToken, bool)> callback_observer_;
+    std::function<void(WeaponSlot, int)> replay_observer_;
     std::optional<CallbackToken> dispatch_filter_;
     bool initialized_{};
 };

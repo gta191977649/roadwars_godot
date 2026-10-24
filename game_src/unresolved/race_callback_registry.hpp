@@ -17,7 +17,8 @@ struct RaceCallbackKey {
         nitrous,
         vehicle_sparks,
         scene_electron,
-        weather
+        weather,
+        replay
     };
     Domain domain{};
     std::size_t owner{}, token{};
@@ -33,6 +34,12 @@ class RaceCallbackRegistry {
     void remove(RaceCallbackKey);
     Result dispatch(const std::function<Result(RaceCallbackKey)>&, std::string& error);
     std::size_t size() const { return entries_.size(); }
+    std::vector<RaceCallbackKey> snapshot() const { return {entries_.begin(), entries_.end()}; }
+    void restore(std::span<const RaceCallbackKey> keys) {
+        reset();
+        for (auto key : keys)
+            entries_.push_back(key);
+    }
 
   private:
     bool search(RaceCallbackKey);

@@ -1,8 +1,8 @@
 #pragma once
 #include "game_src/unresolved/bitmap.hpp"
 #include "game_src/unresolved/resource_store.hpp"
-#include <optional>
 #include <memory>
+#include <optional>
 
 namespace roadwars {
 struct HudRect {
@@ -35,6 +35,15 @@ struct RaceLapSummary {
 };
 Result race_lap_summary(const FrontendRacer&, int total_laps, RaceLapSummary&);
 std::string format_race_time(float seconds, std::string_view no_record = "NO RECORD");
+struct RaceTimeRecord {
+    float seconds{};
+    std::string user{"NONE"}, character{"NONE"};
+    bool improved{};
+};
+struct RaceTimeRecords {
+    RaceTimeRecord best_lap, best_total;
+};
+Result load_race_time_records(ResourceStore&, std::string_view track, RaceTimeRecords&);
 struct FrontendRaceInfo {
     int completed_laps{}, total_laps{}, rank{}, racer_count{};
 };
@@ -58,13 +67,19 @@ class AmmunitionNotices {
     Result advance(float delta);
     void clear() { entries_ = {}; }
     std::span<const AmmunitionNotice> entries() const { return entries_; }
+
   private:
     std::array<AmmunitionNotice, 4> entries_;
 };
 struct FrontendFrame {
+    bool replay{}, replay_paused{};
+    int replay_selection{2}, replay_camera_mode{5};
     std::span<const AmmunitionNotice> ammunition_notices;
     bool cockpit{};
     bool time_table_visible{};
+    bool spectator_is_player{true};
+    std::string track_name;
+    std::optional<RaceTimeRecords> time_records;
     std::array<std::string, 3> cockpit_weapon_names;
     std::size_t cockpit_character{};
     float steering_fraction{}, viewport_aspect{4.f / 3};
@@ -106,6 +121,7 @@ class RaceFrontend {
     const FrontendMapSettings& map_settings() const { return map_; }
     std::span<const HudQuad> commands() const { return commands_; }
     void set_visible(bool visible) { visible_ = visible; }
+    void set_transition_opacity(float opacity) { transition_opacity_ = opacity; }
     void start_fade_in() { fade_remaining_ = .5f; }
     void advance_fade(float delta);
 
@@ -127,7 +143,7 @@ class RaceFrontend {
     FrontendMapSettings map_;
     HudBitmapFont font_, countdown_font_;
     Sprite meter_, needle_, map_texture_, border_, font_texture_, countdown_texture_, eliminated_,
-        finished_;
+        finished_, replay_base_;
     std::vector<Sprite> dots_, portraits_;
     std::vector<TextureHandle> textures_;
     std::vector<HudQuad> commands_;
@@ -138,5 +154,6 @@ class RaceFrontend {
     bool equipment_loaded_{};
     Sprite fade_pixel_;
     float fade_remaining_{};
+    float transition_opacity_{};
 };
 } // namespace roadwars

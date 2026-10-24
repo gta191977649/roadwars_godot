@@ -87,6 +87,28 @@ bool ServerRenderer::test_graphics_quality() {
             }
         }
         valid &= fixture.update_texture(texture, 16, 8, pixels) == Result::ok;
+        const std::array<Vec3, 3> positions{{{-1, 0, 0}, {1, 0, 0}, {0, 1, 0}}};
+        const std::array<Vec3, 3> normals{{{0, 0, 1}, {0, 0, 1}, {0, 0, 1}}};
+        const std::array<std::array<float, 2>, 3> uv{{{0, 0}, {1, 0}, {0, 1}}};
+        const std::array<std::uint32_t, 3> indices{0, 1, 2};
+        const auto mesh = fixture.upload_surface(positions, uv, indices, handle, normals, {});
+        const auto first = fixture.create_instance(mesh), second = fixture.create_instance(mesh);
+        valid &= fixture.set_instance_vertex_color(first, 0xffff0000) == Result::ok;
+        valid &= fixture.set_instance_vertex_color(second, 0xff0000ff) == Result::ok;
+        if (godot::DisplayServer::get_singleton()->get_name() != "headless") {
+            const auto red = fixture.instance_color_materials_.at(first.value).material;
+            const auto blue = fixture.instance_color_materials_.at(second.value).material;
+            valid &= red != blue;
+            const godot::Vector4 a = server->material_get_param(red, "original_vertex_override");
+            const godot::Vector4 b = server->material_get_param(blue, "original_vertex_override");
+            valid &= a.x == 1 && a.z == 0 && b.x == 0 && b.z == 1;
+        }
+        fixture.destroy_instance(first);
+        valid &= fixture.instance_color_materials_.size() == 1;
+        valid &= fixture.set_instance_mesh(second, mesh) == Result::ok;
+        valid &= fixture.instance_color_materials_.empty();
+        fixture.destroy_instance(second);
+        fixture.destroy_mesh(mesh);
         fixture.destroy_material(handle);
         fixture.destroy_texture(texture);
         valid &= fixture.world_textures_.empty() && fixture.texture_sources_.empty();
@@ -144,7 +166,8 @@ Result ServerRenderer::apply_graphics_quality(const GraphicsSettings& settings) 
     default: break;
     }
     server_->viewport_set_msaa_3d(viewport_, msaa);
-    server_->viewport_set_use_taa(viewport_, false);
+    if (server_->get_current_rendering_method() == "forward_plus")
+        server_->viewport_set_use_taa(viewport_, false);
     server_->viewport_set_screen_space_aa(viewport_, settings.aa == AntiAliasing::fxaa
         ? RS::VIEWPORT_SCREEN_SPACE_AA_FXAA : RS::VIEWPORT_SCREEN_SPACE_AA_DISABLED);
     server_->viewport_set_scaling_3d_mode(viewport_, RS::VIEWPORT_SCALING_3D_MODE_BILINEAR);
@@ -213,6 +236,8 @@ ServerRenderer::~ServerRenderer() {
         server_->free_rid(rid);
     for (auto [key, rid] : instances_)
         server_->free_rid(rid);
+    for (const auto& [key, color] : instance_color_materials_)
+        server_->free_rid(color.material);
     for (auto [key, rid] : meshes_)
         server_->free_rid(rid);
     for (auto [key, rid] : materials_)
@@ -339,6 +364,7 @@ InstanceHandle ServerRenderer::create_instance(MeshHandle mesh) {
     auto rid = server_->instance_create2(found->second, scenario_);
     const auto id = next_handle_++;
     instances_.emplace(id, rid);
+    instance_meshes_.emplace(id, mesh.value);
     return {id};
 }
 Result ServerRenderer::update_instance(InstanceHandle instance, const Transform& transform) {
@@ -367,6 +393,13 @@ Result ServerRenderer::set_instance_mesh(InstanceHandle instance, MeshHandle mes
     if (target == instances_.end() || source == meshes_.end())
         return Result::not_found;
     server_->instance_set_base(target->second, source->second);
+    instance_meshes_[instance.value] = mesh.value;
+    if (const auto color = instance_color_materials_.find(instance.value);
+        color != instance_color_materials_.end()) {
+        server_->instance_geometry_set_material_override(target->second, {});
+        server_->free_rid(color->second.material);
+        instance_color_materials_.erase(color);
+    }
     return Result::ok;
 }
 Result ServerRenderer::update_texture(TextureHandle texture, std::uint32_t width,
@@ -391,8 +424,34 @@ Result ServerRenderer::set_instance_vertex_color(InstanceHandle instance, std::u
     const auto found = instances_.find(instance.value);
     if (found == instances_.end())
         return Result::not_found;
-    server_->instance_geometry_set_shader_parameter(
-        found->second, "original_vertex_override",
+    auto override = instance_color_materials_.find(instance.value);
+    if (override == instance_color_materials_.end()) {
+        const auto mesh = instance_meshes_.find(instance.value);
+        if (mesh == instance_meshes_.end())
+            return Result::not_found;
+        const auto source = mesh_materials_.find(mesh->second);
+        if (source == mesh_materials_.end() || !materials_.contains(source->second))
+            return Result::not_found;
+        // Static world instances must not consume the Compatibility renderer's
+        // limited global instance-uniform buffer. Only recolored effects own a copy.
+        const auto material = server_->material_create();
+        trace_resource(FrameResource::material);
+        const auto shader = material_shaders_.at(source->second);
+        server_->material_set_shader(material, shader);
+        const auto parameters = server_->get_shader_parameter_list(shader);
+        for (int i = 0; i < parameters.size(); ++i) {
+            const godot::Dictionary parameter = parameters[i];
+            const godot::StringName name = parameter["name"];
+            const auto value = server_->material_get_param(materials_.at(source->second), name);
+            if (value.get_type() != godot::Variant::NIL)
+                server_->material_set_param(material, name, value);
+        }
+        override = instance_color_materials_.emplace(
+            instance.value, ColorMaterial{material, source->second}).first;
+        server_->instance_geometry_set_material_override(found->second, material);
+    }
+    server_->material_set_param(
+        override->second.material, "original_vertex_override",
         godot::Vector4(((color >> 16) & 255) / 255.f, ((color >> 8) & 255) / 255.f,
                        (color & 255) / 255.f, ((color >> 24) & 255) / 255.f));
     return Result::ok;
@@ -414,13 +473,20 @@ void ServerRenderer::destroy_instance(InstanceHandle instance) {
     invisible_instances_.erase(instance.value);
     static_instances_.erase(instance.value);
     instance_poses_.erase(instance.value);
+    instance_meshes_.erase(instance.value);
     auto found = instances_.find(instance.value);
     if (found != instances_.end()) {
         server_->free_rid(found->second);
         instances_.erase(found);
     }
+    if (const auto color = instance_color_materials_.find(instance.value);
+        color != instance_color_materials_.end()) {
+        server_->free_rid(color->second.material);
+        instance_color_materials_.erase(color);
+    }
 }
 void ServerRenderer::destroy_mesh(MeshHandle mesh) {
+    mesh_materials_.erase(mesh.value);
     auto found = meshes_.find(mesh.value);
     if (found != meshes_.end()) {
         server_->free_rid(found->second);
@@ -647,7 +713,7 @@ RaceDebugCamera ServerRenderer::race_debug_camera(double alpha) const {
 }
 std::size_t ServerRenderer::live_rids() const {
     return meshes_.size() + instances_.size() + textures_.size() + world_textures_.size() +
-           materials_.size() +
+           materials_.size() + instance_color_materials_.size() +
            material_shaders_.size() + 4 + (environment_.is_valid() ? 1 : 0) +
            (light_.is_valid() ? 1 : 0) + (light_instance_.is_valid() ? 1 : 0) +
            (sky_.is_valid() ? 1 : 0) + (sky_material_.is_valid() ? 1 : 0) +
@@ -904,7 +970,7 @@ void ServerRenderer::configure_scene(const SceneSettings& settings) {
                                        settings.far_distance);
     // Native depth fog is radial smoothstep; the original vertex-linear path is
     // supplied through Godot's FOG output instead. Keep sky/particle overrides.
-    for (const auto& [id, material] : materials_) {
+    const auto update_material = [&](std::uint64_t id, godot::RID material) {
         server_->material_set_param(material, "original_fog_color", fog);
         server_->material_set_param(material, "original_fog_start", settings.far_distance * .7f);
         server_->material_set_param(material, "original_fog_end", settings.far_distance);
@@ -917,7 +983,11 @@ void ServerRenderer::configure_scene(const SceneSettings& settings) {
             server_->material_set_param(material, "chrome_fog_color",
                 godot::Vector3(settings.fog_color.x, settings.fog_color.y, settings.fog_color.z));
         }
-    }
+    };
+    for (const auto& [id, material] : materials_)
+        update_material(id, material);
+    for (const auto& [id, color] : instance_color_materials_)
+        update_material(color.source, color.material);
     auto direction = original_coordinates_ ? original_to_godot(settings.directional_light)
                                            : settings.directional_light;
     godot::Transform3D light_transform;
@@ -1020,6 +1090,7 @@ MeshHandle ServerRenderer::upload_surface(std::span<const Vec3> positions,
     }
     const auto id = next_handle_++;
     meshes_.emplace(id, rid);
+    mesh_materials_.emplace(id, material.value);
     return {id};
 }
 void ServerRenderer::clear_sky() {

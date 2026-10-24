@@ -1,6 +1,8 @@
 #pragma once
 #include "game_src/unresolved/race_loadout.hpp"
+#include "game_src/unresolved/vehicle_damage_visuals.hpp"
 #include "game_src/unresolved/vehicle_equipment_effects.hpp"
+#include <optional>
 
 namespace roadwars {
 enum class GarageCategory { tires, drivetrain, weapons, armor, repair, paint };
@@ -22,6 +24,8 @@ struct GarageVehicleState {
     RaceLoadout loadout;
     VehicleEquipmentEffects condition;
     std::array<std::int32_t, 3> weapon_ammunition{};
+    std::optional<VehicleDamageVisualState> visuals;
+    float body_width{}, body_length{};
 };
 struct GarageSelection {
     GarageCategory category{};
@@ -60,8 +64,7 @@ class GarageSession {
     std::optional<GarageSelection> installed(GarageSelection) const;
     const GarageProduct* product(GarageSelection) const;
     float repair_fraction(GarageSelection) const;
-    std::vector<std::string> tire_confirmations(std::int64_t expense,
-                                                GarageSelection) const;
+    std::vector<std::string> tire_confirmations(std::int64_t expense, GarageSelection) const;
     ResourceStore& resources_;
     GarageVehicleState state_;
     std::string track_, track_tires_;

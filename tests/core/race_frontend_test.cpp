@@ -1,12 +1,12 @@
 #include "game_src/unresolved/race_frontend.hpp"
-#include <cassert>
 #include <algorithm>
+#include <cassert>
 #include <cmath>
 #include <filesystem>
 #include <fstream>
 #include <iostream>
-#include <set>
 #include <limits>
+#include <set>
 
 using namespace roadwars;
 class HudRenderer final : public Renderer {
@@ -56,6 +56,29 @@ class Files final : public ResourceReader {
     std::filesystem::path root_;
 };
 int main(int argc, char** argv) {
+    struct RecordReader final : ResourceReader {
+        std::string config;
+        Result read(std::string_view path, std::vector<std::byte>& out) override {
+            if (path != "Tracks/Test/User.txt")
+                return Result::not_found;
+            out.clear();
+            for (const auto c : config)
+                out.push_back(std::byte(c));
+            return Result::ok;
+        }
+    } record_reader;
+    record_reader.config = "[BESTLAP]\nTIME(SECONDS)=30.5\nUSER=Alice\nCHARACTER=Animal\n"
+                           "[BESTTIME]\nTIME(SECONDS)=0\nUSER=Ignored\nCHARACTER=Ignored\n";
+    ResourceStore record_resources(record_reader);
+    RaceTimeRecords records;
+    assert(load_race_time_records(record_resources, "Test", records) == Result::ok);
+    assert(records.best_lap.seconds == 30.5f && records.best_lap.user == "Alice" &&
+           records.best_lap.character == "Animal" && records.best_total.seconds == 0 &&
+           records.best_total.user == "NONE");
+    record_reader.config = "[BESTLAP]\nTIME(SECONDS)=-1\n[BESTTIME]\nTIME(SECONDS)=0\n";
+    assert(load_race_time_records(record_resources, "Test", records) == Result::invalid_argument);
+    assert(load_race_time_records(record_resources, "Missing", records) == Result::ok &&
+           records.best_lap.seconds == 0);
     // 00489fbb sums all configured slots, including the active unfinished lap.
     FrontendRacer timing;
     timing.lap_times = {31.25f, 30.5f, 2.75f};
@@ -80,6 +103,7 @@ int main(int argc, char** argv) {
     assert(format_race_time(0, "EMPTY") == "EMPTY");
     assert(format_race_time(64.5f) == "01'04''50");
     assert(format_race_time(.125f) == "00'00''12");
+    assert(format_race_time(.29f) == "00'00''28");
     assert(format_race_time(600.75f) == "10'00''75");
     // Hand-derived fixed outputs from 0048adf5..0048aebc, including __ftol truncation.
     FrontendMapSettings map{{100, 0, 200}, 0.5f, 67, 52, 90};
@@ -123,7 +147,8 @@ int main(int argc, char** argv) {
     assert(notices.advance(std::numeric_limits<float>::infinity()) == Result::invalid_argument);
     assert(notices.entries()[0].remaining == 2);
     assert(notices.advance(3) == Result::ok);
-    for (const auto& notice : notices.entries()) assert(notice.remaining == 0);
+    for (const auto& notice : notices.entries())
+        assert(notice.remaining == 0);
     assert(!notices.push("", 1) && !notices.push("MACHINE GUN", -1));
     notices.clear();
     assert(notices.push("MACHINE GUN", 1));
@@ -165,6 +190,14 @@ int main(int argc, char** argv) {
     assert(hud.update(frame) == Result::ok);
     assert(renderer.frame.size() >= 9);
     assert(renderer.frame.front().positions[0][0] == 512);
+    frame.rpm = 1208410.625f;
+    frame.speed = 7627.038086f;
+    assert(hud.update(frame) == Result::ok);
+    frame.speed = std::numeric_limits<float>::max();
+    assert(hud.update(frame) == Result::invalid_argument);
+    frame.speed = 30;
+    frame.rpm = 4000;
+    assert(hud.update(frame) == Result::ok);
     const auto& dot = renderer.frame[renderer.frame.size() - 3];
     assert(dot.positions[0][0] == 63 && dot.positions[0][1] == 400);
     racers[0].position = {100, 0, 0};
@@ -257,10 +290,8 @@ int main(int argc, char** argv) {
     assert(hud.update(frame) == Result::ok && renderer.frame.size() == 5);
     racers[0].finished = false;
     frame.equipment.reset();
-    const std::array<AmmunitionNotice, 4> messages{{{"MACHINE GUN 99", 2},
-                                                  {"GATLING GUN 9", 2},
-                                                  {"LAND MINES 2", 2},
-                                                  {"NITROUS BOOST 0", 2}}};
+    const std::array<AmmunitionNotice, 4> messages{
+        {{"MACHINE GUN 99", 2}, {"GATLING GUN 9", 2}, {"LAND MINES 2", 2}, {"NITROUS BOOST 0", 2}}};
     frame.ammunition_notices = messages;
     frame.developer_build = false;
     assert(hud.update(frame) == Result::ok);
@@ -273,16 +304,19 @@ int main(int argc, char** argv) {
     assert(hud.update(frame) == Result::ok && renderer.frame.size() > without_dev.size());
     std::size_t dev_glyphs = 0;
     for (const auto& q : renderer.frame) {
-        const bool present = std::any_of(without_dev.begin(), without_dev.end(), [&](const auto& p) {
-            return q.positions == p.positions && q.uv == p.uv && q.texture.value == p.texture.value;
-        });
+        const bool present =
+            std::any_of(without_dev.begin(), without_dev.end(), [&](const auto& p) {
+                return q.positions == p.positions && q.uv == p.uv &&
+                       q.texture.value == p.texture.value;
+            });
         if (!present) {
             ++dev_glyphs;
             assert(q.positions[0][1] >= 440 + message_height + 5);
         }
     }
     assert(dev_glyphs > 0);
-    for (const auto& message : messages) assert(message.remaining == 2);
+    for (const auto& message : messages)
+        assert(message.remaining == 2);
     const std::array<AmmunitionNotice, 1> fading{{{"MACHINE GUN 0", .25f}}};
     frame.ammunition_notices = fading;
     assert(hud.update(frame) == Result::ok);

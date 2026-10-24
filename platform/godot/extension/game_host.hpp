@@ -10,6 +10,7 @@
 #include "game_src/unresolved/race_presentation.hpp"
 #include "game_src/unresolved/race_session.hpp"
 #include "game_src/unresolved/tire_audio.hpp"
+#include "game_src/unresolved/title_attract.hpp"
 #include "game_src/unresolved/vehicle_dynamics.hpp"
 #include "platform/godot/extension/combat_audio_adapter.hpp"
 #include "platform/godot/extension/debug_overlay.hpp"
@@ -20,6 +21,9 @@
 #include "platform/godot/extension/loading_task.hpp"
 #include "platform/godot/extension/original_weapon_input.hpp"
 #include "platform/godot/extension/sfx_audio_adapter.hpp"
+#include "platform/godot/extension/sound_options_adapter.hpp"
+#include <godot_cpp/classes/audio_listener3d.hpp>
+#include <godot_cpp/classes/camera3d.hpp>
 #include "platform/godot/rendering/server_renderer.hpp"
 #include <godot_cpp/classes/input_event.hpp>
 #include <godot_cpp/classes/node.hpp>
@@ -37,6 +41,9 @@ class GameHost : public godot::Node, public LoopHooks {
 
   private:
     OriginalWeaponKeys weapon_keys_;
+    std::optional<int> diagnostic_replay_seconds_;
+    int rear_camera_scan_{-1};
+    std::optional<CameraView> camera_before_look_back_;
     bool startup_waiting_{};
     double title_elapsed_{1.0};
     void update_window_title(double delta);
@@ -153,7 +160,10 @@ class GameHost : public godot::Node, public LoopHooks {
     std::unique_ptr<MenuFrontend> menu_, pause_menu_;
     void set_competition_paused(bool paused);
     bool update_pause_menu(double delta);
-    void return_to_main_menu();
+    void return_to_main_menu(bool title = false);
+    bool finish_attract_transition();
+    TitleAttract title_attract_;
+    std::uint64_t attract_black_frame_{};
     bool previous_tree_paused_{};
     int inspected_camera_{-1};
     std::unique_ptr<EngineAudioAdapter> frontend_video_voice_;
@@ -168,6 +178,8 @@ class GameHost : public godot::Node, public LoopHooks {
     bool frontend_loading_presented_{};
     std::optional<RaceLoadout> menu_player_loadout_;
     std::unique_ptr<SfxAudioAdapter> frontend_sfx_;
+    SoundOptionsAdapter sound_options_;
+    godot::AudioListener3D* audio_listener_{};
     std::string frontend_audio_screen_;
     void update_frontend_audio();
     FrontendInput frontend_input_;

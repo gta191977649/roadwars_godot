@@ -45,6 +45,17 @@ bool graphics_display_changed(const GraphicsSettings& a, const GraphicsSettings&
     return a.monitor != b.monitor || a.width != b.width || a.height != b.height ||
            a.window_mode != b.window_mode;
 }
+void GraphicsSettingsTransaction::observe_window_size(int width, int height) {
+    if (pending_ || confirmed_.window_mode != WindowMode::windowed || width < 320 || height < 200)
+        return;
+    if (draft_.window_mode == WindowMode::windowed && draft_.width == confirmed_.width &&
+        draft_.height == confirmed_.height) {
+        draft_.width = width;
+        draft_.height = height;
+    }
+    confirmed_.width = width;
+    confirmed_.height = height;
+}
 
 GraphicsSettingsTransaction::GraphicsSettingsTransaction(GraphicsSettingsHost& host)
     : host_(host), confirmed_(host.current_settings()), draft_(confirmed_), candidate_(confirmed_) {}

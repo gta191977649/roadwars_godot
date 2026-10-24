@@ -6,14 +6,16 @@
 namespace roadwars {
 void SfxAudioAdapter::set_tire_sample(const WavePcm& sample) {
     tire_.reset();
-    tire_ = std::make_unique<EngineAudioAdapter>(owner_, sample, true, "OriginalTireSkidVoice");
+    tire_ =
+        std::make_unique<EngineAudioAdapter>(owner_, sample, true, "OriginalTireSkidVoice", true);
 }
 void SfxAudioAdapter::submit_tire(const EngineAudioCommand& command) {
     if (tire_)
         tire_->submit(command);
 }
 void SfxAudioAdapter::play_one_shot(const WavePcm& sample, const EngineAudioCommand& command,
-                                    std::string_view name, std::uint32_t extra_repeats) {
+                                    std::string_view name, std::uint32_t extra_repeats,
+                                    bool spatial) {
     if (command.action != EngineVoiceAction::start)
         return;
     WavePcm repeated;
@@ -29,7 +31,8 @@ void SfxAudioAdapter::play_one_shot(const WavePcm& sample, const EngineAudioComm
         output = &repeated;
     }
     auto voice = std::make_unique<EngineAudioAdapter>(
-        owner_, *output, false, std::string(name) + "_" + std::to_string(one_shots_started_));
+        owner_, *output, false, std::string(name) + "_" + std::to_string(one_shots_started_),
+        spatial);
     voice->submit(command);
     one_shots_.push_back(std::move(voice));
     ++one_shots_started_;

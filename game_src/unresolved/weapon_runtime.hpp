@@ -38,6 +38,11 @@ class WeaponMountRuntime {
     bool visible() const { return visible_; }
     float deployment_roll() const { return deployment_roll_; }
     std::int32_t ammunition() const { return ammunition_; }
+    Result replay_ammunition(std::int32_t count) {
+        if (count < 0) return Result::invalid_argument;
+        ammunition_ = count;
+        return Result::ok;
+    }
     WeaponSlot slot() const { return slot_; }
 
   private:

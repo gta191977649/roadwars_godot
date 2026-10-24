@@ -21,10 +21,10 @@ func step(command: String = "", elapsed: float = 0.31) -> bool:
     await process_frame
     return true
 
-func capture(name: String) -> void:
+func capture(name: String, settle: bool = true) -> void:
     if DisplayServer.get_name() == "headless":
         return
-    if host.get_frontend_screen() != "loading":
+    if settle and host.get_frontend_screen() != "loading":
         host.frontend_test_step(0.31, "")
     await RenderingServer.frame_post_draw
     for argument in OS.get_cmdline_user_args():
@@ -92,18 +92,7 @@ func return_to_menu() -> bool:
         return false
     for row in range(2):
         await key(KEY_DOWN)
-    var paused_ticks: int = host.get_simulation_ticks()
-    await key(KEY_ENTER)
-    if not require(host.get_competition_state().get("frontend_assertion", "") == "REPLAY",
-                   "Replay did not use the shared Not implemented assertion"):
-        return false
-    await key(KEY_ESCAPE)
-    if not require(host.get_competition_state().get("paused", false) and
-                   host.get_competition_state().get("frontend_assertion", "") == "" and
-                   host.get_simulation_ticks() == paused_ticks,
-                   "Dismissing Replay assertion resumed or advanced the race"):
-        return false
-    await key(KEY_DOWN)
+    # Live playback is unavailable, so the original No Replay menu omits its row.
     await key(KEY_ENTER)
     host.set_process(false)
     if not require(host.get_frontend_screen() == "main_menu", "Pause exit did not return to menu"):
@@ -150,8 +139,12 @@ func run_test() -> void:
     print("ROADWARS_LOADING_THEME_MIXER_PEAK_DB: ", peak)
     host.restart_smoke_scene()
     host.set_process(false)
-    if not require(host.frontend_test_step(31.0, ""), "Frontend startup failed"):
-        return
+    for page in range(6):
+        if host.get_frontend_screen() == "main_menu":
+            break
+        if not require(host.frontend_test_step(0, "") and host.frontend_test_step(0.31, "accept"),
+                       "Frontend startup input failed"):
+            return
     await create_timer(0.1).timeout
     var music: Dictionary = host.get_competition_state()
     if not require(host.get_frontend_screen() == "main_menu" and
@@ -217,7 +210,9 @@ func run_test() -> void:
                            garage_music.get("menu_music_gain", 0.0) > 0.0,
                            "Garage character music is missing or silent"):
                 return
-            await create_timer(0.15).timeout
+            var music_deadline := Time.get_ticks_msec() + 1000
+            while Time.get_ticks_msec() < music_deadline and host.get_competition_state().get("menu_music_position", 0.0) <= theme_position:
+                await process_frame
             if not require(host.get_competition_state().get("menu_music_position", 0.0) > theme_position,
                            "Garage character music playback did not advance"):
                 return
@@ -231,8 +226,135 @@ func run_test() -> void:
                            "Weapon store restarted or lost character music"):
                 return
             await capture("weapon_store_theme")
+            var before_purchase: Dictionary = host.get_competition_state()
+            if not require(before_purchase.get("garage_cash", 0) == 25000 and
+                           before_purchase.get("garage_weapons", []) == ["", "", ""],
+                           "Fresh garage must have actual stock vehicle and funds"):
+                return
+            # The original Front/Machine Gun selection has item, weapon and action rows.
+            if not await step("down") or not await step("down") or not await step("accept"):
+                return
+            for confirmation in range(3):
+                if not host.get_competition_state().get("garage_confirmation", false):
+                    break
+                if not await step("left") or not await step("accept"):
+                    return
+            var purchased: Dictionary = host.get_competition_state()
+            if not require(purchased.get("garage_cash", 0) == 15000 and
+                           str(purchased.get("garage_weapons", [""])[0]).to_upper() == "MACHINE GUN" and
+                           purchased.get("frontend_sfx_started", 0) > before_purchase.get("frontend_sfx_started", 0),
+                           "Garage purchase did not debit money, install weapon and play sound"):
+                return
+            # Observe actual SFX mixing on a separate bus, excluding character music.
+            var sfx_bus := AudioServer.bus_count
+            AudioServer.add_bus()
+            AudioServer.set_bus_name(sfx_bus, "GarageSfxProbe")
+            for child in host.get_children():
+                if child is AudioStreamPlayer and child.name != "OriginalFrontendMusic":
+                    child.bus = "GarageSfxProbe"
+            var sfx_peak := -200.0
+            var sfx_deadline := Time.get_ticks_msec() + 300
+            while Time.get_ticks_msec() < sfx_deadline:
+                await process_frame
+                sfx_peak = maxf(sfx_peak, AudioServer.get_bus_peak_volume_left_db(sfx_bus, 0))
+            if DisplayServer.get_name() != "headless" and not require(sfx_peak > -70.0,
+                                   "Garage buy SFX produced no native mixer signal"):
+                return
+            for child in host.get_children():
+                if child is AudioStreamPlayer and child.bus == "GarageSfxProbe":
+                    child.bus = "Master"
+            AudioServer.remove_bus(sfx_bus)
+            print("ROADWARS_GARAGE_SFX_PEAK_DB: ", sfx_peak)
+            await capture("weapon_purchased")
+            # Selecting the installed weapon offers sell-back; cancelling preserves it.
+            if not await step("accept") or not require(host.get_competition_state().get("garage_confirmation", false),
+                                                       "Installed weapon did not offer sell-back confirmation"):
+                return
+            await capture("weapon_sell_confirmation")
+            # The native modal defaults to No; Escape does not dismiss it.
+            if not await step("accept") or not require(
+                not host.get_competition_state().get("garage_confirmation", true) and
+                host.get_competition_state().get("garage_cash", 0) == 15000,
+                                                     "Cancelled sale changed garage money"):
+                return
+            if not await step("up") or not await step("up") or not await step("right", 0.1):
+                return
+            await capture("weapon_board_closing", false)
+            if not await step("", 1.0):
+                return
+            var door_voice = null
+            for child in host.get_children():
+                if child is AudioStreamPlayer and str(child.name).begins_with("OriginalGarageDoor_") and child.playing:
+                    door_voice = child
+            if not require(door_voice is AudioStreamPlayer and door_voice.playing,
+                           "Door threshold did not start the original stereo ADPCM voice"):
+                return
+            var door_bus := AudioServer.bus_count
+            AudioServer.add_bus()
+            AudioServer.set_bus_name(door_bus, "GarageDoorProbe")
+            door_voice.bus = "GarageDoorProbe"
+            var door_peak := -200.0
+            var door_deadline := Time.get_ticks_msec() + 300
+            while Time.get_ticks_msec() < door_deadline:
+                await process_frame
+                door_peak = maxf(door_peak, AudioServer.get_bus_peak_volume_left_db(door_bus, 0))
+            if DisplayServer.get_name() != "headless" and not require(door_peak > -70.0,
+                                    "Door ADPCM voice produced no native mixer signal"):
+                return
+            door_voice.bus = "Master"
+            AudioServer.remove_bus(door_bus)
+            print("ROADWARS_GARAGE_DOOR_PEAK_DB: ", door_peak)
+            await capture("weapon_board_open")
             if not await step("back"):
                 return
+            # Tires: stock Street/Poor trade-in is $250; Best costs $3000.
+            if not await step("accept") or not await step("down") or not await step("right") or not await step("right") or not await step("down") or not await step("accept"):
+                return
+            if not require(host.get_competition_state().get("garage_cash", 0) == 12250 and
+                           str(host.get_competition_state().get("garage_tire_quality", "")).to_upper() == "BEST",
+                           "Tire upgrade did not use original trade-in and selected quality"):
+                return
+            if not await step("back") or not await step("down") or not await step("accept") or not await step("right") or not await step("", 1.0) or not await step("down") or not await step("down") or not await step("accept"):
+                return
+            if not require(host.get_competition_state().get("garage_cash", 0) == 12150,
+                           "Air Filter purchase did not use original component price"):
+                return
+            if not await step("back"):
+                return
+            for row in range(3):
+                if not await step("down"):
+                    return
+            if not await step("accept") or not await step("down") or not await step("down") or not await step("accept"):
+                return
+            if not require(host.get_competition_state().get("garage_cash", 0) == 10150 and
+                           str(host.get_competition_state().get("garage_armor", "")).to_upper() == "STEEL",
+                           "Armor purchase did not commit the real vehicle configuration"):
+                return
+            if not await step("back"):
+                return
+            for row in range(4):
+                if not await step("down"):
+                    return
+            if not await step("accept") or not await step("down") or not await step("down") or not await step("accept"):
+                return
+            if not require(host.get_competition_state().get("garage_cash", 0) == 10150,
+                           "Healthy repair should not deduct cash"):
+                return
+            await capture("garage_repair")
+            if not await step("back"):
+                return
+            for row in range(5):
+                if not await step("down"):
+                    return
+            if not await step("accept") or not await step("right") or not await step("", 1.0) or not await step("down") or not await step("accept"):
+                return
+            if not require(host.get_competition_state().get("garage_paint", 0) == 2 and
+                           host.get_competition_state().get("garage_cash", 0) == 10150,
+                           "Paint store failed to commit original free livery selection"):
+                return
+            if not await step("back"):
+                return
+            await capture("garage_modified_vehicle")
             if not await step("back") or not require(host.get_frontend_screen() == "start_race_summary",
                                                      "Garage back route incorrect"):
                 return
@@ -268,13 +390,31 @@ func run_test() -> void:
             return
         for racer in range(6):
             if single and racer == 5:
-                if not require(loadouts[racer].paint == 0 and loadouts[racer].weapons == ["", "", ""],
-                               "Single unexpectedly randomized fresh player"):
+                if not require(loadouts[racer].paint == 2 and
+                               str(loadouts[racer].weapons[0]).to_upper() == "MACHINE GUN" and
+                               loadouts[racer].weapons[1] == "" and loadouts[racer].weapons[2] == "",
+                               "Single discarded the actual Garage loadout"):
+                    return
+                if not require(str(loadouts[racer].tire_quality).to_upper() == "BEST" and
+                               str(loadouts[racer].armor).to_upper() == "STEEL" and
+                               loadouts[racer].engine_upgrades[0] == 2 and
+                               loadouts[racer].maximum_armor_hp == [125.0, 125.0, 125.0, 125.0],
+                               "Garage tires, armor and drivetrain did not reach real race effects"):
                     return
             elif not require(loadouts[racer].paint >= 1 and loadouts[racer].paint <= 6 and
                              not "" in loadouts[racer].weapons, "Random race loadout missing"):
                 return
         await capture("single_grid" if single else "quick_grid")
+        if single:
+            host.set_process(true)
+            await key(KEY_ESCAPE)
+            await key(KEY_DOWN)
+            await key(KEY_ENTER)
+            host.set_process(false)
+            var restarted: Array = host.get_competition_state().get("loadouts", [])
+            if not require(restarted == loadouts and not host.get_competition_state().get("paused", false),
+                           "Restart discarded modified equipment or left the race paused"):
+                return
         if not await return_to_menu():
             return
     host.queue_free()

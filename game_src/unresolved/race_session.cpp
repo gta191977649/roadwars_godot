@@ -51,6 +51,10 @@ std::array<Vec3, 4> footprint(const VehicleDynamics& v) {
 }
 } // namespace
 RaceSession::~RaceSession() {
+    if (replaying()) {
+        std::string error;
+        end_replay(error);
+    }
     for (auto& racer : racers_)
         if (racer.vehicle) {
             racer.vehicle->set_respawn_handler({});
@@ -58,8 +62,12 @@ RaceSession::~RaceSession() {
             racer.vehicle->set_damage_visual_handler({});
             racer.vehicle->set_collision_damage_handler({});
             racer.vehicle->set_elimination_handler({});
-            if (racer.vehicle->combat())
+            if (racer.vehicle->damage_visuals())
+                racer.vehicle->damage_visuals()->observe_replay_mutations({}, {});
+            if (racer.vehicle->combat()) {
                 racer.vehicle->combat()->observe_callbacks({});
+                racer.vehicle->combat()->observe_replay_requests({});
+            }
         }
 }
 std::uint32_t RaceSession::random() {
@@ -110,6 +118,17 @@ Result RaceSession::load(ResourceStore& resources, const TrackCollision& collisi
         return Result::unavailable;
     }
     difficulty_ = static_cast<int>(difficulty);
+    if (config.number("ROADWARS", "REPLAYSECS", replay_seconds_) != Result::ok ||
+        replay_seconds_ < 0 || replay_seconds_ > 36000) {
+        error = "Original REPLAYSECS is missing or malformed";
+        return Result::invalid_argument;
+    }
+    user_name_ = config.value("ROADWARS", "USERNAME");
+    time_records_dirty_ = false;
+    if (load_race_time_records(resources, options.track, time_records_) != Result::ok) {
+        error = "Original track time records are malformed";
+        return Result::unavailable;
+    }
     if (load_combat_audio(resources, audio_resources_, error) != Result::ok ||
         fire_audio_.initialize(CombatSample::fire) != Result::ok ||
         nitrous_audio_.initialize(CombatSample::nitrous) != Result::ok)
@@ -312,10 +331,14 @@ Result RaceSession::load(ResourceStore& resources, const TrackCollision& collisi
 }
 // RE: 93b4e4c301a5694b55e16977c2e52f4971bd9089659e3d58617c8af2368436c8:function:0048355e
 Result RaceSession::restart(std::string& error) {
+    if (replaying() && !replay_initializing_ && end_replay(error) != Result::ok)
+        return Result::unavailable;
     if (racers_.empty())
         return Result::unavailable;
     race_time_ = 0;
-    countdown_ = initial_countdown_;
+    countdown_ = options_.attract_demo ? 2.f : initial_countdown_;
+    attract_look_back_ = false;
+    look_back_ = false;
     warning_countdown_ready_ = false;
     ticks_ = 0;
     scanner_ = 0;
@@ -389,11 +412,25 @@ Result RaceSession::restart(std::string& error) {
             combat->load(*resources_, racer.character, racer.loadout.weapons, error) != Result::ok)
             return Result::unavailable;
         racer.vehicle->set_combat(std::move(combat));
+        racer.vehicle->combat()->observe_replay_requests(
+            [this, i](WeaponSlot slot, int ammunition) {
+                if (i < replay_tracks_.size())
+                    replay_tracks_[i].record_event(ReplayWeaponEvent{slot, ammunition});
+            });
         auto visuals = std::make_unique<VehicleDamageVisuals>();
         if (visuals->load(*resources_, racer.character, racer.loadout.paint_job, error) !=
             Result::ok)
             return Result::unavailable;
         racer.vehicle->set_damage_visuals(std::move(visuals));
+        racer.vehicle->damage_visuals()->observe_replay_mutations(
+            [this, i](const VehicleTextureMark& mark) {
+                if (i < replay_tracks_.size())
+                    replay_tracks_[i].record_event(ReplayTextureEvent{mark});
+            },
+            [this, i](const VehicleDeformation& deformation) {
+                if (i < replay_tracks_.size())
+                    replay_tracks_[i].record_event(ReplayDeformationEvent{deformation});
+            });
         racer.vehicle->set_damage_visual_handler(
             [this, i](const VehicleDamageVisualContact& contact) {
                 ParticleRandom shared([this] { return random(); });
@@ -408,10 +445,17 @@ Result RaceSession::restart(std::string& error) {
                 callbacks_.remove(key);
         });
         racer.vehicle->set_collision_damage_handler([this, i](Vec3 force, Vec3 point) {
-            return apply_vehicle_collision_damage(*racers_[i].vehicle, force, point,
-                                                  racers_[i].progress.completed_laps >=
-                                                      options_.laps,
-                                                  i == player_index(), difficulty_);
+            const auto result =
+                apply_vehicle_collision_damage(*racers_[i].vehicle, force, point,
+                                               racers_[i].progress.completed_laps >= options_.laps,
+                                               i == player_index(), difficulty_);
+            // Native004211a0 appends type3 after collision-side armor dispatch.
+            if (result == Result::ok && i < replay_tracks_.size()) {
+                const auto& health = racers_[i].vehicle->equipment();
+                replay_tracks_[i].record_event(
+                    ReplayHealthEvent{health.internal_hp, health.armor_hp});
+            }
+            return result;
         });
         racer.vehicle->set_elimination_handler(
             i == player_index() ? std::function<Result()>{[this] {
@@ -428,6 +472,8 @@ Result RaceSession::restart(std::string& error) {
         for (auto& tire : vehicle_particles_[i].tires)
             tire.reset();
         racer.vehicle->set_particle_impact_handler([this, i](const ParticleImpact& impact) {
+            if (i < replay_tracks_.size())
+                replay_tracks_[i].record_event(ReplayImpactEvent{impact.velocity, impact.position});
             if (vehicle_particles_[i].sparks.begin_burst(impact))
                 callbacks_.insert({RaceCallbackKey::Domain::vehicle_sparks, i, 0});
         });
@@ -461,6 +507,9 @@ Result RaceSession::restart(std::string& error) {
                     return Result::unavailable;
                 break;
             }
+    spectator_chase_ = racers_[player_index()].chase_camera;
+    spectator_steering_chase_ = spectator_chase_;
+    spectator_chase_frame_ = racers_[player_index()].camera;
     start_.reset();
     if (start_.update(countdown_, 0, *racers_[player_index()].vehicle, *collision_) != Result::ok)
         return Result::unavailable;
@@ -478,6 +527,8 @@ Result RaceSession::restart(std::string& error) {
             callbacks_.remove(key);
     });
     update_ranking();
+    if (reset_replay_recording(error) != Result::ok)
+        return Result::unavailable;
     error.clear();
     return Result::ok;
 }
@@ -497,6 +548,10 @@ Result RaceSession::advance(float dt, const InputState& input, std::string& erro
         return Result::ok;
     if (input.reset_requested)
         return restart(error);
+    if (countdown_ < 1)
+        look_back_ = input.look_back;
+    if (replaying())
+        return advance_replay(dt, error);
     if (ending_ != RaceEndReason::none && !idle_return_requested_ && idle_return_timer_ != 0) {
         if (input.any_key_down)
             idle_return_timer_ = 10;
@@ -545,7 +600,8 @@ Result RaceSession::advance(float dt, const InputState& input, std::string& erro
     std::vector<bool> human_controls(racers_.size());
     const auto prepare_controller = [&](std::size_t i) -> Result {
         auto& r = racers_[i];
-        const bool ai = i != player_index() || player_autopilot_ || r.progress.finished;
+        const bool ai = options_.attract_demo || i != player_index() || player_autopilot_ ||
+                        r.progress.finished;
         prepared[i] = {0, 0, r.vehicle->state().steering_degrees};
         if (!go) {
             prepared[i] = {0, 1, 0};
@@ -607,7 +663,7 @@ Result RaceSession::advance(float dt, const InputState& input, std::string& erro
         r.vehicle->solve_race_walls(remaining);
         if (r.vehicle->collision_damage_result() != Result::ok)
             damage_visual_result = r.vehicle->collision_damage_result();
-        if (i != player_index() || player_autopilot_)
+        if (options_.attract_demo || i != player_index() || player_autopilot_)
             r.ai.wall_update(static_cast<unsigned>(r.vehicle->wall_contact_count() - before),
                              r.vehicle->state().engine_throttle, remaining);
     };
@@ -734,6 +790,36 @@ Result RaceSession::advance(float dt, const InputState& input, std::string& erro
     }
     if (ending_ != RaceEndReason::none)
         selected_hud_item_ = 0;
+    if (ending_ != RaceEndReason::none) {
+        // 00480b40 considers only finished/eliminated participants after player terminal.
+        for (std::size_t i = 0; i < racers_.size(); ++i) {
+            const auto& racer = racers_[i];
+            if (!racer.progress.finished && racer.vehicle->equipment().dying_timer == 0)
+                continue;
+            const auto improve = [&](RaceTimeRecord& record, float time) {
+                if (record.seconds != 0 && time >= record.seconds)
+                    return;
+                record.seconds = time;
+                record.user = i == player_index() ? user_name_ : "COMPUTER";
+                record.character = racer.character;
+                record.improved = true;
+                time_records_dirty_ = true;
+            };
+            if (racer.progress.completed_laps != 0) {
+                float best = racer.lap_times[0];
+                for (int lap = 0; lap < std::min(racer.progress.completed_laps, options_.laps);
+                     ++lap)
+                    best = std::min(best, racer.lap_times[lap]);
+                improve(time_records_.best_lap, best);
+            }
+            if (racer.progress.finished) {
+                float total{};
+                for (int lap = 0; lap < options_.laps; ++lap)
+                    total += racer.lap_times[lap];
+                improve(time_records_.best_total, total);
+            }
+        }
+    }
     if (advance_audio(dt, error) != Result::ok)
         return Result::unavailable;
     if (advance_combat(dt, error) != Result::ok)
@@ -749,6 +835,8 @@ Result RaceSession::advance(float dt, const InputState& input, std::string& erro
         return Result::invalid_argument;
     warning_countdown_ready_ = countdown_ == 0;
     countdown_ = std::max(0.f, countdown_ - dt);
+    if (record_replay(dt, error) != Result::ok)
+        return Result::unavailable;
     error.clear();
     return Result::ok;
 }
@@ -790,9 +878,13 @@ Result RaceSession::refresh_side_target(std::size_t owner, std::string& error) {
 }
 void RaceSession::activate_nitrous(std::size_t owner) {
     if (activate_vehicle_nitrous(racers_[owner].vehicle->equipment())) {
+        if (owner < replay_tracks_.size())
+            replay_tracks_[owner].record_event(
+                ReplayNitrousEvent{racers_[owner].vehicle->equipment().nitrous_ammo + 1});
         callbacks_.insert({RaceCallbackKey::Domain::nitrous, owner, 0});
         if (owner == player_index())
-            ammunition_notices_.push("NITROUS BOOST", racers_[owner].vehicle->equipment().nitrous_ammo);
+            ammunition_notices_.push("NITROUS BOOST",
+                                     racers_[owner].vehicle->equipment().nitrous_ammo);
     }
 }
 Result RaceSession::combat_commands(std::size_t owner, float dt, const InputState& input,
@@ -821,7 +913,8 @@ Result RaceSession::combat_commands(std::size_t owner, float dt, const InputStat
             }
             return Result::ok;
         };
-        if (i == player_index() && !player_autopilot_ && !racer.progress.finished) {
+        if (i == player_index() && !options_.attract_demo && !player_autopilot_ &&
+            !racer.progress.finished) {
             std::array<bool, 3> present;
             for (std::size_t slot = 0; slot < 3; ++slot)
                 present[slot] =
@@ -928,7 +1021,8 @@ Result RaceSession::combat_commands(std::size_t owner, float dt, const InputStat
 }
 Result RaceSession::apply_combat_damage(std::size_t participant, std::size_t side, float hitpoints,
                                         bool internal, bool impulse, bool yaw,
-                                        WeaponProjectileImpulse force, std::string& error) {
+                                        WeaponProjectileImpulse force, std::string& error,
+                                        bool projectile_visual) {
     if (participant >= racers_.size())
         return Result::invalid_argument;
     auto& racer = racers_[participant];
@@ -936,6 +1030,19 @@ Result RaceSession::apply_combat_damage(std::size_t participant, std::size_t sid
     VehicleDamagePermission permission{racer.progress.completed_laps >= options_.laps,
                                        vehicle.equipment().dying_timer != 0, true};
     const auto previous_hp = vehicle.equipment().internal_hp;
+    // Native004cf69c snapshots the common weapon damage caller's current health.
+    if (participant < replay_tracks_.size())
+        replay_tracks_[participant].record_event(
+            ReplayHealthEvent{vehicle.equipment().internal_hp, vehicle.equipment().armor_hp});
+    if (projectile_visual && vehicle.damage_visuals()) {
+        ParticleRandom shared([this] { return random(); });
+        const auto visual = vehicle.damage_visuals()->projectile_damage(
+            side, 0, shared, permission.route_invulnerable, permission.dying);
+        if (visual != Result::ok) {
+            error = "Original projectile damage pixel dispatch failed";
+            return visual;
+        }
+    }
     const auto damaged =
         internal ? damage_vehicle_internal(vehicle.equipment(), hitpoints, permission)
                  : damage_vehicle_contact(vehicle.equipment(), side, hitpoints, permission);
@@ -958,7 +1065,7 @@ Result RaceSession::apply_combat_damage(std::size_t participant, std::size_t sid
     }
     return Result::ok;
 }
-Result RaceSession::advance_combat(float dt, std::string& error) {
+Result RaceSession::advance_combat(float dt, std::string& error, bool callbacks_only) {
     ParticleRandom shared([this] { return random(); });
     const auto impact_event = [&](bool scene, std::size_t owner, WeaponSlot slot,
                                   std::size_t projectile, std::string_view weapon,
@@ -1064,7 +1171,7 @@ Result RaceSession::advance_combat(float dt, std::string& error) {
         services.damage = [&](const VehicleCombatDamage& damage) {
             return apply_combat_damage(damage.participant, damage.contact_side, damage.hitpoints,
                                        damage.internal_damage, damage.has_impulse, damage.apply_yaw,
-                                       damage.impulse, error);
+                                       damage.impulse, error, damage.projectile_visual);
         };
         services.jam = [&](std::size_t index, float seconds) {
             if (index >= jammer_weapons.size())
@@ -1124,7 +1231,8 @@ Result RaceSession::advance_combat(float dt, std::string& error) {
     };
     scene.damage = [&](const SceneCombatDamageEvent& damage) {
         return apply_combat_damage(damage.participant, damage.contact_side, damage.hitpoints, false,
-                                   damage.has_impulse, damage.has_impulse, damage.impulse, error);
+                                   damage.has_impulse, damage.has_impulse, damage.impulse, error,
+                                   damage.projectile_visual);
     };
     const auto scene_pool = [&](SceneCombatTrailKey key, WeaponTrailPool*& output) {
         for (auto& trail : scene_trails_)
@@ -1171,44 +1279,55 @@ Result RaceSession::advance_combat(float dt, std::string& error) {
         return scene_electron_trails_[step.key.projectile].advance(
             step.delta, step.emitting, step.position, step.velocity, shared);
     };
-    if (chimneys_enabled_)
-        for (auto& chimney : chimneys_)
-            if (chimney.pool.advance(dt, chimney.position, start_.camera().transform.origin,
-                                     shared) != Result::ok)
-                return Result::unavailable;
-    if (scene_combat_.advance_controllers(
-            dt, turret_targets, error,
-            race_world_weapons_unlocked(countdown_, static_cast<float>(race_time_),
-                                        weapon_lock_seconds_)) != Result::ok)
-        return Result::unavailable;
-    if (scene_electron_traps_.advance_world(dt, error) != Result::ok)
-        return Result::unavailable;
     const auto append_audio = [&](auto& owner) {
         const auto events = owner.drain_audio_events();
         for (const auto& event : events)
             if (event.sample != CombatSample::jammer)
                 audio_events_.push_back(event);
     };
-    append_audio(scene_combat_);
-    append_audio(scene_electron_traps_);
+    if (!callbacks_only) {
+        if (chimneys_enabled_)
+            for (auto& chimney : chimneys_)
+                if (chimney.pool.advance(dt, chimney.position, start_.camera().transform.origin,
+                                         shared) != Result::ok)
+                    return Result::unavailable;
+        if (scene_combat_.advance_controllers(
+                dt, turret_targets, error,
+                race_world_weapons_unlocked(countdown_, static_cast<float>(race_time_),
+                                            weapon_lock_seconds_)) != Result::ok)
+            return Result::unavailable;
+        if (scene_electron_traps_.advance_world(dt, error) != Result::ok)
+            return Result::unavailable;
+        append_audio(scene_combat_);
+        append_audio(scene_electron_traps_);
+    }
     // 00480b40 updates the active camera after direct world effects and before
     // 004dc9e1 enters the global callback manager.
-    for (auto& racer : racers_)
-        if (racer.chase_camera.update(racer.vehicle->state(), racer.vehicle->parameters(),
-                                      collision_, dt, racer.camera) != Result::ok)
-            return Result::unavailable;
-    if (start_.update(countdown_, dt, *racers_[player_index()].vehicle, *collision_,
-                      racers_[player_index()].progress.finished) != Result::ok) {
-        error = "Original race start camera update unavailable";
+    if (!replaying() && update_cameras(dt, error) != Result::ok)
         return Result::unavailable;
-    }
     const float callback_dt = countdown_ >= 3.0f ? dt + dt : dt;
     const auto process_callback = [&](RaceCallbackKey key) -> Result {
         using Domain = RaceCallbackKey::Domain;
+        if (key.domain == Domain::replay) {
+            const auto result =
+                replay_tracks_[key.owner].advance(callback_dt, replay_target(key.owner));
+            race_time_ = replay_tracks_[key.owner].time();
+            replay_clock_owner_ = key.owner;
+            return result;
+        }
         // Native callbacks dereference the live vehicles, including velocity
         // changes made by preceding callbacks in this same captured-count pass.
         for (std::size_t owner = 0; owner < racers_.size(); ++owner) {
             const auto& v = *racers_[owner].vehicle;
+            if (replaying()) {
+                const auto footprint = vehicle_pair_footprint(v.parameters(), v.state());
+                targets[owner].position = v.state().position;
+                targets[owner].footprint = footprint;
+                targets[owner].air_time = v.state().air_time;
+                projectile_targets[owner].position = v.state().position;
+                projectile_targets[owner].footprint = footprint;
+                turret_targets[owner].position = v.state().position;
+            }
             targets[owner].velocity = v.state().velocity;
             turret_targets[owner].velocity = v.state().velocity;
             turret_targets[owner].inactive_timer = v.equipment().dying_timer;
@@ -1219,6 +1338,13 @@ Result RaceSession::advance_combat(float dt, std::string& error) {
         if (key.domain == Domain::vehicle) {
             auto& frame = all_frames[key.owner];
             const auto& racer = racers_[key.owner];
+            if (replaying()) {
+                frame = combat_pose(*racer.vehicle, static_cast<std::int32_t>(key.owner + 1));
+                frame.route_node = racer.progress.current_node;
+                frame.on_branch = racer.progress.on_branch;
+                frame.targets = targets;
+                frame.jammer_weapons = jammer_weapons;
+            }
             frame.guided_target.reset();
             if (racer.active_side_target >= 0) {
                 const auto& target = racers_[static_cast<std::size_t>(racer.active_side_target)];
@@ -1335,9 +1461,44 @@ Result RaceSession::advance_combat(float dt, std::string& error) {
             return result;
         },
         error);
-    for (std::size_t owner = 0; owner < racers_.size(); ++owner)
+    for (std::size_t owner = 0; owner < racers_.size(); ++owner) {
+        if (replaying())
+            all_frames[owner] =
+                combat_pose(*racers_[owner].vehicle, static_cast<std::int32_t>(owner + 1));
         racers_[owner].vehicle->combat()->refresh_visuals(all_frames[owner]);
+    }
+    if (dispatched == Result::ok && replaying())
+        return update_cameras(dt, error);
     return dispatched;
+}
+Result RaceSession::update_cameras(float dt, std::string& error) {
+    for (auto& racer : racers_)
+        if (racer.chase_camera.update(racer.vehicle->state(), racer.vehicle->parameters(),
+                                      collision_, dt, racer.camera) != Result::ok)
+            return Result::unavailable;
+    if (look_back() || native_camera_mode_ == 1 || native_camera_mode_ == 3 ||
+        native_camera_mode_ == 4) {
+        const auto& target = *racers_[spectator_target_].vehicle;
+        OriginalCameraView view;
+        view.follow_vehicle_heading = native_camera_mode_ == 3 && !look_back();
+        view.look_back = look_back();
+        view.steering_offset_chase = native_camera_mode_ == 1 && !look_back();
+        view.nitrous_active =
+            (replaying() ? replay_nitrous_flags_[spectator_target_]
+                         : racers_[spectator_target_].vehicle->equipment().nitrous_timer > 0) &&
+            countdown_ == 0;
+    view.badlands = ResourceStore::canonical(options_.track) == "BADLANDS";
+        auto& chase = view.steering_offset_chase ? spectator_steering_chase_ : spectator_chase_;
+        if (chase.update(target.state(), target.parameters(), collision_, dt,
+                         spectator_chase_frame_, view) != Result::ok)
+            return Result::unavailable;
+    }
+    if (start_.update(countdown_, dt, *racers_[player_index()].vehicle, *collision_,
+                      racers_[player_index()].progress.finished) != Result::ok) {
+        error = "Original race start camera update unavailable";
+        return Result::unavailable;
+    }
+    return Result::ok;
 }
 // RE-STUB: 93b4e4c301a5694b55e16977c2e52f4971bd9089659e3d58617c8af2368436c8:function:00484d8f
 Result RaceSession::advance_audio(float dt, std::string& error) {
@@ -1348,8 +1509,8 @@ Result RaceSession::advance_audio(float dt, std::string& error) {
         fire.push_back({i, vehicle.state().position, vehicle.state().velocity,
                         health.maximum_internal_hp > 0 &&
                             health.internal_hp < health.maximum_internal_hp * .5f});
-        nitrous.push_back(
-            {i, vehicle.state().position, vehicle.state().velocity, health.nitrous_timer != 0});
+        nitrous.push_back({i, vehicle.state().position, vehicle.state().velocity,
+                           replaying() ? replay_nitrous_flags_[i] : health.nitrous_timer != 0});
     }
     // 00484d8f/00484e27 precede world/global callbacks and the next camera update.
     const auto listener = start_.camera().transform.origin;
@@ -1390,26 +1551,52 @@ void RaceSession::update_ranking() {
 // RE-STUB: 93b4e4c301a5694b55e16977c2e52f4971bd9089659e3d58617c8af2368436c8:function:00408501
 // RE-STUB: 93b4e4c301a5694b55e16977c2e52f4971bd9089659e3d58617c8af2368436c8:function:0040860d
 Result RaceSession::select_native_camera(int mode) {
-    if (mode != 2 && mode != 4 && mode != 5)
+    if (mode < 0 || mode > 5)
         return Result::unavailable;
     if (racers_.empty() || countdown_ >= 1)
         return Result::unavailable;
     const auto& player = racers_[player_index()];
-    if (!player.progress.finished && player.vehicle->equipment().dying_timer == 0)
+    if (mode == 0 || (!player.progress.finished && player.vehicle->equipment().dying_timer == 0))
         spectator_target_ = player_index();
     else if (mode == native_camera_mode_)
         spectator_target_ = (spectator_target_ + 1) % racers_.size();
     native_camera_mode_ = mode;
     return Result::ok;
 }
+int RaceSession::randomize_attract_camera() {
+    constexpr int modes[]{4, 2, 1, 5};
+    const int mode = modes[original_random(random_state_) % 4];
+    // Demo calls the setters with a null target, bypassing keyboard target cycling.
+    native_camera_mode_ = mode;
+    spectator_target_ = player_index();
+    attract_look_back_ = original_random(random_state_) % 2 == 0;
+    return mode;
+}
 CameraFrame RaceSession::spectator_camera() const {
     if (racers_.empty() || countdown_ >= 1)
         return start_.camera();
+    if (look_back())
+        return spectator_chase_frame_;
     if (native_camera_mode_ == 5) {
         CameraFrame result;
         if (start_.track_camera(racers_[spectator_target_].vehicle->state().position, result) ==
             Result::ok)
             return result;
+    }
+    if (native_camera_mode_ == 1 || native_camera_mode_ == 3 || native_camera_mode_ == 4)
+        return spectator_chase_frame_;
+    if (native_camera_mode_ == 0) {
+        const auto& car = *racers_[player_index()].vehicle;
+        const auto& state = car.state();
+        const auto& settings = racers_[player_index()].chase_camera.settings();
+        auto cockpit_settings = settings;
+        cockpit_settings.hood_point_local_position = settings.body_local_position;
+        cockpit_settings.body_local_angles = {0, car.body_orientation().body_pitch,
+                                              car.body_orientation().body_roll};
+        CameraFrame frame;
+        if (camera_view_frame(CameraView::cockpit, state, car.parameters(), cockpit_settings,
+                              collision_, racers_[player_index()].camera, frame) == Result::ok)
+            return frame;
     }
     return racers_[spectator_target_].camera;
 }
@@ -1418,13 +1605,20 @@ FrontendFrame RaceSession::frontend_frame(std::vector<FrontendRacer>& storage) c
     for (std::size_t i = 0; i < racers_.size(); ++i)
         storage.push_back({racers_[i].vehicle->state().position, i, racers_[i].passive_jammer,
                            racers_[i].vehicle->equipment().dying_timer != 0,
-                           racers_[i].progress.finished, racers_[i].character,
-                           racers_[i].lap_times, racers_[i].progress.completed_laps});
+                           racers_[i].progress.finished, racers_[i].character, racers_[i].lap_times,
+                           racers_[i].progress.completed_laps});
     FrontendFrame frame;
+    frame.replay = replaying();
+    frame.replay_paused = replay_paused_;
+    frame.replay_selection = replay_selection_;
+    frame.replay_camera_mode = native_camera_mode_;
     frame.racers = storage;
     frame.ranking = ranking_;
     frame.player_index = player_index();
     frame.time_table_visible = ending_ != RaceEndReason::none && time_table_remaining_ != 0;
+    frame.spectator_is_player = native_camera_mode_ != 0 && spectator_target_ == player_index();
+    frame.track_name = options_.track;
+    frame.time_records = time_records_;
     const auto& r = racers_[player_index()];
     const auto& v = r.vehicle->state();
     frame.speed = v.cached_speed;

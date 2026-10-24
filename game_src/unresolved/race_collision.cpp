@@ -131,7 +131,9 @@ Response response(std::span<const Intersection> contacts) {
     }
     return result;
 }
-Vec3 contact_velocity(const VehicleState& state, Vec3 point) {
+} // namespace
+// RE: 93b4e4c301a5694b55e16977c2e52f4971bd9089659e3d58617c8af2368436c8:function:0042ba96
+Vec3 vehicle_contact_velocity(const VehicleState& state, Vec3 point) {
     if (state.yaw_rate == 0)
         return state.velocity;
     const Vec3 offset = subtract(point, state.position);
@@ -141,8 +143,12 @@ Vec3 contact_velocity(const VehicleState& state, Vec3 point) {
     const float cosine = static_cast<float>(std::cos(static_cast<double>(angle)));
     const Vec3 rotated{offset.x * cosine + offset.z * sine, offset.y,
                        offset.z * cosine - offset.x * sine};
-    return add(state.velocity, scale(scale(rotated, distance), kDegreesToRadians * state.yaw_rate));
+    // Native imported D3DRMVectorRotate normalizes its result. The caller then
+    // restores the saved radius once; retaining it here would produce radius^2.
+    return add(state.velocity,
+               scale(scale(normalized(rotated), distance), kDegreesToRadians * state.yaw_rate));
 }
+namespace {
 void impulses(const VehicleParameters& ap, VehicleState& a, const VehicleParameters& bp,
               VehicleState& b, Vec3 force_on_a, Vec3 point) {
     apply_vehicle_impulse(a.velocity, force_on_a, .65f, ap.inverse_mass, false);
@@ -272,8 +278,8 @@ VehiclePairContact solve_vehicle_collision(const VehicleParameters& ap, VehicleS
             record.b = {corners_b[record.b_index], corners_b[(record.b_index + 1) % 4]};
         }
         const auto selected = response(last_contacts);
-        const Vec3 av = contact_velocity(a, last_contacts.front().point);
-        const Vec3 bv = contact_velocity(b, last_contacts.front().point);
+        const Vec3 av = vehicle_contact_velocity(a, last_contacts.front().point);
+        const Vec3 bv = vehicle_contact_velocity(b, last_contacts.front().point);
         const Vec3 am =
             scale({av.x * selected.normal.x, av.y * selected.normal.y, av.z * selected.normal.z},
                   ap.mass_kg);

@@ -10,7 +10,8 @@ class SfxAudioAdapter {
     void set_tire_sample(const WavePcm& sample);
     void submit_tire(const EngineAudioCommand& command);
     void play_one_shot(const WavePcm& sample, const EngineAudioCommand& command,
-                       std::string_view name, std::uint32_t extra_repeats = 0);
+                       std::string_view name, std::uint32_t extra_repeats = 0,
+                       bool spatial = false);
     void reap_finished();
     void reset();
     void set_paused(bool paused);

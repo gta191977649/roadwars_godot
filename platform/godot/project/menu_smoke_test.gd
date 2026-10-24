@@ -28,8 +28,12 @@ func run_test() -> void:
     if not require(host.get_frontend_screen() == "publisher_1", "Default launch did not enter publisher intro"):
         return
     var initial_rids = host.get_live_rids()
-    if not require(host.frontend_test_step(31.0, ""), "Startup loop failed"):
-        return
+    for page in range(6):
+        if host.get_frontend_screen() == "main_menu":
+            break
+        if not require(host.frontend_test_step(0, "") and host.frontend_test_step(0.31, "accept"),
+                       "Startup input failed"):
+            return
     if not require(host.get_frontend_screen() == "main_menu", "Startup did not reach main menu"):
         return
     await capture("default_main_menu")

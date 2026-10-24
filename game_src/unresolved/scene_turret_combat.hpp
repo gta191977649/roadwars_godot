@@ -15,6 +15,7 @@ struct SceneCombatDamageEvent {
     Vec3 point{};
     bool has_impulse{};
     WeaponProjectileImpulse impulse;
+    bool projectile_visual{};
 };
 struct SceneCombatImpact {
     SceneCombatTrailKey key;

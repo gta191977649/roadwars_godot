@@ -353,9 +353,11 @@ void OriginalChaseCamera::reset() {
     follow_heading_ = follow_pitch_ = 0;
     distance_ = 6.5f;
     distance_offset_ = height_ = obstruction_distance_ = 0;
+    steering_heading_offset_ = 0;
 }
 
 // RE-STUB: 93b4e4c301a5694b55e16977c2e52f4971bd9089659e3d58617c8af2368436c8:function:004094fb
+// RE-STUB: 93b4e4c301a5694b55e16977c2e52f4971bd9089659e3d58617c8af2368436c8:function:0040a378
 // Active default chase path. Original intro/countdown/camera-acquisition dispatch is not fabricated.
 void OriginalChaseCamera::compute_pose(const VehicleState& vehicle, const VehicleParameters&,
                                        float dt, const OriginalCameraView& view) {
@@ -373,14 +375,15 @@ void OriginalChaseCamera::compute_pose(const VehicleState& vehicle, const Vehicl
     if (desired_distance <= 0)
         desired_distance = .1f;
     distance_ = approach(distance_, desired_distance, 2 * dt, 4 * dt);
-    float target_offset = vehicle.engine_throttle > 0 ? 1.0f
+    float target_offset = vehicle.engine_throttle > 0 ? (view.steering_offset_chase ? 3.5f : 1.0f)
                           : vehicle.brake_amount > 0  ? -1.0f
                                                       : 0.0f;
     if (obstruction_distance_ != 0)
         target_offset = 0;
     distance_offset_ = approach(distance_offset_, target_offset, dt, dt);
-    Vec3 direction =
-        (view.follow_vehicle_heading || vehicle.cached_speed < 2) ? forward : vehicle.velocity;
+    const bool forward_follow = !view.steering_offset_chase &&
+                                (view.follow_vehicle_heading || vehicle.cached_speed < 2);
+    Vec3 direction = forward_follow ? forward : vehicle.velocity;
     float desired_pitch{};
     if (std::abs(direction.y) >= 0.05000000074505806) {
         direction = normalized(direction);
@@ -391,10 +394,23 @@ void OriginalChaseCamera::compute_pose(const VehicleState& vehicle, const Vehicl
         direction = normalized(direction);
     if (direction.y < 0)
         desired_pitch = -desired_pitch;
-    const Vec3 desired_heading_vector =
-        (view.follow_vehicle_heading || vehicle.cached_speed < 2) ? forward : vehicle.velocity;
-    const float desired_heading =
+    const Vec3 desired_heading_vector = forward_follow ? forward : vehicle.velocity;
+    float desired_heading =
         direction_heading(desired_heading_vector) + (view.look_back ? 180.0f : 0.0f);
+    if (view.steering_offset_chase) {
+        // 0040a378 retains a five-degree steering bias when the wheels center.
+        if (vehicle.steering_degrees > 5)
+            steering_heading_offset_ = std::min(7.5f, steering_heading_offset_ + 10 * dt);
+        else if (vehicle.steering_degrees < -5)
+            steering_heading_offset_ = std::max(-7.5f, steering_heading_offset_ - 10 * dt);
+        else if (steering_heading_offset_ > 5)
+            steering_heading_offset_ = std::max(5.f, steering_heading_offset_ - dt);
+        else if (steering_heading_offset_ < -5)
+            steering_heading_offset_ = std::min(-5.f, steering_heading_offset_ + dt);
+        desired_heading = vehicle.cached_speed > 1
+                              ? desired_heading + steering_heading_offset_
+                              : initialized_ ? follow_heading_ : vehicle.heading_degrees;
+    }
     if (!initialized_ || look_back_ != view.look_back) {
         follow_heading_ = desired_heading;
         follow_pitch_ = desired_pitch;
@@ -402,9 +418,11 @@ void OriginalChaseCamera::compute_pose(const VehicleState& vehicle, const Vehicl
         look_back_ = view.look_back;
     } else
         follow_heading_ = interpolate_original_camera_angle(
-            follow_heading_, desired_heading, dt * (view.follow_vehicle_heading ? 7.0f : 2.5f));
+            follow_heading_, desired_heading,
+            dt * (view.steering_offset_chase ? 4.5f : view.follow_vehicle_heading ? 7.0f : 2.5f));
     follow_pitch_ =
-        interpolate_original_camera_angle(follow_pitch_, desired_pitch + pitch_offset, dt * 2);
+        interpolate_original_camera_angle(follow_pitch_, desired_pitch + pitch_offset,
+                                           dt * (view.steering_offset_chase ? 2.5f : 2.f));
     direction = original_vehicle_transform({}, follow_heading_, follow_pitch_, 0).basis[2];
     if (view.look_back)
         direction.y = -direction.y;
