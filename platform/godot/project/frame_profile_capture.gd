@@ -21,8 +21,10 @@ func run_capture() -> void:
     host.set_process(false)
     var data = host.get_frame_profile_trace()
     var timing = host.get_frame_timing_state()
+    var race_state = host.get_competition_state()
     var file = FileAccess.open("res://../../../build/frame_profile_" + label + ".json", FileAccess.WRITE)
-    file.store_string(JSON.stringify({"frames": data, "timing": timing}, "  "))
+    file.store_string(JSON.stringify({"frames": data, "timing": timing, "race": race_state,
+                                     "capture_start_us": start}, "  "))
     file.close()
     timing.erase("samples_ms")
     print("FRAME_PROFILE_CAPTURE ", label, " frames=", data.size(), " ", JSON.stringify(timing))

@@ -130,6 +130,7 @@ class ServerRenderer final : public Renderer {
         godot::RID particles, instance, mesh, process_shader, process_material, draw_shader,
             draw_material;
         std::uint32_t capacity{};
+        bool has_active_particles{true}; // Force the initial empty uniform upload.
     };
     std::unordered_map<std::uint64_t, ParticleResources> particle_systems_;
     std::unordered_map<std::uint32_t, godot::RID> particle_process_shaders_;

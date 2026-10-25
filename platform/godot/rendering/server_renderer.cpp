@@ -613,6 +613,30 @@ bool ServerRenderer::test_interpolation_history() {
         if (native)
             valid &= first_positions.size() == 15 && second_positions.size() == 15 &&
                      first_positions[0].x == 1 && second_positions[0].x == 2;
+        std::array<ParticleDrawState, 15> retired{};
+        valid &= fixture.update_particles(second, retired) == Result::ok;
+        valid &= !b.has_active_particles;
+        if (native) {
+            const godot::PackedVector4Array cleared =
+                server->material_get_param(b.process_material, "slot_color");
+            valid &= cleared.size() == 15 && cleared[0].w == 0;
+        }
+        // Inactive positions are irrelevant. A second empty submission must not
+        // replace the already-cleared uniforms, while reactivation must do so.
+        retired[0].position.x = 999;
+        valid &= fixture.update_particles(second, retired) == Result::ok;
+        if (native) {
+            const godot::PackedVector4Array unchanged =
+                server->material_get_param(b.process_material, "slot_position");
+            valid &= unchanged.size() == 15 && unchanged[0].x == 0;
+        }
+        valid &= fixture.update_particles(second, blue) == Result::ok;
+        valid &= b.has_active_particles;
+        if (native) {
+            const godot::PackedVector4Array reactivated =
+                server->material_get_param(b.process_material, "slot_position");
+            valid &= reactivated.size() == 15 && reactivated[0].x == 2;
+        }
         fixture.destroy_particles(first);
         valid &= fixture.update_particles(second, blue) == Result::ok;
         fixture.destroy_particles(second);
@@ -1270,6 +1294,13 @@ Result ServerRenderer::update_particles(ParticleSystemHandle handle,
     if (found == particle_systems_.end() || particles.size() != found->second.capacity)
         return Result::invalid_argument;
     auto& system = found->second;
+    const bool active = std::any_of(particles.begin(), particles.end(),
+                                    [](const auto& particle) { return particle.active; });
+    // Retired pools stay allocated for reuse. Clear them once, then avoid packing
+    // and uploading five uniform arrays on every subsequent simulation tick.
+    if (!active && !system.has_active_particles)
+        return Result::ok;
+    system.has_active_particles = active;
     godot::PackedVector4Array positions, colors, data, triangles_ab, triangles_c;
     godot::AABB bounds;
     bool has_bounds = false;

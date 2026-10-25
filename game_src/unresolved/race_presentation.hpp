@@ -161,6 +161,7 @@ class RacePresentation {
     struct CombatParticleVisual {
         ParticleSystemHandle handle;
         std::size_t capacity{};
+        bool submitted{};
     };
     std::map<std::array<std::size_t, 5>, CombatParticleVisual> combat_particle_ids_;
     std::string combat_render_status_;

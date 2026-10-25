@@ -672,17 +672,46 @@ Result RacePresentation::prepare_combat(ResourceStore& resources, const RaceSess
             error = "Scene particle preparation failed";
             return Result::unavailable;
         }
+    // Scene projectile slots exist before launch, including invisible rockets and
+    // muzzle flashes. Prepare their exact submission keys without firing a turret.
+    const auto& scene = session.scene_combat();
+    for (const auto& visual : scene.projectiles()) {
+        if (visual.asset >= scene.assets().size())
+            return Result::invalid_argument;
+        const auto& asset = scene.assets()[visual.asset];
+        const auto* descriptor = find_weapon_descriptor(asset.name);
+        if (!descriptor ||
+            (visual.muzzle_flash && visual.projectile >= asset.muzzle_meshes.size()))
+            return Result::invalid_argument;
+        const std::array<std::size_t, 4> key{
+            0, visual.turret, visual.projectile,
+            visual.muzzle_flash ? 1u : visual.missile_flare ? 2u : 0u};
+        if (combat_visual_ids_.contains(key))
+            continue;
+        const auto& mesh = visual.muzzle_flash    ? asset.muzzle_meshes[visual.projectile]
+                           : visual.missile_flare ? asset.flare_mesh
+                                                  : asset.ammunition;
+        const auto base = "Cars/Shared/Weapons/" +
+                          std::string(weapon_slot_name(descriptor->slot)) + "/" + asset.name;
+        std::size_t id{};
+        const auto result = add_combat_visual(resources, mesh, base, id, error);
+        if (result != Result::ok)
+            return result;
+        combat_visual_ids_.emplace(key, id);
+    }
     return Result::ok;
 }
 // RE-STUB: 93b4e4c301a5694b55e16977c2e52f4971bd9089659e3d58617c8af2368436c8:function:004f878f
 Result RacePresentation::update_combat(ResourceStore& resources, const RaceSession& session,
                                        std::string& error) {
     std::size_t undefined_uv_slots{};
-    for (const auto& [key, visual] : combat_particle_ids_) {
-        const std::vector<ParticleDrawState> hidden(visual.capacity);
-        if (renderer_.update_particles(visual.handle, hidden) != Result::ok)
-            return Result::unavailable;
-    }
+    for (auto& [key, visual] : combat_particle_ids_)
+        visual.submitted = false;
+    const auto submit_states = [&](CombatParticleVisual& visual,
+                                   std::span<const ParticleDrawState> states) {
+        visual.submitted = true;
+        return renderer_.update_particles(visual.handle, states);
+    };
     const auto submit_particles = [&](std::array<std::size_t, 5> key,
                                       std::span<const ParticleRenderState> particles,
                                       std::string_view texture, bool alpha_mix, bool lower_atlas,
@@ -723,7 +752,7 @@ Result RacePresentation::update_combat(ResourceStore& resources, const RaceSessi
             }
             states.resize(particles.size());
         }
-        return renderer_.update_particles(found->second.handle, states);
+        return submit_states(found->second, states);
     };
     for (std::size_t i = 0; i < session.chimneys().size(); ++i) {
         const auto& pool = session.chimneys()[i].pool;
@@ -745,7 +774,7 @@ Result RacePresentation::update_combat(ResourceStore& resources, const RaceSessi
             state.triangle = pool.triangles()[n];
             state.custom_triangle = true;
         }
-        if (renderer_.update_particles(found->second.handle, states) != Result::ok)
+        if (submit_states(found->second, states) != Result::ok)
             return Result::unavailable;
     }
     for (std::size_t i = 0; i < session.impact_pools().size(); ++i) {
@@ -816,7 +845,7 @@ Result RacePresentation::update_combat(ResourceStore& resources, const RaceSessi
                     combat_particle_ids_.emplace(key, CombatParticleVisual{handle, states.size()})
                         .first;
             }
-            if (renderer_.update_particles(found->second.handle, states) != Result::ok)
+            if (submit_states(found->second, states) != Result::ok)
                 return Result::unavailable;
         }
     }
@@ -862,7 +891,7 @@ Result RacePresentation::update_combat(ResourceStore& resources, const RaceSessi
             states.push_back(state);
         }
         states.resize(pool.particles().size());
-        return renderer_.update_particles(found->second.handle, states);
+        return submit_states(found->second, states);
     };
     for (const auto& trail : session.scene_trails())
         if (submit_pool({0, trail.key.turret, trail.key.projectile,
@@ -1037,7 +1066,7 @@ Result RacePresentation::update_combat(ResourceStore& resources, const RaceSessi
                 const auto& particle = flames->particles[n];
                 states[n] = {particle.position, 1, particle.color_argb, particle.atlas_frame, true};
             }
-            if (renderer_.update_particles(found->second.handle, states) != Result::ok)
+            if (submit_states(found->second, states) != Result::ok)
                 return Result::unavailable;
         }
         for (const auto& visual : combat->visuals()) {
@@ -1089,6 +1118,14 @@ Result RacePresentation::update_combat(ResourceStore& resources, const RaceSessi
             }
         }
     }
+    // Removed pools (including replay transitions) must still clear their last
+    // submitted state. Pools present this tick already received their final data.
+    for (const auto& [key, visual] : combat_particle_ids_)
+        if (!visual.submitted) {
+            const std::vector<ParticleDrawState> hidden(visual.capacity);
+            if (renderer_.update_particles(visual.handle, hidden) != Result::ok)
+                return Result::unavailable;
+        }
     return Result::ok;
 }
 void RacePresentation::release_damage_visual(DamageVisual& visual) {
